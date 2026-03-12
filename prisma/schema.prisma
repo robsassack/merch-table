@@ -1,0 +1,206 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum ReleaseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FULFILLED
+  REFUNDED
+  CANCELED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  email         String         @unique
+  name          String?
+  memberships   Membership[]
+  organizations Organization[] @relation("OrganizationOwner")
+  artists       Artist[]       @relation("ArtistOwner")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model Organization {
+  id          String       @id @default(cuid())
+  name        String
+  slug        String       @unique
+  ownerId     String
+  owner       User         @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships Membership[]
+  artists     Artist[]
+  customers   Customer[]
+  orders      Order[]
+  releases    Release[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model Membership {
+  id             String         @id @default(cuid())
+  userId         String
+  organizationId String
+  role           MembershipRole @default(MEMBER)
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([userId, organizationId])
+  @@index([organizationId, role])
+}
+
+model Artist {
+  id             String       @id @default(cuid())
+  organizationId String
+  ownerId        String?
+  name           String
+  slug           String
+  bio            String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner          User?        @relation("ArtistOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  releases       Release[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, name])
+}
+
+model Release {
+  id             String                @id @default(cuid())
+  organizationId String
+  artistId       String
+  title          String
+  slug           String
+  description    String?
+  coverImageUrl  String?
+  priceCents     Int                   @default(0)
+  currency       String                @default("USD")
+  status         ReleaseStatus         @default(DRAFT)
+  publishedAt    DateTime?
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist         Artist                @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  files          ReleaseFile[]
+  orderItems     OrderItem[]
+  entitlements   DownloadEntitlement[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([organizationId, slug])
+  @@index([artistId, status])
+}
+
+model ReleaseFile {
+  id           String                @id @default(cuid())
+  releaseId    String
+  fileName     String
+  storageKey   String
+  mimeType     String
+  sizeBytes    Int
+  sortOrder    Int                   @default(0)
+  release      Release               @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  entitlements DownloadEntitlement[]
+  createdAt    DateTime              @default(now())
+  updatedAt    DateTime              @updatedAt
+
+  @@unique([releaseId, storageKey])
+  @@index([releaseId, sortOrder])
+}
+
+model Customer {
+  id             String                @id @default(cuid())
+  organizationId String
+  email          String
+  name           String?
+  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orders         Order[]
+  entitlements   DownloadEntitlement[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@unique([organizationId, email])
+  @@index([organizationId, name])
+}
+
+model Order {
+  id             String       @id @default(cuid())
+  organizationId String
+  customerId     String
+  orderNumber    String
+  status         OrderStatus  @default(PENDING)
+  currency       String       @default("USD")
+  subtotalCents  Int          @default(0)
+  taxCents       Int          @default(0)
+  totalCents     Int          @default(0)
+  paidAt         DateTime?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items          OrderItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, orderNumber])
+  @@index([customerId, createdAt])
+}
+
+model OrderItem {
+  id              String                @id @default(cuid())
+  orderId         String
+  releaseId       String
+  lineNumber      Int
+  quantity        Int                   @default(1)
+  unitPriceCents  Int
+  totalPriceCents Int
+  order           Order                 @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  release         Release               @relation(fields: [releaseId], references: [id], onDelete: Restrict)
+  entitlements    DownloadEntitlement[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+
+  @@unique([orderId, lineNumber])
+  @@index([releaseId])
+}
+
+model DownloadEntitlement {
+  id            String      @id @default(cuid())
+  customerId    String
+  releaseId     String
+  releaseFileId String
+  orderItemId   String
+  token         String      @unique
+  expiresAt     DateTime?
+  redeemedAt    DateTime?
+  customer      Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  release       Release     @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  releaseFile   ReleaseFile @relation(fields: [releaseFileId], references: [id], onDelete: Cascade)
+  orderItem     OrderItem   @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([orderItemId, releaseFileId])
+  @@index([customerId, releaseId])
+}
