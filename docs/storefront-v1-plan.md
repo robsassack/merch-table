@@ -1,11 +1,13 @@
-## Merch Table v1 Plan
+# Merch Table v1 Plan
 
-### Summary
+## Summary
+
 - Current stack snapshot: Next.js App Router + TypeScript + Tailwind 4 + Prisma/Postgres are set up; database schema already covers organizations, artists, releases, orders, and download entitlements; app/business logic is still scaffold-level.
 - Product direction locked: digital-only storefront, single-org per deployment, guest checkout with magic-link library, Stripe Checkout + Stripe Tax basic, S3-compatible storage with Docker Compose defaulting to bundled MinIO, release+track model, and host-configurable preview mode (timed clip or full preview).
 - Security first step: rotate existing local secrets and replace with documented `.env.example` values before publishing/open-sourcing.
 
-### Key Implementation Changes
+## Key Implementation Changes
+
 - App architecture:
   - Keep a single Next.js app with App Router.
   - Use server actions for admin mutations and route handlers for webhooks/download endpoints.
@@ -39,7 +41,8 @@
   - Storage adapter supports MinIO and external S3-compatible providers through env config.
   - Add health/readiness endpoints and basic structured logs.
 
-### Public APIs / Interfaces / Types
+## Public APIs / Interfaces / Types
+
 - HTTP endpoints:
   - `POST /api/checkout/session` (create Stripe Checkout session).
   - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
@@ -54,7 +57,8 @@
   - Required: DB URL, auth secret, SMTP settings, Stripe keys/webhook secret, storage credentials, MinIO toggle.
   - Optional: Redis URL override, CDN base URL, transcoding concurrency.
 
-### Test Plan
+## Test Plan
+
 - Unit tests:
   - Pricing validation for free/fixed/PWYW paths.
   - Preview policy resolution (clip/full, release defaults vs track overrides).
@@ -74,7 +78,8 @@
   - External S3 configuration path validated.
   - Worker processes a transcoding job and outputs variants.
 
-### Assumptions and Defaults
+## Assumptions and Defaults
+
 - Single-org per deployment is enforced at runtime even though schema remains multi-org capable.
 - License choice is intentionally deferred.
 - Stripe Tax “basic use” means tax is computed in Stripe Checkout; no custom in-app tax engine.
