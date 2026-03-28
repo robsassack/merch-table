@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "db:validate": "prisma validate",
     "db:status": "prisma migrate status",
     "db:migrate": "prisma migrate dev",

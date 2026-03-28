@@ -61,6 +61,22 @@ To start all services (including `web` and `worker` stubs):
 npm run infra:up:all
 ```
 
+## Infra Scripts
+
+```bash
+npm run infra:up        # core services (postgres, redis, minio)
+npm run infra:up:core   # same as infra:up
+npm run infra:up:web    # web + worker stubs
+npm run infra:up:all    # all services
+npm run infra:ps        # docker compose ps
+npm run infra:down      # stop and remove stack
+```
+
+## Docker Networking Note
+
+- Use `localhost` in `.env` when running the Next.js app directly on your host machine.
+- Use Docker service names when one container talks to another (for example `postgres`, `redis`, `minio` instead of `localhost`).
+
 ### Option B: Local Postgres
 
 1. Create database:
@@ -98,6 +114,14 @@ npx prisma migrate status
 ```
 
 If this command succeeds and shows your migration state, your database connection is working.
+
+## Troubleshooting
+
+If you see a container name conflict (for example `merchtable-postgres is already in use`), remove old standalone containers from earlier `docker run` commands:
+
+```bash
+docker rm -f merchtable-postgres merchtable-redis merchtable-minio
+```
 
 ## Run the App
 
