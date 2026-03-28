@@ -40,17 +40,17 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Setup wizard (`/setup`)
 
-- [ ] Middleware: check `StoreSettings.setupComplete`; if false, redirect all routes to `/setup`
-- [ ] Step 1 — Store basics: org name, store name, contact email, currency (ISO code, default USD)
-- [ ] Step 2 — SMTP config: host, port, credentials + "send test email" action; block progression on failure
-- [ ] Step 3 — Storage: choose bundled MinIO (default) or external S3; validate credentials if external
-- [ ] Step 4 — Stripe: API key + webhook secret; display exact webhook URL; "verify connection" check
-- [ ] Step 5 — Admin account: enter admin email; send first magic-link using SMTP from Step 2
-- [ ] Step 6 — Confirmation: set `setupComplete = true`, `storeStatus = PRIVATE`, redirect to admin
+- [x] Middleware: check `StoreSettings.setupComplete`; if false, redirect all routes to `/setup`
+- [x] Step 1 — Store basics: org name, store name, contact email, currency (ISO code, default USD)
+- [x] Step 2 — SMTP config: host, port, credentials + "send test email" action; block progression on failure
+- [x] Step 3 — Storage: choose bundled MinIO (default) or external S3; validate credentials if external
+- [x] Step 4 — Stripe: API key + webhook secret; display exact webhook URL; "verify connection" check
+- [x] Step 5 — Admin account: enter admin email; send first magic-link using SMTP from Step 2
+- [x] Step 6 — Confirmation: set `setupComplete = true`, `storeStatus = PRIVATE`, redirect to admin
 
 ### Setup wizard test email template
 
-- [ ] Minimal HTML template confirming SMTP works
+- [x] Minimal HTML template confirming SMTP works
 
 ### Admin auth
 

@@ -378,6 +378,55 @@ model DownloadEntitlement {
   @@index([customerId, releaseId])
 }
 
+model SetupWizardState {
+  id                String    @id @default(cuid())
+  singletonKey      Int       @default(1) @unique
+  orgName           String?
+  storeName         String?
+  contactEmail      String?
+  currency          String    @default("USD")
+  smtpHost          String?
+  smtpProviderPreset String    @default("custom")
+  smtpPort          Int?
+  smtpUsername      String?
+  smtpPassword      String?
+  smtpSecure        Boolean   @default(false)
+  smtpFromEmail     String?
+  smtpTestRecipient String?
+  smtpTestPassedAt  DateTime?
+  smtpLastTestError String?
+  storageMode       String    @default("MINIO")
+  storageEndpoint   String?
+  storageRegion     String?
+  storageBucket     String?
+  storageAccessKeyId String?
+  storageSecretAccessKey String?
+  storageUsePathStyle Boolean @default(false)
+  storageValidatedAt DateTime?
+  storageLastError   String?
+  stripeSecretKey    String?
+  stripeWebhookSecret String?
+  stripeVerifiedAt   DateTime?
+  stripeLastError    String?
+  adminEmail         String?
+  adminMagicLinkSentAt DateTime?
+  adminMagicLinkLastError String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model AdminMagicLinkToken {
+  id        String   @id @default(cuid())
+  email     String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email, usedAt, expiresAt])
+}
+
 model SetupToken {
   id        String   @id @default(cuid())
   token     String?  @unique

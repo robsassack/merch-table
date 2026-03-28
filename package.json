@@ -18,22 +18,28 @@
     "infra:up:all": "docker compose up -d",
     "infra:up:web": "docker compose up -d web worker",
     "infra:down": "docker compose down",
-    "infra:ps": "docker compose ps"
+    "infra:ps": "docker compose ps",
+    "stripe:listen": "stripe listen --forward-to localhost:3000/api/webhooks/stripe",
+    "stripe:trigger:checkout-complete": "stripe trigger checkout.session.completed"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1019.0",
     "@prisma/adapter-pg": "^7.6.0",
     "@prisma/client": "^7.6.0",
     "next": "^16.2.1",
     "next-auth": "^4.24.13",
+    "nodemailer": "^7.0.13",
     "pg": "^8.20.0",
     "prisma": "^7.6.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "stripe": "^21.0.1",
     "zod": "^4.3.6"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^7.0.11",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

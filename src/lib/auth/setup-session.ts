@@ -4,7 +4,11 @@ const SETUP_SESSION_COOKIE_NAME = "setup_wizard_access";
 const SETUP_SESSION_TTL_HOURS = 2;
 
 function getSessionSecret() {
-  return process.env.AUTH_SECRET ?? "dev-setup-session-secret";
+  const secret = process.env.AUTH_SECRET?.trim();
+  if (!secret) {
+    throw new Error("AUTH_SECRET environment variable is required.");
+  }
+  return secret;
 }
 
 function signValue(value: string) {

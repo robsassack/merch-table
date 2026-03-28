@@ -13,9 +13,13 @@ export function ClaimToken({ token }: ClaimTokenProps) {
 
   useEffect(() => {
     const claim = async () => {
-      const response = await fetch(
-        `/api/setup/claim?token=${encodeURIComponent(token)}`,
-      );
+      const response = await fetch("/api/setup/claim", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
 
       if (!response.ok) {
         setError("That setup token is invalid, expired, or already used.");
