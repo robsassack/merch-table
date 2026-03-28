@@ -1,0 +1,255 @@
+# Merch Table v1 Plan
+
+## Summary
+
+- Current stack snapshot: Next.js App Router + TypeScript + Tailwind 4 + Prisma/Postgres are set up; database schema already covers organizations, artists, releases, orders, and download entitlements; app/business logic is still scaffold-level.
+- Product direction locked: digital-only storefront, single-org per deployment, single-release-per-checkout (no cart), guest checkout with magic-link library, Stripe Checkout + Stripe Tax basic, S3-compatible storage with Docker Compose defaulting to bundled MinIO, release+track model, host-configurable preview mode (timed clip or full preview), Howler.js audio player, WCAG 2.1 AA accessibility baseline, and Redis-backed rate limiting.
+- Security first step: rotate existing local secrets and replace with documented `.env.example` values before publishing/open-sourcing.
+
+## Key Implementation Changes
+
+- App architecture:
+  - Keep a single Next.js app with App Router.
+  - Use server actions for admin mutations and route handlers for webhooks/download endpoints.
+  - Enforce single-org runtime (use one canonical org slug from config); keep existing multi-org schema compatibility for future expansion.
+- Data model evolution (Prisma):
+  - Add `StoreSettings` (branding, homepage copy, preview defaults, transcoding enabled, contact/social links, `storeStatus`, `currency`).
+  - Add `ReleaseTrack` (releaseId, title, trackNumber, durationMs, lyrics/credits optional).
+  - Add `TrackAsset` (trackId, storageKey, format, mimeType, fileSizeBytes, bitrate/sampleRate/channels, isLossless, assetRole).
+  - Add pricing fields on `Release`: `pricingMode` (`FREE|FIXED|PWYW`), `fixedPriceCents`, `minimumPriceCents`. A system-level minimum price floor (e.g., $0.50, configurable via env var) is enforced to ensure transactions cover Stripe's processing fee. This floor applies to `fixedPriceCents` on fixed-price releases and `minimumPriceCents` on PWYW releases. PWYW artist-set minimum is enforced both client-side and server-side on `POST /api/checkout/session`.
+  - Add preview fields on `ReleaseTrack`: `previewMode` (`CLIP|FULL`), `previewSeconds` (nullable when full).
+  - Add `TranscodeJob` and `TranscodeOutput` for optional server-side variants when lossless masters exist.
+  - Extend `Order` with Stripe linkage (`checkoutSessionId` with unique constraint, `paymentIntentId`, `taxCentsFromStripe`) and email delivery tracking (`emailStatus`, `emailSentAt`).
+  - Add `BuyerLibraryToken` for reusable emailed access links, with fields: `expiresAt` (nullable), `revokedAt` (nullable), `lastUsedAt`, `accessCount`.
+  - Add `deletedAt` (nullable timestamp) to `Artist` and `Release` for soft deletion. Soft-deleted records are excluded from storefront queries but preserved for order history integrity. Associated `TrackAsset` files are retained in storage; admin can permanently delete assets separately via a "purge" action that requires explicit confirmation.
+- Purchase flow (single-release, no cart):
+  - Each purchase is a single-release transaction. There is no cart, no multi-release checkout, and no persistent cart state.
+  - Buyer clicks purchase on a release page → Stripe Checkout (paid) or email capture (free) → redirect to post-purchase confirmation → buyer library.
+  - Already-purchased detection: after a successful purchase, set a client-side cookie/localStorage flag mapping owned release IDs. This is a UX hint only; actual download access is gated by `BuyerLibraryToken`.
+  - If a buyer visits a release they already own, show "You own this — go to your library" with a secondary "Buy again" option. Re-purchase is allowed (supports tipping via PWYW or recovering a lost library link).
+  - `Order` remains one-to-one with `Release`. No line items table or abandoned cart tracking.
+- Storefront experience:
+  - Public pages: home/catalog, release detail, post-purchase confirmation, buyer library (token-auth).
+  - Release page supports tracklist, per-track preview playback (clip/full), and pricing UI for free/fixed/PWYW.
+  - Before purchase, show quality disclosure if only lossy files are available.
+  - Store in `PRIVATE` state shows a maintenance/coming-soon page to unauthenticated visitors.
+  - Free releases bypass Stripe entirely; buyer provides an email address to receive a library magic-link. Email is required to prevent anonymous bulk downloads.
+  - Preview clips are generated server-side at upload time and stored as a separate `TrackAsset` with `assetRole: PREVIEW`. No on-the-fly streaming or byte-range slicing of masters.
+  - Audio playback uses Howler.js. Single persistent player instance across the release page — clicking a different track stops the current one and starts the new one. Player UI shows track title, play/pause, and progress bar. No gapless playback in v1. On mobile, playback respects browser autoplay restrictions (user gesture required to start).
+  - Accessibility:
+    - Storefront targets WCAG 2.1 AA compliance as a baseline.
+    - Semantic HTML throughout: proper heading hierarchy, landmark regions (`nav`, `main`, `footer`), and form labels on all inputs.
+    - Full keyboard navigation: all interactive elements (purchase buttons, track play/pause, pricing inputs, library downloads) are reachable and operable via keyboard. Visible focus indicators on all focusable elements.
+    - Audio player: play/pause and track selection are keyboard-accessible with ARIA labels (e.g., `aria-label="Play track 3, Song Title"`). Player state changes (playing, paused, track switched) announced via `aria-live` region.
+    - Color contrast meets AA ratio (4.5:1 for normal text, 3:1 for large text) across all storefront and admin pages.
+    - PWYW and email capture forms use associated `<label>` elements and surface validation errors with `aria-describedby`.
+    - Skip-to-content link on all pages.
+    - Admin dashboard follows the same standards; accessibility is not storefront-only.
+- Admin experience:
+  - Email magic-link admin auth with a bootstrap token fallback for fresh deployments (see First-Run Experience).
+  - Admin sections: branding/settings, artist/release CRUD, track management, asset uploads, preview mode controls, pricing setup, orders/customers.
+  - Pricing setup UI shows an inline notice when setting a fixed price or PWYW minimum, displaying the approximate Stripe fee and net payout at that price point (e.g., "At $5.00, Stripe fees are ~$0.45 — you receive ~$4.55"). Updates dynamically as the admin adjusts the price. Also warns if the entered price is below the system minimum floor.
+  - Upload workflow prompts for lossless masters first; if missing, mark release as lossy-only and require confirmation.
+  - Optional "generate download formats" action when lossless masters exist (queues transcoding).
+  - Preview clip generation is queued automatically on asset upload when `previewMode` is `CLIP`; no manual trigger required.
+  - Orders panel surfaces retry action for undelivered purchase confirmation emails.
+  - Admin can revoke individual `BuyerLibraryToken`s from the orders/customers panel.
+  - Admin can toggle store between `PRIVATE` and `PUBLIC` from the dashboard.
+  - Deleting an artist or release is a soft delete (`deletedAt` timestamp). Soft-deleted items disappear from the storefront but remain visible in admin with a "deleted" badge. Existing buyers retain download access to their purchased assets. Admin can restore a soft-deleted record or permanently purge its assets from storage (requires confirmation).
+- Payments/download fulfillment:
+  - Stripe Checkout session creation per order draft for paid releases (`FIXED` and `PWYW`).
+  - Stripe webhook (`checkout.session.completed`) finalizes order and creates entitlements.
+  - Webhook idempotency: the handler runs inside a database transaction that first checks for an existing `Order` with the incoming `checkoutSessionId`. If one exists, processing is skipped and the endpoint returns 200. This prevents duplicate orders, entitlements, and emails when Stripe retries delivery. A unique constraint on `Order.checkoutSessionId` provides a database-level safety net if the check-then-insert races under concurrent deliveries.
+  - Stripe Tax basic enabled during Checkout session creation.
+  - Free releases (`PricingMode: FREE`) bypass Stripe entirely. Buyer submits an email address; server creates an Order and issues a `BuyerLibraryToken` directly. Email is required — no anonymous free downloads.
+  - Entitlements are unlimited; buyer receives email magic-link to library with re-download access.
+  - Download endpoint (`GET /api/download/:entitlementToken/:assetId`) validates that the token is not revoked and not expired, then generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused; the buyer always hits this endpoint first. The signed URL includes a `Content-Disposition: attachment` header with a human-readable filename derived from artist, release, and track title (e.g., `Artist - Track Title.flac`), so browsers save the file with a meaningful name rather than a storage key or UUID.
+- File upload:
+  - Admin requests a presigned PUT URL via `POST /api/admin/assets/upload-url`; browser uploads directly to MinIO/S3, bypassing the Next.js server.
+  - Upload UI shows filename, file size, and progress; save action is disabled while an upload is in progress.
+  - On upload failure: retry button is shown without losing other form state.
+  - Client-side validation of file type and minimum bitrate/sample rate before upload begins.
+  - Server-side file size limit configurable via env var (default: 2 GB).
+- Email templates:
+  - All transactional emails are HTML. No plain-text fallback in v1; no admin customization of content or branding.
+  - Four email templates required:
+    - Purchase confirmation: includes library magic-link, release name, and amount paid. Sent on successful paid checkout.
+    - Free-release library link: includes library magic-link and release name. Sent on free checkout email capture.
+    - Admin magic-link login: includes one-time login link and expiry notice.
+    - Setup wizard test email: minimal message confirming SMTP is working. Sent during setup Step 2.
+  - Templates are inline HTML strings in the codebase — no external template engine.
+  - The bootstrap setup token is printed to container stdout, not emailed.
+  - Documentation (`README` and `.env.example`) recommends a dedicated transactional email provider. Resend is the primary example (clean Node.js SDK, `react-email` compatibility with Next.js, generous free tier). Postmark and Amazon SES listed as alternatives. Raw SMTP via Gmail or similar is documented as functional but discouraged for deliverability reasons.
+- Rate limiting:
+  - Redis-backed IP-based rate limiting using the existing Redis instance in the Docker Compose stack.
+  - Rate-limited endpoints and default thresholds:
+    - `POST /api/checkout/free` (free release email capture): strict limit to prevent email-bombing and entitlement spam.
+    - `GET /api/download/:entitlementToken/:assetId` (download): moderate limit to prevent bulk scraping of signed URLs.
+    - `POST /api/admin/assets/upload-url` (presigned upload URL generation): moderate limit per admin session.
+    - `POST /api/checkout/session` (Stripe session creation): moderate limit to prevent session flooding.
+  - Rate limit thresholds are configurable via env vars with sensible defaults.
+  - Exceeded limits return `429 Too Many Requests` with a `Retry-After` header.
+  - Rate limiting is not applied to the Stripe webhook endpoint (Stripe handles its own retry logic).
+- Self-host/deployment:
+  - Provide Docker Compose profile with `web`, `postgres`, `minio`, `redis`, `worker`.
+  - Worker handles transcoding jobs via FFmpeg.
+  - Storage adapter supports MinIO and external S3-compatible providers through env config.
+  - Add health/readiness endpoints (distinguishing app-running from database-reachable) and basic structured logs with a configurable log level env var.
+  - Container entrypoint runs `prisma migrate deploy` before starting the Next.js server; container exits non-zero if migration fails.
+- Monitoring and admin status:
+  - Admin dashboard includes a status panel showing operational health at a glance. No external monitoring stack required.
+  - Status panel displays:
+    - Service connectivity: database, Redis, and storage (MinIO/S3) reachable or unreachable.
+    - Worker health: whether the worker process is connected, number of jobs in the transcode queue, and last completed job timestamp.
+    - Email delivery: count of recent `FAILED` emails and a link to the orders panel for retry.
+    - Storage usage: total asset size stored (sum of `TrackAsset` file sizes from the database, not a live bucket query).
+  - Health endpoints (`GET /api/health/live` and `GET /api/health/ready`) return JSON with component-level status, suitable for Docker healthchecks or external uptime monitors.
+  - Structured logs include event type tags (e.g., `webhook.received`, `email.failed`, `transcode.completed`, `download.served`) so hosts can pipe to any log aggregator if they choose. No aggregator is bundled or required.
+
+## First-Run Experience
+
+- Setup state detection:
+  - `StoreSettings` includes a `setupComplete` boolean flag.
+  - Middleware checks this flag on every request; if absent or false, all routes redirect to `/setup`.
+  - The public storefront is inaccessible until setup completes — no half-configured store is ever reachable.
+- Setup wizard (`/setup`) — six steps completed in-browser, no CLI required:
+  - Step 1 — Store basics: org name, store name, contact email, store currency (three-letter ISO code, e.g., `USD`, `EUR`, `GBP`; defaults to `USD`). Initializes the org row and `StoreSettings` record. Currency is set once during setup and used for all Stripe Checkout sessions and storefront price display.
+  - Step 2 — SMTP configuration: host, port, credentials. Includes a "send test email" action that must succeed before proceeding; on failure, surfaces a clear error rather than silently continuing.
+  - Step 3 — Storage: choose bundled MinIO (default, zero config) or external S3-compatible provider. If external, validates credentials and bucket access before proceeding.
+  - Step 4 — Stripe: API key and webhook secret entry. Displays the exact webhook URL to register in Stripe (`https://<domain>/api/webhooks/stripe`), lists the required event (`checkout.session.completed`), and includes a "verify connection" check.
+  - Step 5 — Admin account: enter admin email. Sends first magic-link login email using the SMTP config validated in Step 2.
+  - Step 6 — Confirmation: marks `setupComplete = true`, sets `storeStatus` to `PRIVATE`, and redirects to the admin dashboard.
+- Bootstrap token (SMTP fallback):
+  - On first container start, if no admin account exists, a one-time setup token is printed to container stdout (e.g. `SETUP TOKEN: abc123xyz — expires in 30 minutes`).
+  - Visiting `/setup?token=abc123xyz` grants access to the wizard without requiring email first.
+  - Token is single-use and invalidated immediately on use or after 30 minutes, whichever comes first.
+  - Prevents SMTP misconfiguration from permanently locking out a new deployment.
+- Store published state:
+  - `storeStatus` enum on `StoreSettings`: `SETUP | PRIVATE | PUBLIC`.
+  - `SETUP`: all routes redirect to `/setup`.
+  - `PRIVATE`: admin accessible; public visitors see a maintenance page.
+  - `PUBLIC`: store fully live.
+  - Admin can toggle `PRIVATE` ↔ `PUBLIC` from the dashboard without re-running setup.
+- Re-running setup:
+  - A "Factory reset" option in admin settings re-triggers the wizard. Does not wipe order/customer data by default; requires explicit confirmation.
+
+## Public APIs / Interfaces / Types
+
+- HTTP endpoints:
+  - `POST /api/checkout/session` (create Stripe Checkout session).
+  - `POST /api/checkout/free` (email capture and entitlement issuance for free releases, no Stripe).
+  - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
+  - `GET /api/library/:token` (resolve buyer library).
+  - `GET /api/download/:entitlementToken/:assetId` (validate token, generate fresh signed URL, redirect).
+  - `POST /api/admin/assets/upload-url` (generate presigned PUT URL for direct-to-storage upload).
+  - `GET /api/health/live` (app is running).
+  - `GET /api/health/ready` (app is running and all dependencies — database, Redis, storage — are reachable; returns component-level status JSON).
+- Core enums/types:
+  - `PricingMode`: `FREE | FIXED | PWYW`.
+  - `PreviewMode`: `CLIP | FULL`.
+  - `AssetRole`: `MASTER | PREVIEW | DELIVERY`.
+  - `TranscodeStatus`: `QUEUED | RUNNING | SUCCEEDED | FAILED`.
+  - `StoreStatus`: `SETUP | PRIVATE | PUBLIC`.
+  - `EmailStatus`: `PENDING | SENT | FAILED`.
+- Environment contract:
+  - Required: DB URL, auth secret, SMTP settings, Stripe keys/webhook secret, storage credentials, MinIO toggle.
+  - Optional: Redis URL override, CDN base URL, transcoding concurrency, max upload size, default token TTL, signed URL expiry (default: 15 minutes), rate limit thresholds per endpoint, minimum price floor in cents (default: 50).
+
+## Test Plan
+
+- Unit tests:
+  - Pricing validation for free/fixed/PWYW paths.
+  - Server-side PWYW validation rejects checkout session creation when amount is below artist-set `minimumPriceCents`.
+  - System minimum price floor rejects `fixedPriceCents` and `minimumPriceCents` below the configured threshold.
+  - Admin pricing UI displays correct estimated Stripe fee and net payout for a given price.
+  - Preview policy resolution (clip/full, release defaults vs track overrides).
+  - Quality disclosure logic when only lossy files exist.
+  - Bootstrap token is single-use and expires after 30 minutes.
+  - Revoked `BuyerLibraryToken` returns 403 on download attempt.
+  - Expired `BuyerLibraryToken` (when TTL is configured) returns 403 on download attempt.
+  - File size limit enforced with a clear error message.
+  - Free checkout rejects requests with no email address.
+- Integration tests:
+  - Checkout session creation with Stripe Tax settings.
+  - Webhook idempotency: delivering the same `checkout.session.completed` event twice results in exactly one `Order`, one set of entitlements, and one confirmation email. Second delivery returns 200 with no side effects.
+  - Entitlement generation and library token issuance.
+  - Free checkout issues entitlement and sends library email without creating a Stripe session.
+  - `lastUsedAt` and `accessCount` update correctly on library access.
+  - Presigned upload URL generation and expiry enforcement.
+  - Preview clip asset is created automatically on track upload when previewMode is CLIP.
+  - Download endpoint generates a fresh signed URL on every request; the same entitlement token produces a different URL on consecutive calls.
+  - Email failure on purchase sets `emailStatus` flag on Order record.
+  - Each email template (purchase confirmation, free-release library link, admin magic-link, setup test) renders valid HTML with the correct dynamic values (release name, library URL, amount).
+  - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on free checkout endpoint.
+  - Rate limiter returns 429 on download endpoint when threshold is exceeded; valid requests succeed again after the window resets.
+  - Stripe webhook endpoint is not rate-limited; rapid consecutive webhook deliveries are all processed.
+- End-to-end scenarios:
+  - Fresh container start → bootstrap token in logs → setup wizard completes → store moves to `PRIVATE`.
+  - Setup wizard SMTP step fails and blocks progression with a clear error.
+  - Store in `PRIVATE` state shows maintenance page to unauthenticated visitors.
+  - Admin sets store to `PUBLIC`; storefront becomes accessible.
+  - Admin creates release with tracks and uploads lossless masters (including a file >100 MB).
+  - Admin creates release with lossy-only files and storefront warning appears pre-purchase.
+  - Buyer claims a free release with email only; receives library magic-link without going through Stripe.
+  - Buyer purchases fixed-price release, receives magic link, and downloads multiple times.
+  - Buyer revisits a release they already own; "You own this" indicator appears and library link works. Re-purchase via "Buy again" succeeds and issues a new library token.
+  - Buyer uses PWYW amount above minimum and receives correct entitlements.
+  - Preview playback works for both clip and full modes; clip asset is confirmed as a separate stored file.
+  - Clicking a second track while one is playing stops the first and starts the second; player UI updates to reflect the new track.
+  - Admin revokes a `BuyerLibraryToken`; buyer receives 403 on next download attempt.
+  - Admin sees retry option for an undelivered purchase confirmation in the orders panel.
+  - Downloaded file has a human-readable filename (e.g., `Artist - Track Title.flac`), not a UUID or storage key.
+  - Admin soft-deletes a release with existing orders; release disappears from storefront but buyer retains download access. Admin restores the release and it reappears on the storefront.
+  - Admin permanently purges a soft-deleted release's assets; storage files are removed and buyer download returns 404.
+  - Storefront pages pass automated accessibility audit (axe-core or equivalent) with no critical or serious violations at WCAG 2.1 AA level.
+  - Audio player is fully operable via keyboard only: play, pause, and switch tracks without a mouse.
+- Deployment verification:
+  - Compose up succeeds with bundled MinIO.
+  - External S3 configuration path validated.
+  - Worker processes a transcoding job and outputs variants.
+  - Container upgrade applies pending migrations and starts successfully.
+  - Container exits non-zero if migration fails (no silent partial state).
+  - Health endpoints return component-level status; `ready` endpoint reports unhealthy when database is unreachable.
+  - Admin status panel reflects failed email count and worker queue depth accurately.
+
+## Operations & Backup
+
+- Postgres backup:
+  - Named Docker volume (not anonymous) required for the Postgres data directory to survive container recreation.
+  - Recommended approach: scheduled `pg_dump` via cron or a sidecar container writing to a mounted volume. Example cron job documented in README.
+- Asset backup:
+  - Assets in MinIO can be mirrored to external S3 using `mc mirror` (MinIO Client). Example command documented in README.
+  - Moving from bundled MinIO to external S3 is supported by updating env vars; migration path documented explicitly.
+- What must survive a full container wipe:
+  - Postgres named volume (all order, customer, release, and settings data).
+  - MinIO named volume or external S3 bucket (all uploaded audio assets).
+  - `.env` file or equivalent secret store (Stripe keys, SMTP credentials, auth secret).
+  - Note: losing the auth secret invalidates all active sessions and magic links. Intentional rotation is fine; accidental loss is not.
+- Upgrade path:
+  - `docker compose pull && docker compose up -d` is the documented upgrade path.
+  - README includes an "Upgrading" section advising a Postgres snapshot before pulling a new image and documenting how to roll back to a previous image if migration fails.
+
+## Assumptions and Defaults
+
+- Single-org per deployment is enforced at runtime even though schema remains multi-org capable.
+- Single-release-per-checkout; no cart. `Order` is always one-to-one with `Release`. Re-purchase of an already-owned release is allowed.
+- License choice is intentionally deferred.
+- Stripe Tax "basic use" means tax is computed in Stripe Checkout; no custom in-app tax engine.
+- Single currency per store, set during setup and passed to all Stripe Checkout sessions. Stripe handles display formatting and processing. Currency cannot be changed after setup without a factory reset.
+- Transcoding is optional and only available when lossless masters are uploaded.
+- If no lossless upload exists, purchasers only receive uploaded lossy assets and are warned before checkout.
+- `BuyerLibraryToken`s are non-expiring by default. Hosts may configure a default TTL in `StoreSettings`. Admin revocation is available at any time.
+- Migrations run automatically at container start via `prisma migrate deploy`. All migrations must be backwards-compatible within a single release (additive only — no column drops or renames in the same release that uses them). Breaking changes are staged across two releases.
+- Asset uploads bypass the Next.js server via presigned URLs to avoid body size limits.
+- SMTP is validated during the setup wizard, not at runtime. Email send failures are logged and surfaced to the admin; they do not cause request-level failures.
+- The store is `PRIVATE` by default after setup completes. Admin must explicitly set it to `PUBLIC`.
+- Email deliverability is the host's responsibility. Documentation recommends a dedicated transactional provider (Resend, Postmark, Amazon SES) and notes that SPF/DKIM records are required for reliable delivery. Example SMTP config values for common providers are included in `.env.example`.
+- Transactional emails are HTML-only in v1. No plain-text multipart fallback and no admin customization of email content or branding. Templates are inline in the codebase.
+- PWYW artist-set minimum is enforced both client-side and server-side. `POST /api/checkout/session` rejects amounts below `minimumPriceCents`.
+- A system-level minimum price floor (configurable via env var, e.g., $0.50) prevents transactions that would be consumed entirely by Stripe fees. Applies to both `fixedPriceCents` and `minimumPriceCents`. The admin pricing UI surfaces this floor and shows estimated Stripe fees and net payout dynamically.
+- Free releases do not use Stripe. Buyer provides an email address; the server issues entitlements and sends a library magic-link directly. Email is required on free checkout to prevent anonymous bulk requests.
+- Signed URLs for downloads are generated fresh on every request to the download endpoint and expire after 15 minutes (configurable). URLs are never cached or reused.
+- Preview clips are generated automatically by the worker at upload time and stored as a discrete `TrackAsset` with `assetRole: PREVIEW`. Masters are never streamed directly to the public.
+- Artist and release deletion is soft delete (`deletedAt` timestamp). Soft-deleted records are hidden from the storefront but preserved for order history. Existing buyers retain download access until assets are permanently purged. Hard deletion of storage assets is a separate, explicit admin action.
+- Storefront and admin target WCAG 2.1 AA compliance. Automated accessibility checks (axe-core or equivalent) are run as part of E2E testing.
+- Download signed URLs include `Content-Disposition: attachment` with a human-readable filename derived from artist, release, and track metadata.
