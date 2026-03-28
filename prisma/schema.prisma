@@ -10,7 +10,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 enum MembershipRole {
@@ -33,6 +32,42 @@ enum OrderStatus {
   CANCELED
 }
 
+enum PricingMode {
+  FREE
+  FIXED
+  PWYW
+}
+
+enum PreviewMode {
+  CLIP
+  FULL
+}
+
+enum AssetRole {
+  MASTER
+  PREVIEW
+  DELIVERY
+}
+
+enum TranscodeStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum StoreStatus {
+  SETUP
+  PRIVATE
+  PUBLIC
+}
+
+enum EmailStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
@@ -45,18 +80,21 @@ model User {
 }
 
 model Organization {
-  id          String       @id @default(cuid())
-  name        String
-  slug        String       @unique
-  ownerId     String
-  owner       User         @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  memberships Membership[]
-  artists     Artist[]
-  customers   Customer[]
-  orders      Order[]
-  releases    Release[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id                 String              @id @default(cuid())
+  name               String
+  slug               String              @unique
+  ownerId            String
+  owner              User                @relation("OrganizationOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  memberships        Membership[]
+  artists            Artist[]
+  customers          Customer[]
+  orders             Order[]
+  releases           Release[]
+  storeSettings      StoreSettings?
+  buyerLibraryTokens BuyerLibraryToken[]
+  transcodeJobs      TranscodeJob[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 }
 
 model Membership {
@@ -80,6 +118,7 @@ model Artist {
   name           String
   slug           String
   bio            String?
+  deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner          User?        @relation("ArtistOwner", fields: [ownerId], references: [id], onDelete: SetNull)
   releases       Release[]
@@ -91,27 +130,99 @@ model Artist {
 }
 
 model Release {
-  id             String                @id @default(cuid())
-  organizationId String
-  artistId       String
-  title          String
-  slug           String
-  description    String?
-  coverImageUrl  String?
-  priceCents     Int                   @default(0)
-  currency       String                @default("USD")
-  status         ReleaseStatus         @default(DRAFT)
-  publishedAt    DateTime?
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  artist         Artist                @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  files          ReleaseFile[]
-  orderItems     OrderItem[]
-  entitlements   DownloadEntitlement[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id                String                @id @default(cuid())
+  organizationId    String
+  artistId          String
+  title             String
+  slug              String
+  description       String?
+  coverImageUrl     String?
+  priceCents        Int                   @default(0)
+  currency          String                @default("USD")
+  pricingMode       PricingMode           @default(FREE)
+  fixedPriceCents   Int?
+  minimumPriceCents Int?
+  status            ReleaseStatus         @default(DRAFT)
+  publishedAt       DateTime?
+  deletedAt         DateTime?
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  artist            Artist                @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks            ReleaseTrack[]
+  files             ReleaseFile[]
+  orderItems        OrderItem[]
+  entitlements      DownloadEntitlement[]
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([organizationId, slug])
   @@index([artistId, status])
+}
+
+model StoreSettings {
+  id                    String       @id @default(cuid())
+  organizationId        String       @unique
+  storeStatus           StoreStatus  @default(SETUP)
+  setupComplete         Boolean      @default(false)
+  storeName             String?
+  brandName             String?
+  brandTagline          String?
+  brandDescription      String?
+  currency              String       @default("USD")
+  defaultPreviewMode    PreviewMode  @default(CLIP)
+  defaultPreviewSeconds Int          @default(30)
+  contactEmail          String?
+  contactName           String?
+  supportEmail          String?
+  websiteUrl            String?
+  instagramUrl          String?
+  xUrl                  String?
+  tiktokUrl             String?
+  youtubeUrl            String?
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+}
+
+model ReleaseTrack {
+  id             String         @id @default(cuid())
+  releaseId      String
+  title          String
+  trackNumber    Int
+  durationMs     Int?
+  lyrics         String?
+  credits        String?
+  previewMode    PreviewMode    @default(CLIP)
+  previewSeconds Int?
+  release        Release        @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  assets         TrackAsset[]
+  transcodeJobs  TranscodeJob[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([releaseId, trackNumber])
+  @@index([releaseId, trackNumber])
+}
+
+model TrackAsset {
+  id            String            @id @default(cuid())
+  trackId       String
+  storageKey    String
+  format        String
+  mimeType      String
+  fileSizeBytes Int
+  bitrateKbps   Int?
+  sampleRateHz  Int?
+  channels      Int?
+  isLossless    Boolean           @default(false)
+  assetRole     AssetRole         @default(MASTER)
+  track         ReleaseTrack      @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  sourceJobs    TranscodeJob[]    @relation("TranscodeSourceAsset")
+  outputRecords TranscodeOutput[] @relation("TranscodeOutputAsset")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([trackId, storageKey])
+  @@index([trackId, assetRole])
 }
 
 model ReleaseFile {
@@ -132,39 +243,101 @@ model ReleaseFile {
 }
 
 model Customer {
-  id             String                @id @default(cuid())
-  organizationId String
-  email          String
-  name           String?
-  organization   Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  orders         Order[]
-  entitlements   DownloadEntitlement[]
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
+  id                 String                @id @default(cuid())
+  organizationId     String
+  email              String
+  name               String?
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  orders             Order[]
+  entitlements       DownloadEntitlement[]
+  buyerLibraryTokens BuyerLibraryToken[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@unique([organizationId, email])
   @@index([organizationId, name])
 }
 
 model Order {
-  id             String       @id @default(cuid())
-  organizationId String
-  customerId     String
-  orderNumber    String
-  status         OrderStatus  @default(PENDING)
-  currency       String       @default("USD")
-  subtotalCents  Int          @default(0)
-  taxCents       Int          @default(0)
-  totalCents     Int          @default(0)
-  paidAt         DateTime?
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  items          OrderItem[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id                 String       @id @default(cuid())
+  organizationId     String
+  customerId         String
+  orderNumber        String
+  status             OrderStatus  @default(PENDING)
+  currency           String       @default("USD")
+  subtotalCents      Int          @default(0)
+  taxCents           Int          @default(0)
+  totalCents         Int          @default(0)
+  checkoutSessionId  String?      @unique
+  paymentIntentId    String?
+  taxCentsFromStripe Int?
+  emailStatus        EmailStatus  @default(PENDING)
+  emailSentAt        DateTime?
+  paidAt             DateTime?
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer           Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items              OrderItem[]
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
   @@unique([organizationId, orderNumber])
   @@index([customerId, createdAt])
+}
+
+model BuyerLibraryToken {
+  id             String       @id @default(cuid())
+  organizationId String
+  customerId     String
+  token          String       @unique
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  lastUsedAt     DateTime?
+  accessCount    Int          @default(0)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer       Customer     @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([customerId])
+  @@index([organizationId, revokedAt, expiresAt])
+}
+
+model TranscodeJob {
+  id             String            @id @default(cuid())
+  organizationId String
+  trackId        String
+  sourceAssetId  String
+  status         TranscodeStatus   @default(QUEUED)
+  errorMessage   String?
+  queuedAt       DateTime          @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  track          ReleaseTrack      @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  sourceAsset    TrackAsset        @relation("TranscodeSourceAsset", fields: [sourceAssetId], references: [id], onDelete: Cascade)
+  outputs        TranscodeOutput[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([status, queuedAt])
+  @@index([trackId])
+}
+
+model TranscodeOutput {
+  id            String       @id @default(cuid())
+  jobId         String
+  outputAssetId String
+  format        String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  job           TranscodeJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  outputAsset   TrackAsset   @relation("TranscodeOutputAsset", fields: [outputAssetId], references: [id], onDelete: Cascade)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@unique([jobId, format])
+  @@index([outputAssetId])
 }
 
 model OrderItem {

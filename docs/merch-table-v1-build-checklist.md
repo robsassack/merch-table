@@ -15,17 +15,17 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Schema migration
 
-- [ ] Add `StoreSettings` table (`storeStatus`, `setupComplete`, branding fields, `currency`, preview defaults, contact/social links)
-- [ ] Add `ReleaseTrack` table (`releaseId`, `title`, `trackNumber`, `durationMs`, lyrics/credits)
-- [ ] Add `TrackAsset` table (`trackId`, `storageKey`, `format`, `mimeType`, `fileSizeBytes`, bitrate/sampleRate/channels, `isLossless`, `assetRole` enum)
-- [ ] Add pricing fields to `Release` (`pricingMode` enum, `fixedPriceCents`, `minimumPriceCents`)
-- [ ] Add preview fields to `ReleaseTrack` (`previewMode` enum, `previewSeconds`)
-- [ ] Extend `Order` with Stripe linkage (`checkoutSessionId` unique, `paymentIntentId`, `taxCentsFromStripe`) and email tracking (`emailStatus` enum, `emailSentAt`)
-- [ ] Add `BuyerLibraryToken` table (`expiresAt`, `revokedAt`, `lastUsedAt`, `accessCount`)
-- [ ] Add `deletedAt` nullable timestamp to `Artist` and `Release`
-- [ ] Add `TranscodeJob` and `TranscodeOutput` tables
-- [ ] Create all enums: `PricingMode`, `PreviewMode`, `AssetRole`, `TranscodeStatus`, `StoreStatus`, `EmailStatus`
-- [ ] Verify `prisma migrate deploy` runs cleanly in container entrypoint; container exits non-zero on failure
+- [x] Add `StoreSettings` table (`storeStatus`, `setupComplete`, branding fields, `currency`, preview defaults, contact/social links)
+- [x] Add `ReleaseTrack` table (`releaseId`, `title`, `trackNumber`, `durationMs`, lyrics/credits)
+- [x] Add `TrackAsset` table (`trackId`, `storageKey`, `format`, `mimeType`, `fileSizeBytes`, bitrate/sampleRate/channels, `isLossless`, `assetRole` enum)
+- [x] Add pricing fields to `Release` (`pricingMode` enum, `fixedPriceCents`, `minimumPriceCents`)
+- [x] Add preview fields to `ReleaseTrack` (`previewMode` enum, `previewSeconds`)
+- [x] Extend `Order` with Stripe linkage (`checkoutSessionId` unique, `paymentIntentId`, `taxCentsFromStripe`) and email tracking (`emailStatus` enum, `emailSentAt`)
+- [x] Add `BuyerLibraryToken` table (`expiresAt`, `revokedAt`, `lastUsedAt`, `accessCount`)
+- [x] Add `deletedAt` nullable timestamp to `Artist` and `Release`
+- [x] Add `TranscodeJob` and `TranscodeOutput` tables
+- [x] Create all enums: `PricingMode`, `PreviewMode`, `AssetRole`, `TranscodeStatus`, `StoreStatus`, `EmailStatus`
+- [x] Verify `prisma migrate deploy` runs cleanly in container entrypoint; container exits non-zero on failure
 
 ---
 
