@@ -377,3 +377,15 @@ model DownloadEntitlement {
   @@unique([orderItemId, releaseFileId])
   @@index([customerId, releaseId])
 }
+
+model SetupToken {
+  id        String   @id @default(cuid())
+  token     String?  @unique
+  tokenHash String   @unique
+  expiresAt DateTime
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([consumedAt, expiresAt])
+}

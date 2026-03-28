@@ -35,8 +35,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Bootstrap token
 
-- [ ] On first start, if no admin exists, print one-time setup token to stdout with 30-min expiry
-- [ ] `/setup?token=...` grants wizard access; token is single-use and invalidated on use or expiry
+- [x] On first start, if no admin exists, print one-time setup token to stdout with 30-min expiry
+- [x] `/setup?token=...` grants wizard access; token is single-use and invalidated on use or expiry
 
 ### Setup wizard (`/setup`)
 
