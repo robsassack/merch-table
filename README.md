@@ -28,23 +28,9 @@ cp .env.example .env
 
 ## Database Quickstart
 
-You can run Postgres either locally or in Docker.
+This project is Docker-first. Start with Docker Postgres unless you already run Postgres locally.
 
-### Option A: Local Postgres
-
-1. Create database:
-
-```sql
-CREATE DATABASE merchtable;
-```
-
-2. Ensure `.env` points at your local database:
-
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
-```
-
-### Option B: Docker Postgres (single command)
+### Option A: Docker Postgres (recommended)
 
 ```bash
 docker run --name merchtable-postgres \
@@ -56,6 +42,20 @@ docker run --name merchtable-postgres \
 ```
 
 Use this URL in `.env`:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+```
+
+### Option B: Local Postgres
+
+1. Create database:
+
+```sql
+CREATE DATABASE merchtable;
+```
+
+2. Ensure `.env` points at your local database:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
