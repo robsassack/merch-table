@@ -6,6 +6,7 @@ Merch Table is a Next.js + Prisma app for running a digital music storefront.
 
 - Node.js 22+
 - npm 10+
+- Docker 24+ (recommended for local Postgres)
 - PostgreSQL 15+ (local install or Docker)
 
 ## Initial Setup
@@ -30,21 +31,22 @@ cp .env.example .env
 
 This project is Docker-first. Start with Docker Postgres unless you already run Postgres locally.
 
-### Option A: Docker Postgres (recommended)
+### Option A: Docker Compose (recommended)
 
 ```bash
-docker run --name merchtable-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=merchtable \
-  -p 5432:5432 \
-  -d postgres:16
+docker compose up -d postgres redis minio
 ```
 
 Use this URL in `.env`:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+```
+
+Check service status:
+
+```bash
+docker compose ps
 ```
 
 ### Option B: Local Postgres
