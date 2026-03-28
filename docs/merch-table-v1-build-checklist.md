@@ -11,7 +11,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Rotate all existing local secrets; create `.env.example` with documented values
 - [x] Define all env vars (required + optional) and their defaults in `.env.example`
 - [x] Verify Docker Compose brings up `postgres`, `redis`, `minio` with named volumes
-- [ ] Add `web` and `worker` service stubs to Docker Compose
+- [x] Add `web` and `worker` service stubs to Docker Compose
 
 ### Schema migration
 

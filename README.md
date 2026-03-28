@@ -37,6 +37,12 @@ This project is Docker-first. Start with Docker Postgres unless you already run 
 docker compose up -d postgres redis minio
 ```
 
+Equivalent npm script:
+
+```bash
+npm run infra:up:core
+```
+
 Use this URL in `.env`:
 
 ```env
@@ -47,6 +53,12 @@ Check service status:
 
 ```bash
 docker compose ps
+```
+
+To start all services (including `web` and `worker` stubs):
+
+```bash
+npm run infra:up:all
 ```
 
 ### Option B: Local Postgres

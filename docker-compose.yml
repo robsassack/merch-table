@@ -1,4 +1,44 @@
 services:
+  web:
+    image: node:22-alpine
+    container_name: merchtable-web
+    working_dir: /app
+    command: ["sh", "-c", "echo 'web service stub (replace in later phase)' && tail -f /dev/null"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
+      REDIS_URL: redis://redis:6379
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_BUCKET: media
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      STORAGE_USE_PATH_STYLE: "true"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  worker:
+    image: node:22-alpine
+    container_name: merchtable-worker
+    working_dir: /app
+    command: ["sh", "-c", "echo 'worker service stub (replace in later phase)' && tail -f /dev/null"]
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
+      REDIS_URL: redis://redis:6379
+      TRANSCODE_CONCURRENCY: "1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   postgres:
     image: postgres:16
     container_name: merchtable-postgres
