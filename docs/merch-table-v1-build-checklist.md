@@ -8,7 +8,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Clean slate, working local dev, schema ready.
 
-- [ ] Rotate all existing local secrets; create `.env.example` with documented values
+- [x] Rotate all existing local secrets; create `.env.example` with documented values
 - [ ] Define all env vars (required + optional) and their defaults in `.env.example`
 - [ ] Verify Docker Compose brings up `postgres`, `redis`, `minio` with named volumes
 - [ ] Add `web` and `worker` service stubs to Docker Compose
