@@ -88,61 +88,67 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     hasAccess && canAccessStepFive ? await getStepFiveState() : null;
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col justify-center gap-4 px-6 py-16">
-      <h1 className="text-3xl font-semibold tracking-tight">Store Setup</h1>
+    <main className="operator-theme min-h-screen w-full px-4 py-10 sm:px-6 sm:py-16">
+      <div className="mx-auto flex w-full max-w-3xl flex-col justify-center gap-4">
+        <section className="rounded-3xl border border-slate-700 bg-slate-900/85 p-6 shadow-[0_30px_80px_-38px_rgba(5,9,18,0.85)] backdrop-blur sm:p-8">
+          <h1 className="text-3xl font-semibold tracking-tight text-zinc-100">
+            Store Setup
+          </h1>
 
-      {token ? (
-        <ClaimToken token={token} />
-      ) : hasAccess ? (
-        <>
-          <p className="text-sm text-zinc-600">
-            Step {step} of 5
-          </p>
-          {step === 5 ? (
-            canAccessStepFive ? (
-              <StepFiveForm initialValues={stepFiveState!} />
-            ) : (
-              <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Complete Step 4 before continuing to Step 5.
+          {token ? (
+            <ClaimToken token={token} />
+          ) : hasAccess ? (
+            <>
+              <p className="mt-2 inline-flex w-fit rounded-full border border-slate-600 bg-slate-800/80 px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-zinc-300">
+                Step {step} of 5
               </p>
-            )
-          ) : step === 4 ? (
-            canAccessStepFour ? (
-              <StepFourForm initialValues={stepFourState!} />
-            ) : (
-              <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Complete Step 3 before continuing to Step 4.
-              </p>
-            )
-          ) : step === 3 ? (
-            canAccessStepThree ? (
-              <StepThreeForm initialValues={stepThreeState!} />
-            ) : (
-              <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Complete Step 2 before continuing to Step 3.
-              </p>
-            )
-          ) : step === 2 ? (
-            canAccessStepTwo ? (
-              <StepTwoForm initialValues={stepTwoState!} />
-            ) : (
-              <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Complete Step 1 before continuing to Step 2.
-              </p>
-            )
+              {step === 5 ? (
+                canAccessStepFive ? (
+                  <StepFiveForm initialValues={stepFiveState!} />
+                ) : (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Complete Step 4 before continuing to Step 5.
+                  </p>
+                )
+              ) : step === 4 ? (
+                canAccessStepFour ? (
+                  <StepFourForm initialValues={stepFourState!} />
+                ) : (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Complete Step 3 before continuing to Step 4.
+                  </p>
+                )
+              ) : step === 3 ? (
+                canAccessStepThree ? (
+                  <StepThreeForm initialValues={stepThreeState!} />
+                ) : (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Complete Step 2 before continuing to Step 3.
+                  </p>
+                )
+              ) : step === 2 ? (
+                canAccessStepTwo ? (
+                  <StepTwoForm initialValues={stepTwoState!} />
+                ) : (
+                  <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Complete Step 1 before continuing to Step 2.
+                  </p>
+                )
+              ) : (
+                <StepOneForm initialValues={stepOneState!} />
+              )}
+            </>
           ) : (
-            <StepOneForm initialValues={stepOneState!} />
+            <>
+              <p className="mt-3 rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                Setup is locked. Use the bootstrap token from server logs:
+                <code className="ml-1">/setup?token=...</code>
+              </p>
+              <TokenEntryForm />
+            </>
           )}
-        </>
-      ) : (
-        <>
-          <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Setup is locked. Use the bootstrap token from server logs:
-            <code className="ml-1">/setup?token=...</code>
-          </p>
-          <TokenEntryForm />
-        </>
-      )}
+        </section>
+      </div>
     </main>
   );
 }

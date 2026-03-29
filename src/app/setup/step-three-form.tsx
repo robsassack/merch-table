@@ -3,6 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  setupContinueButtonClassName,
+  setupPrimaryButtonClassName,
+  setupSecondaryButtonClassName,
+} from "./button-styles";
+
 type StepThreeInitialValues = {
   storageMode: "MINIO" | "S3";
   storageEndpoint: string;
@@ -197,8 +203,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
   const externalMode = storageMode === "S3";
 
   return (
-    <form onSubmit={onSave} className="flex w-full max-w-xl flex-col gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">Step 3: Storage</h2>
+    <form onSubmit={onSave} className="step-enter mt-5 flex w-full max-w-xl flex-col gap-4">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Step 3: Storage</h2>
 
       <div className="rounded border border-zinc-200 bg-white p-4">
         <p className="mb-2 text-sm font-medium text-zinc-700">Storage mode</p>
@@ -299,42 +305,46 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={isSaving || isValidating || isContinuing}
-          className="inline-flex items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSaving ? "Saving..." : "Save Storage Settings"}
-        </button>
+      <div className="mt-1 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={isSaving || isValidating || isContinuing}
+            className={setupPrimaryButtonClassName}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
 
-        {externalMode ? (
+          {externalMode ? (
+            <button
+              type="button"
+              onClick={onValidate}
+              disabled={isSaving || isValidating || isContinuing}
+              className={setupSecondaryButtonClassName}
+            >
+              {isValidating ? "Validating..." : "Validate Connection"}
+            </button>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-between gap-2">
           <button
             type="button"
-            onClick={onValidate}
-            disabled={isSaving || isValidating || isContinuing}
-            className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60"
+            onClick={() => router.push("/setup?step=2")}
+            className={setupSecondaryButtonClassName}
           >
-            {isValidating ? "Validating..." : "Validate External S3"}
+            ← Back
           </button>
-        ) : null}
 
-        <button
-          type="button"
-          onClick={() => router.push("/setup?step=2")}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
-        >
-          Back to Step 2
-        </button>
-
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={isSaving || isValidating || isContinuing}
-          className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isContinuing ? "Continuing..." : "Continue to Step 4"}
-        </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={isSaving || isValidating || isContinuing}
+            className={setupContinueButtonClassName}
+          >
+            {isContinuing ? "Continuing..." : "Continue →"}
+          </button>
+        </div>
       </div>
 
       {validated ? (

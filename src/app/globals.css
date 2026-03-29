@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7faf9;
+  --foreground: #121826;
 }
 
 @theme inline {
@@ -12,15 +12,86 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+body {
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), "Segoe UI", sans-serif;
+  background:
+    radial-gradient(circle at 15% 20%, #e6f8ee 0, transparent 35%),
+    radial-gradient(circle at 85% 0%, #e9f2ff 0, transparent 28%),
+    linear-gradient(180deg, #f8fbf9 0%, #f3f6f8 100%);
+  min-height: 100vh;
+}
+
+code {
+  font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
+}
+
+.operator-theme {
+  color: #e6e9f2;
+  background:
+    radial-gradient(circle at 20% 10%, #1f2a44 0, transparent 32%),
+    radial-gradient(circle at 90% 0%, #1c3a34 0, transparent 28%),
+    linear-gradient(180deg, #090f1c 0%, #0d1320 100%);
+}
+
+.operator-theme .text-zinc-900 {
+  color: #f7f8fc !important;
+}
+
+.operator-theme .text-zinc-800 {
+  color: #eceff7 !important;
+}
+
+.operator-theme .text-zinc-700,
+.operator-theme .text-zinc-600,
+.operator-theme .text-zinc-500 {
+  color: #aeb7cd !important;
+}
+
+.operator-theme .bg-white {
+  background-color: #0f1729 !important;
+}
+
+.operator-theme .bg-zinc-50 {
+  background-color: #111c31 !important;
+}
+
+.operator-theme .bg-zinc-100 {
+  background-color: #18243b !important;
+}
+
+.operator-theme .border-zinc-300 {
+  border-color: #30405f !important;
+}
+
+.operator-theme .border-zinc-200 {
+  border-color: #273650 !important;
+}
+
+.operator-theme input,
+.operator-theme select,
+.operator-theme textarea {
+  color: #f4f6fc;
+  background-color: #0f1729;
+  border-color: #30405f;
+}
+
+.operator-theme input::placeholder,
+.operator-theme textarea::placeholder {
+  color: #8f9cbc;
+}
+
+@keyframes step-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.step-enter {
+  animation: step-enter 0.28s ease-out;
 }

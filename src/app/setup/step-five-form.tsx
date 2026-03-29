@@ -3,6 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  setupContinueButtonClassName,
+  setupPrimaryButtonClassName,
+  setupSecondaryButtonClassName,
+} from "./button-styles";
+
 type StepFiveInitialValues = {
   adminEmail: string;
   magicLinkSent: boolean;
@@ -160,8 +166,8 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
   };
 
   return (
-    <form onSubmit={onSave} className="flex w-full max-w-xl flex-col gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">Step 5: Admin Account</h2>
+    <form onSubmit={onSave} className="step-enter mt-5 flex w-full max-w-xl flex-col gap-4">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Step 5: Admin Account</h2>
       <p className="text-sm text-zinc-600">
         Enter the first admin email, then send a one-time magic link using your saved email
         configuration.
@@ -180,31 +186,35 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
         />
       </label>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={isSaving || isSending}
-          className="inline-flex items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSaving ? "Saving..." : "Save Admin Email"}
-        </button>
+      <div className="mt-1 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={isSaving || isSending}
+            className={setupPrimaryButtonClassName}
+          >
+            {isSaving ? "Saving..." : "Save Email"}
+          </button>
 
-        <button
-          type="button"
-          onClick={onSendLink}
-          disabled={isSaving || isSending}
-          className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSending ? "Sending..." : "Send First Magic Link"}
-        </button>
+          <button
+            type="button"
+            onClick={onSendLink}
+            disabled={isSaving || isSending}
+            className={setupContinueButtonClassName}
+          >
+            {isSending ? "Sending..." : "Send Magic Link"}
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => router.push("/setup?step=4")}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
-        >
-          Back to Step 4
-        </button>
+        <div className="flex">
+          <button
+            type="button"
+            onClick={() => router.push("/setup?step=4")}
+            className={setupSecondaryButtonClassName}
+          >
+            ← Back
+          </button>
+        </div>
       </div>
 
       {magicLinkSent ? (
@@ -243,7 +253,7 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
             type="button"
             onClick={onUseBootstrapFallback}
             disabled={isSaving || isSending || isUsingFallback}
-            className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60"
+            className={setupSecondaryButtonClassName}
           >
             {isUsingFallback ? "Signing In..." : "Use Bootstrap Fallback"}
           </button>

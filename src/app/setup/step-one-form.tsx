@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 
 import { SUPPORTED_CURRENCIES } from "@/lib/setup/currencies";
 
+import { setupContinueButtonClassName } from "./button-styles";
+
 type StepOneFormProps = {
   initialValues: {
     orgName: string;
@@ -64,8 +66,8 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full max-w-lg flex-col gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">Step 1: Store Basics</h2>
+    <form onSubmit={onSubmit} className="step-enter mt-5 flex w-full max-w-xl flex-col gap-4">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Step 1: Store Basics</h2>
 
       <label className="flex flex-col gap-1 text-sm text-zinc-700">
         Organization name
@@ -120,13 +122,15 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
         </select>
       </label>
 
-      <button
-        type="submit"
-        disabled={isSaving}
-        className="inline-flex w-fit items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-      >
-        {isSaving ? "Saving..." : "Save and Continue to Step 2"}
-      </button>
+      <div className="mt-1 flex w-fit">
+        <button
+          type="submit"
+          disabled={isSaving}
+          className={setupContinueButtonClassName}
+        >
+          {isSaving ? "Saving..." : "Save & Continue →"}
+        </button>
+      </div>
 
       {saved ? (
         <p className="text-sm text-green-700">Step 1 saved.</p>

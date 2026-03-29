@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 
-import { MembershipRole } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 
 const SETUP_TOKEN_TTL_MINUTES = 30;
@@ -46,25 +45,16 @@ async function createSetupToken(now: Date) {
 }
 
 export async function ensureBootstrapSetupTokenOnStartup() {
-  const adminExists = await prisma.user.findFirst({
-    where: {
-      OR: [
-        { organizations: { some: {} } },
-        {
-          memberships: {
-            some: {
-              role: {
-                in: [MembershipRole.OWNER, MembershipRole.ADMIN],
-              },
-            },
-          },
-        },
-      ],
-    },
-    select: { id: true },
+  const storeSettings = await prisma.storeSettings.findFirst({
+    select: { setupComplete: true, storeStatus: true },
+    orderBy: { createdAt: "asc" },
   });
 
-  if (adminExists) {
+  const isSetupPending =
+    (storeSettings?.setupComplete ?? false) === false &&
+    (storeSettings?.storeStatus ?? "SETUP") === "SETUP";
+
+  if (!isSetupPending) {
     return;
   }
 

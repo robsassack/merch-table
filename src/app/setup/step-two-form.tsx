@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 
 import { SMTP_PRESETS } from "@/lib/setup/smtp-presets";
 
+import {
+  setupContinueButtonClassName,
+  setupPrimaryButtonClassName,
+  setupSecondaryButtonClassName,
+} from "./button-styles";
+
 type StepTwoInitialValues = {
   smtpProviderPreset: string;
   smtpHost: string;
@@ -268,8 +274,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
   }, [persistDraft]);
 
   return (
-    <form onSubmit={onSave} className="flex w-full max-w-lg flex-col gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">Step 2: Email Config</h2>
+    <form onSubmit={onSave} className="step-enter mt-5 flex w-full max-w-xl flex-col gap-4">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Step 2: Email Config</h2>
 
       <label className="flex flex-col gap-1 text-sm text-zinc-700">
         Email provider preset
@@ -377,43 +383,47 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
         />
       </label>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={isSaving || isTesting}
-          className="inline-flex items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSaving ? "Saving..." : "Save SMTP Settings"}
-        </button>
+      <div className="mt-1 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={isSaving || isTesting}
+            className={setupPrimaryButtonClassName}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
 
-        <button
-          type="button"
-          onClick={onSendTest}
-          disabled={isSaving || isTesting}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60"
-        >
-          {isTesting ? "Testing..." : "Send Test Email"}
-        </button>
+          <button
+            type="button"
+            onClick={onSendTest}
+            disabled={isSaving || isTesting}
+            className={setupSecondaryButtonClassName}
+          >
+            {isTesting ? "Sending..." : "Send Test Email"}
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => {
-            persistDraft();
-            router.push("/setup?step=1");
-          }}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
-        >
-          Back to Step 1
-        </button>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              persistDraft();
+              router.push("/setup?step=1");
+            }}
+            className={setupSecondaryButtonClassName}
+          >
+            ← Back
+          </button>
 
-        <button
-          type="button"
-          onClick={() => router.push("/setup?step=3")}
-          disabled={!testPassed || isSaving || isTesting}
-          className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          Continue to Step 3
-        </button>
+          <button
+            type="button"
+            onClick={() => router.push("/setup?step=3")}
+            disabled={!testPassed || isSaving || isTesting}
+            className={setupContinueButtonClassName}
+          >
+            Continue →
+          </button>
+        </div>
       </div>
 
       {testPassed ? (

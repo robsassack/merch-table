@@ -51,7 +51,7 @@ export function AdminAuthRequestForm() {
   };
 
   return (
-    <form onSubmit={onSubmit} className="flex w-full max-w-lg flex-col gap-4">
+    <form onSubmit={onSubmit} className="mt-5 flex w-full max-w-xl flex-col gap-4">
       <label className="flex flex-col gap-1 text-sm text-zinc-700">
         Admin email
         <input
@@ -59,7 +59,7 @@ export function AdminAuthRequestForm() {
           type="email"
           value={email}
           onChange={(event) => setEmail(event.target.value)}
-          className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          className="rounded-lg border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500 focus:ring-2 focus:ring-emerald-200"
           placeholder="you@example.com"
         />
       </label>
@@ -67,7 +67,7 @@ export function AdminAuthRequestForm() {
       <button
         type="submit"
         disabled={isSubmitting}
-        className="inline-flex w-fit items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+        className="inline-flex w-fit items-center rounded-lg bg-zinc-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 disabled:opacity-60"
       >
         {isSubmitting ? "Sending..." : "Send Sign-In Link"}
       </button>

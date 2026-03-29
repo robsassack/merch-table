@@ -3,6 +3,12 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  setupContinueButtonClassName,
+  setupPrimaryButtonClassName,
+  setupSecondaryButtonClassName,
+} from "./button-styles";
+
 type StepFourInitialValues = {
   hasSecretKey: boolean;
   stripeWebhookSecret: string;
@@ -143,8 +149,8 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
   };
 
   return (
-    <form onSubmit={onSave} className="flex w-full max-w-xl flex-col gap-4">
-      <h2 className="text-xl font-semibold tracking-tight">Step 4: Stripe</h2>
+    <form onSubmit={onSave} className="step-enter mt-5 flex w-full max-w-xl flex-col gap-4">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-900">Step 4: Stripe</h2>
       <p className="text-sm text-zinc-600">
         Need help? See Stripe docs for{" "}
         <a
@@ -218,40 +224,44 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
         />
       </label>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="submit"
-          disabled={isSaving || isVerifying || isContinuing}
-          className="inline-flex items-center rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isSaving ? "Saving..." : "Save Stripe Settings"}
-        </button>
+      <div className="mt-1 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            disabled={isSaving || isVerifying || isContinuing}
+            className={setupPrimaryButtonClassName}
+          >
+            {isSaving ? "Saving..." : "Save"}
+          </button>
 
-        <button
-          type="button"
-          onClick={onVerify}
-          disabled={isSaving || isVerifying || isContinuing}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60"
-        >
-          {isVerifying ? "Verifying..." : "Verify Connection"}
-        </button>
+          <button
+            type="button"
+            onClick={onVerify}
+            disabled={isSaving || isVerifying || isContinuing}
+            className={setupSecondaryButtonClassName}
+          >
+            {isVerifying ? "Verifying..." : "Verify Connection"}
+          </button>
+        </div>
 
-        <button
-          type="button"
-          onClick={() => router.push("/setup?step=3")}
-          className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900"
-        >
-          Back to Step 3
-        </button>
+        <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/setup?step=3")}
+            className={setupSecondaryButtonClassName}
+          >
+            ← Back
+          </button>
 
-        <button
-          type="button"
-          onClick={onContinue}
-          disabled={isSaving || isVerifying || isContinuing}
-          className="inline-flex items-center rounded bg-green-700 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-        >
-          {isContinuing ? "Continuing..." : "Continue to Step 5"}
-        </button>
+          <button
+            type="button"
+            onClick={onContinue}
+            disabled={isSaving || isVerifying || isContinuing}
+            className={setupContinueButtonClassName}
+          >
+            {isContinuing ? "Continuing..." : "Continue →"}
+          </button>
+        </div>
       </div>
 
       {verified ? (
