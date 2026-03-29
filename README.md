@@ -161,6 +161,11 @@ Setup API security:
 - External provider errors returned by setup APIs are sanitized before being stored/displayed.
 - Default security headers are applied globally (for example `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`).
 
+Store status behavior:
+- `SETUP`: routes redirect to `/setup` (except setup/magic-link completion paths).
+- `PRIVATE`: admin routes are accessible; public visitors are redirected to `/coming-soon`.
+- `PUBLIC`: storefront routes are fully live.
+
 Notes for Step 5:
 - The magic-link email sends to the admin email entered in the wizard.
 - Link target is `${APP_BASE_URL}/admin/auth/magic-link?token=...`.

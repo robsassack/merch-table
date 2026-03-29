@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 type SetupStatusResponse = {
   setupComplete: boolean;
+  storeStatus: "SETUP" | "PRIVATE" | "PUBLIC";
 };
 
 type AdminAuthStatusResponse = {
@@ -20,13 +21,22 @@ async function isSetupComplete(request: NextRequest) {
     });
 
     if (!response.ok) {
-      return false;
+      return {
+        setupComplete: false,
+        storeStatus: "SETUP" as const,
+      };
     }
 
     const payload = (await response.json()) as SetupStatusResponse;
-    return payload.setupComplete === true;
+    return {
+      setupComplete: payload.setupComplete === true,
+      storeStatus: payload.storeStatus,
+    };
   } catch {
-    return false;
+    return {
+      setupComplete: false,
+      storeStatus: "SETUP" as const,
+    };
   }
 }
 
@@ -53,17 +63,35 @@ async function isAdminAuthenticated(request: NextRequest) {
 }
 
 export async function proxy(request: NextRequest) {
-  const setupComplete = await isSetupComplete(request);
+  const setup = await isSetupComplete(request);
+  const { pathname } = request.nextUrl;
 
-  if (!setupComplete) {
+  const isSetupPath = pathname.startsWith("/setup") || pathname.startsWith("/api/setup");
+  const isAdminAuthPath = pathname.startsWith("/admin/auth");
+  const isAdminPath = pathname.startsWith("/admin");
+  const isMaintenancePath = pathname === "/coming-soon";
+  const isSetupMagicLinkPath = pathname.startsWith("/admin/auth/magic-link");
+
+  if (setup.storeStatus === "SETUP" || !setup.setupComplete) {
+    if (isSetupPath || isSetupMagicLinkPath) {
+      return NextResponse.next();
+    }
+
     const setupUrl = new URL("/setup", request.url);
     return NextResponse.redirect(setupUrl);
   }
 
-  if (
-    request.nextUrl.pathname.startsWith("/admin") &&
-    !request.nextUrl.pathname.startsWith("/admin/auth")
-  ) {
+  if (isSetupPath) {
+    return NextResponse.redirect(new URL("/admin", request.url));
+  }
+
+  if (setup.storeStatus === "PRIVATE") {
+    if (!isAdminPath && !isMaintenancePath) {
+      return NextResponse.redirect(new URL("/coming-soon", request.url));
+    }
+  }
+
+  if (isAdminPath && !isAdminAuthPath) {
     const authenticated = await isAdminAuthenticated(request);
     if (!authenticated) {
       const signInUrl = new URL("/admin/auth", request.url);
@@ -76,6 +104,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!setup|api/setup|api/admin/auth|admin/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    "/((?!api/setup|api/admin/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)",
   ],
 };

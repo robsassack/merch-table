@@ -60,9 +60,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Store status middleware
 
-- [ ] `SETUP` → redirect to `/setup`
-- [ ] `PRIVATE` → admin accessible; public visitors see maintenance/coming-soon page
-- [ ] `PUBLIC` → store fully live
+- [x] `SETUP` → redirect to `/setup`
+- [x] `PRIVATE` → admin accessible; public visitors see maintenance/coming-soon page
+- [x] `PUBLIC` → store fully live
 
 ---
 
