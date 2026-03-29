@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { MembershipRole } from "@/generated/prisma/enums";
+import { adminEmailHasAccessToOrganization } from "@/lib/auth/admin-access";
 import { sendAdminMagicLink } from "@/lib/auth/admin-magic-link";
 import { prisma } from "@/lib/prisma";
 import { authRateLimitPolicies } from "@/lib/security/auth-policies";
@@ -21,25 +21,8 @@ const requestSchema = z.object({
 const GENERIC_SUCCESS_MESSAGE =
   "If that email is authorized, a magic link has been sent.";
 
-async function isAuthorizedAdminEmail(email: string) {
-  const user = await prisma.user.findUnique({
-    where: { email },
-    select: {
-      id: true,
-      organizations: { select: { id: true }, take: 1 },
-      memberships: {
-        where: { role: { in: [MembershipRole.OWNER, MembershipRole.ADMIN] } },
-        select: { id: true },
-        take: 1,
-      },
-    },
-  });
-
-  if (!user) {
-    return false;
-  }
-
-  return user.organizations.length > 0 || user.memberships.length > 0;
+async function isAuthorizedAdminEmail(email: string, organizationId: string) {
+  return adminEmailHasAccessToOrganization({ email, organizationId });
 }
 
 export async function POST(request: Request) {
@@ -57,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   const setup = await prisma.storeSettings.findFirst({
-    select: { setupComplete: true },
+    select: { setupComplete: true, organizationId: true },
     orderBy: { createdAt: "asc" },
   });
   if (!setup?.setupComplete) {
@@ -83,7 +66,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, message: GENERIC_SUCCESS_MESSAGE });
     }
 
-    const authorized = await isAuthorizedAdminEmail(normalizedEmail);
+    const authorized = await isAuthorizedAdminEmail(
+      normalizedEmail,
+      setup.organizationId,
+    );
     if (authorized) {
       try {
         await sendAdminMagicLink(normalizedEmail);

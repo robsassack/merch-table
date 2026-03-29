@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { userHasAdminAccessToOrganization } from "@/lib/auth/admin-access";
 import { readAdminSession } from "@/lib/auth/admin-session";
 import { prisma } from "@/lib/prisma";
 
@@ -10,6 +11,7 @@ export type AdminRequestContext = {
     userId: string;
     email: string;
     expiresAt: number;
+    organizationId?: string;
   };
 };
 
@@ -37,6 +39,33 @@ export async function requireAdminRequestContext() {
       response: NextResponse.json(
         { ok: false, error: "Setup must be complete before using admin management." },
         { status: 409 },
+      ),
+    };
+  }
+
+  if (
+    session.organizationId &&
+    session.organizationId !== setup.organizationId
+  ) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { ok: false, error: "Admin session is not valid for this organization." },
+        { status: 403 },
+      ),
+    };
+  }
+
+  const hasAccess = await userHasAdminAccessToOrganization({
+    userId: session.userId,
+    organizationId: setup.organizationId,
+  });
+  if (!hasAccess) {
+    return {
+      ok: false as const,
+      response: NextResponse.json(
+        { ok: false, error: "Admin access is required for this organization." },
+        { status: 403 },
       ),
     };
   }

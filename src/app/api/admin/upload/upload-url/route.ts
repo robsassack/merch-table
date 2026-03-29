@@ -7,12 +7,10 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { readAdminSession } from "@/lib/auth/admin-session";
-import { prisma } from "@/lib/prisma";
+import { requireAdminRequestContext } from "@/lib/admin/request-context";
 import { adminRateLimitPolicies } from "@/lib/security/admin-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -106,33 +104,20 @@ export async function POST(request: Request) {
     return csrfError;
   }
 
-  const cookieStore = await cookies();
-  const session = readAdminSession(cookieStore);
-  if (!session) {
-    return NextResponse.json(
-      { ok: false, error: "Admin authentication required." },
-      { status: 401 },
-    );
+  const auth = await requireAdminRequestContext();
+  if (!auth.ok) {
+    return auth.response;
   }
 
   const sessionScopedRateLimitError = await enforceRateLimit(
     request,
     adminRateLimitPolicies.uploadUrl,
-    { key: `admin-session:${session.userId}:${session.expiresAt}` },
+    {
+      key: `admin-session:${auth.context.session.userId}:${auth.context.session.expiresAt}`,
+    },
   );
   if (sessionScopedRateLimitError) {
     return sessionScopedRateLimitError;
-  }
-
-  const setup = await prisma.storeSettings.findFirst({
-    select: { setupComplete: true },
-    orderBy: { createdAt: "asc" },
-  });
-  if (!setup?.setupComplete) {
-    return NextResponse.json(
-      { ok: false, error: "Setup must be complete before uploading files." },
-      { status: 409 },
-    );
   }
 
   try {

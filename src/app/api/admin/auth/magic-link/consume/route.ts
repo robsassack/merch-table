@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { MembershipRole } from "@/generated/prisma/enums";
+import { userHasAdminAccessToOrganization } from "@/lib/auth/admin-access";
 import { consumeAdminMagicLinkToken } from "@/lib/auth/admin-magic-link";
 import {
   createAdminSessionCookieValue,
@@ -50,9 +50,10 @@ export async function POST(request: Request) {
     const normalizedEmail = consumed.email.trim().toLowerCase();
 
     const setup = await prisma.storeSettings.findFirst({
-      select: { setupComplete: true },
+      select: { setupComplete: true, organizationId: true },
       orderBy: { createdAt: "asc" },
     });
+    let organizationId = setup?.organizationId ?? null;
 
     if (!setup?.setupComplete) {
       const stepOneState = await getStepOneState();
@@ -63,27 +64,19 @@ export async function POST(request: Request) {
         );
       }
 
-      await completeSetup({
+      const setupResult = await completeSetup({
         orgName: stepOneState.orgName,
         storeName: stepOneState.storeName,
         contactEmail: stepOneState.contactEmail,
         currency: stepOneState.currency,
         adminEmail: normalizedEmail,
       });
+      organizationId = setupResult.organizationId;
     }
 
     const user = await prisma.user.findUnique({
       where: { email: normalizedEmail },
-      select: {
-        id: true,
-        email: true,
-        organizations: { select: { id: true }, take: 1 },
-        memberships: {
-          where: { role: { in: [MembershipRole.OWNER, MembershipRole.ADMIN] } },
-          select: { id: true },
-          take: 1,
-        },
-      },
+      select: { id: true, email: true },
     });
 
     if (!user) {
@@ -93,8 +86,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const hasAdminAccess =
-      user.organizations.length > 0 || user.memberships.length > 0;
+    if (!organizationId) {
+      return NextResponse.json(
+        { ok: false, error: "Could not resolve admin organization." },
+        { status: 500 },
+      );
+    }
+
+    const hasAdminAccess = await userHasAdminAccessToOrganization({
+      userId: user.id,
+      organizationId,
+    });
 
     if (!hasAdminAccess) {
       return NextResponse.json(
@@ -109,6 +111,7 @@ export async function POST(request: Request) {
       value: createAdminSessionCookieValue({
         userId: user.id,
         email: user.email,
+        organizationId,
       }),
       httpOnly: true,
       sameSite: "lax",

@@ -99,7 +99,7 @@ export async function POST(request: Request) {
     );
   }
 
-  await completeSetup({
+  const setupResult = await completeSetup({
     orgName: stepOneState.orgName,
     storeName: stepOneState.storeName,
     contactEmail: stepOneState.contactEmail,
@@ -125,6 +125,7 @@ export async function POST(request: Request) {
     value: createAdminSessionCookieValue({
       userId: user.id,
       email: user.email,
+      organizationId: setupResult.organizationId,
     }),
     httpOnly: true,
     sameSite: "lax",

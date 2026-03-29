@@ -1,13 +1,12 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { hasValidAdminSession } from "@/lib/auth/admin-session";
+import { requireAdminRequestContext } from "@/lib/admin/request-context";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const cookieStore = await cookies();
-  const authenticated = hasValidAdminSession(cookieStore);
+  const auth = await requireAdminRequestContext();
+  const authenticated = auth.ok;
 
   return NextResponse.json(
     { authenticated },

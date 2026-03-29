@@ -7,10 +7,16 @@ type AdminSessionPayload = {
   expiresAt: number;
   userId: string;
   email: string;
+  organizationId?: string;
 };
 
 function getSessionSecret() {
-  return process.env.AUTH_SECRET ?? "dev-admin-session-secret";
+  const secret = process.env.AUTH_SECRET?.trim();
+  if (!secret) {
+    throw new Error("AUTH_SECRET environment variable is required.");
+  }
+
+  return secret;
 }
 
 function signValue(value: string) {
@@ -36,10 +42,18 @@ function decodePayload(value: string): AdminSessionPayload | null {
       return null;
     }
 
+    if (
+      parsed.organizationId !== undefined &&
+      typeof parsed.organizationId !== "string"
+    ) {
+      return null;
+    }
+
     return {
       expiresAt: parsed.expiresAt,
       userId: parsed.userId,
       email: parsed.email,
+      organizationId: parsed.organizationId,
     };
   } catch {
     return null;
@@ -49,12 +63,14 @@ function decodePayload(value: string): AdminSessionPayload | null {
 export function createAdminSessionCookieValue(input: {
   userId: string;
   email: string;
+  organizationId: string;
 }) {
   const expiresAt = Date.now() + ADMIN_SESSION_TTL_HOURS * 60 * 60 * 1_000;
   const payload: AdminSessionPayload = {
     expiresAt,
     userId: input.userId,
     email: input.email,
+    organizationId: input.organizationId,
   };
   const encodedPayload = encodePayload(payload);
   const signature = signValue(encodedPayload);
