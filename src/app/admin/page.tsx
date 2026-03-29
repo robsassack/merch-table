@@ -3,15 +3,20 @@ import { prisma } from "@/lib/prisma";
 
 import { AdminWorkspace } from "./admin-workspace";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default async function AdminPage() {
-  const settings = await prisma.storeSettings.findFirst({
-    select: {
-      storeStatus: true,
-      storeName: true,
-      brandName: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  const settings = await prisma.storeSettings
+    .findFirst({
+      select: {
+        storeStatus: true,
+        storeName: true,
+        brandName: true,
+      },
+      orderBy: { createdAt: "asc" },
+    })
+    .catch(() => null);
 
   const storeStatus = settings?.storeStatus ?? StoreStatus.SETUP;
   const storeName = settings?.storeName ?? settings?.brandName ?? null;
