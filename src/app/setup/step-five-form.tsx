@@ -27,6 +27,12 @@ type SendLinkResponse = {
   expiresAt?: string;
 };
 
+type BootstrapFallbackResponse = {
+  ok?: boolean;
+  error?: string;
+  redirectTo?: string;
+};
+
 export function StepFiveForm({ initialValues }: StepFiveFormProps) {
   const router = useRouter();
   const [adminEmail, setAdminEmail] = useState(initialValues.adminEmail);
@@ -39,6 +45,8 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [bootstrapToken, setBootstrapToken] = useState("");
+  const [isUsingFallback, setIsUsingFallback] = useState(false);
 
   const saveAdminEmail = async () => {
     const response = await fetch("/api/setup/step-5", {
@@ -117,6 +125,40 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
     }
   };
 
+  const onUseBootstrapFallback = async () => {
+    setError(null);
+    setNotice(null);
+    setIsUsingFallback(true);
+
+    try {
+      await saveAdminEmail();
+
+      const response = await fetch("/api/setup/step-5/bootstrap-fallback", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ bootstrapToken }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | BootstrapFallbackResponse
+        | null;
+
+      if (!response.ok || !body?.ok) {
+        throw new Error(body?.error ?? "Could not complete fallback sign-in.");
+      }
+
+      router.push(body.redirectTo ?? "/admin");
+      router.refresh();
+    } catch (fallbackError) {
+      setError(
+        fallbackError instanceof Error
+          ? fallbackError.message
+          : "Could not complete fallback sign-in.",
+      );
+    } finally {
+      setIsUsingFallback(false);
+    }
+  };
+
   return (
     <form onSubmit={onSave} className="flex w-full max-w-xl flex-col gap-4">
       <h2 className="text-xl font-semibold tracking-tight">Step 5: Admin Account</h2>
@@ -183,6 +225,30 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
       {magicLinkLastError && !error ? (
         <p className="text-sm text-red-700">Last send failed: {magicLinkLastError}</p>
       ) : null}
+
+      <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-4">
+        <p className="text-sm font-medium text-zinc-800">SMTP fallback</p>
+        <p className="mt-1 text-xs text-zinc-600">
+          If email delivery is failing, restart the server to print a fresh bootstrap
+          token and use it here to complete setup.
+        </p>
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            value={bootstrapToken}
+            onChange={(event) => setBootstrapToken(event.target.value)}
+            placeholder="Paste bootstrap token from server logs"
+            className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+          />
+          <button
+            type="button"
+            onClick={onUseBootstrapFallback}
+            disabled={isSaving || isSending || isUsingFallback}
+            className="inline-flex items-center rounded border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60"
+          >
+            {isUsingFallback ? "Signing In..." : "Use Bootstrap Fallback"}
+          </button>
+        </div>
+      </div>
     </form>
   );
 }

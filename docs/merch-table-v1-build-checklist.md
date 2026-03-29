@@ -54,9 +54,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Admin auth
 
-- [ ] Magic-link email login flow (request link → email → validate token → session)
-- [ ] Admin magic-link login email template (one-time link + expiry notice)
-- [ ] Bootstrap token fallback path (for when SMTP is misconfigured on first deploy)
+- [x] Magic-link email login flow (request link → email → validate token → session)
+- [x] Admin magic-link login email template (one-time link + expiry notice)
+- [x] Bootstrap token fallback path (for when SMTP is misconfigured on first deploy)
 
 ### Store status middleware
 

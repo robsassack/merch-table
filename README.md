@@ -165,6 +165,8 @@ Notes for Step 5:
 - The magic-link email sends to the admin email entered in the wizard.
 - Link target is `${APP_BASE_URL}/admin/auth/magic-link?token=...`.
 - Token expiry is 30 minutes and each send creates a new one-time token.
+- After setup is complete, admins can request new sign-in links at `/admin/auth`.
+- If SMTP is misconfigured on first deploy, Step 5 includes a bootstrap-token fallback path.
 
 If you pull new changes and setup pages start failing with missing columns, run migrations again:
 
