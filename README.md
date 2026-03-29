@@ -116,6 +116,28 @@ npx prisma migrate status
 
 If this command succeeds and shows your migration state, your database connection is working.
 
+## Testing & CI
+
+Run local checks:
+
+```bash
+npm run db:validate
+npm run -s lint
+npm run -s typecheck
+npm test
+npm run -s build
+```
+
+`npm test` uses Node's built-in test runner with tsx:
+
+```bash
+node --import tsx --test "src/**/*.test.ts"
+```
+
+GitHub Actions CI runs the same quality checks on:
+- every pull request
+- pushes to `main`
+
 ## Troubleshooting
 
 If you see a container name conflict (for example `merchtable-postgres is already in use`), remove old standalone containers from earlier `docker run` commands:
