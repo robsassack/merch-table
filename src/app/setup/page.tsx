@@ -17,6 +17,8 @@ import { StepThreeForm } from "./step-three-form";
 import { StepTwoForm } from "./step-two-form";
 import { TokenEntryForm } from "./token-entry-form";
 
+export const dynamic = "force-dynamic";
+
 type SetupPageProps = {
   searchParams: Promise<{
     token?: string | string[];
