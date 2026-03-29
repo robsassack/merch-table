@@ -23,7 +23,8 @@ function getMagicLinkUrl(token: string) {
     ? appBaseUrl.slice(0, -1)
     : appBaseUrl;
 
-  return `${normalized}/admin/auth/magic-link?token=${encodeURIComponent(token)}`;
+  // Keep token out of server logs and referrers by using URL fragments.
+  return `${normalized}/admin/auth/magic-link#token=${encodeURIComponent(token)}`;
 }
 
 type SmtpConfig = {

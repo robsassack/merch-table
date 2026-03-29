@@ -3,9 +3,14 @@ import { z } from "zod";
 
 import { MembershipRole } from "@/generated/prisma/enums";
 import { sendAdminMagicLink } from "@/lib/auth/admin-magic-link";
-import { enforceCsrfProtection } from "@/lib/security/csrf";
-import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { prisma } from "@/lib/prisma";
+import { authRateLimitPolicies } from "@/lib/security/auth-policies";
+import { enforceCsrfProtection } from "@/lib/security/csrf";
+import {
+  consumeRateLimit,
+  createHashedRateLimitKey,
+  enforceRateLimit,
+} from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -43,11 +48,10 @@ export async function POST(request: Request) {
     return csrfError;
   }
 
-  const rateLimitError = enforceRateLimit(request, {
-    id: "admin-auth-request-link",
-    maxRequests: 10,
-    windowMs: 15 * 60 * 1_000,
-  });
+  const rateLimitError = await enforceRateLimit(
+    request,
+    authRateLimitPolicies.requestLinkByIp,
+  );
   if (rateLimitError) {
     return rateLimitError;
   }
@@ -68,14 +72,26 @@ export async function POST(request: Request) {
     const parsed = requestSchema.parse(payload);
     const normalizedEmail = parsed.email.trim().toLowerCase();
 
+    const emailScopedRateLimit = await consumeRateLimit(
+      request,
+      authRateLimitPolicies.requestLinkByEmail,
+      {
+        key: `admin-email:${createHashedRateLimitKey(normalizedEmail)}`,
+      },
+    );
+    if (emailScopedRateLimit.limited) {
+      return NextResponse.json({ ok: true, message: GENERIC_SUCCESS_MESSAGE });
+    }
+
     const authorized = await isAuthorizedAdminEmail(normalizedEmail);
     if (authorized) {
       try {
         await sendAdminMagicLink(normalizedEmail);
-      } catch {
-        return NextResponse.json(
-          { ok: false, error: "Could not send sign-in link." },
-          { status: 400 },
+      } catch (error) {
+        console.warn(
+          `[auth] Failed to send admin magic link: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
         );
       }
     }

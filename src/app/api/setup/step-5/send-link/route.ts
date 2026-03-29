@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return csrfError;
   }
 
-  const rateLimitError = enforceRateLimit(
+  const rateLimitError = await enforceRateLimit(
     request,
     setupRateLimitPolicies.sendAdminMagicLink,
   );

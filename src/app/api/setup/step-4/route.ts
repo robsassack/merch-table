@@ -57,7 +57,7 @@ export async function POST(request: Request) {
     return csrfError;
   }
 
-  const rateLimitError = enforceRateLimit(request, setupRateLimitPolicies.saveStep);
+  const rateLimitError = await enforceRateLimit(request, setupRateLimitPolicies.saveStep);
   if (rateLimitError) {
     return rateLimitError;
   }

@@ -12,15 +12,21 @@ describe("rate limit", () => {
       windowMs: 60_000,
     };
 
-    const first = enforceRateLimit(request, policy, { key: "admin-session:a" });
+    const first = await enforceRateLimit(request, policy, {
+      key: "admin-session:a",
+    });
     assert.equal(first, null);
 
-    const second = enforceRateLimit(request, policy, { key: "admin-session:a" });
+    const second = await enforceRateLimit(request, policy, {
+      key: "admin-session:a",
+    });
     assert.ok(second);
     assert.equal(second?.status, 429);
     assert.ok(second?.headers.get("retry-after"));
 
-    const third = enforceRateLimit(request, policy, { key: "admin-session:b" });
+    const third = await enforceRateLimit(request, policy, {
+      key: "admin-session:b",
+    });
     assert.equal(third, null);
   });
 });

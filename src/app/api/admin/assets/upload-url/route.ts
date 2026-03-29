@@ -115,7 +115,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const sessionScopedRateLimitError = enforceRateLimit(
+  const sessionScopedRateLimitError = await enforceRateLimit(
     request,
     adminRateLimitPolicies.uploadUrl,
     { key: `admin-session:${session.userId}:${session.expiresAt}` },

@@ -10,6 +10,7 @@ import {
 } from "@/lib/auth/admin-session";
 import { getSetupSessionCookieName } from "@/lib/auth/setup-session";
 import { prisma } from "@/lib/prisma";
+import { authRateLimitPolicies } from "@/lib/security/auth-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { getStepOneState, isStepOneComplete } from "@/lib/setup/step-one";
@@ -27,11 +28,10 @@ export async function POST(request: Request) {
     return csrfError;
   }
 
-  const rateLimitError = enforceRateLimit(request, {
-    id: "admin-auth-consume-link",
-    maxRequests: 30,
-    windowMs: 15 * 60 * 1_000,
-  });
+  const rateLimitError = await enforceRateLimit(
+    request,
+    authRateLimitPolicies.consumeLinkByIp,
+  );
   if (rateLimitError) {
     return rateLimitError;
   }

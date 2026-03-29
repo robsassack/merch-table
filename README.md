@@ -178,7 +178,8 @@ Setup secret handling:
 
 Setup API security:
 - State-changing setup endpoints enforce origin-based CSRF checks (`Origin` / `Sec-Fetch-Site`).
-- Setup endpoints also have per-IP in-memory rate limits (claim token, save steps, SMTP/storage/Stripe verification, admin magic-link send).
+- Setup endpoints also have rate limits (claim token, save steps, SMTP/storage/Stripe verification, admin magic-link send).
+- If `REDIS_URL` is configured, limits are enforced in Redis across instances. If Redis is unavailable, the app falls back to in-memory buckets.
 - You can tune these with `RATE_LIMIT_SETUP_*` env vars in `.env`.
 - External provider errors returned by setup APIs are sanitized before being stored/displayed.
 - Default security headers are applied globally (for example `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`).
@@ -190,7 +191,7 @@ Store status behavior:
 
 Notes for Step 5:
 - The magic-link email sends to the admin email entered in the wizard.
-- Link target is `${APP_BASE_URL}/admin/auth/magic-link?token=...`.
+- Link target is `${APP_BASE_URL}/admin/auth/magic-link#token=...`.
 - Token expiry is 30 minutes and each send creates a new one-time token.
 - After setup is complete, admins can request new sign-in links at `/admin/auth`.
 - If SMTP is misconfigured on first deploy, Step 5 includes a bootstrap-token fallback path.

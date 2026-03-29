@@ -1,16 +1,6 @@
 import { MagicLinkClaim } from "./magic-link-claim";
 
-type AdminMagicLinkPageProps = {
-  searchParams: Promise<{ token?: string | string[] }>;
-};
-
-export default async function AdminMagicLinkPage({
-  searchParams,
-}: AdminMagicLinkPageProps) {
-  const params = await searchParams;
-  const token =
-    typeof params.token === "string" ? params.token : params.token?.[0];
-
+export default function AdminMagicLinkPage() {
   return (
     <main className="operator-theme min-h-screen w-full px-4 py-10 sm:px-6 sm:py-16">
       <div className="mx-auto flex w-full max-w-3xl flex-col justify-center">
@@ -19,13 +9,7 @@ export default async function AdminMagicLinkPage({
             Admin Magic Link
           </h1>
           <div className="mt-4">
-            {token ? (
-              <MagicLinkClaim token={token} />
-            ) : (
-              <p className="rounded border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                Missing token.
-              </p>
-            )}
+            <MagicLinkClaim />
           </div>
         </section>
       </div>
