@@ -5,7 +5,7 @@ import { enforceRateLimit } from "@/lib/security/rate-limit";
 
 describe("rate limit", () => {
   it("scopes limits by custom session key", async () => {
-    const request = new Request("http://localhost/api/admin/assets/upload-url");
+    const request = new Request("http://localhost/api/admin/upload/upload-url");
     const policy = {
       id: `test-upload-url-${Date.now()}`,
       maxRequests: 1,

@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "npm run -s db:generate",
     "dev": "next dev",
     "build": "npm run -s db:generate && next build",
+    "prestart": "npm run -s db:generate",
     "start": "next start",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "lint": "eslint",

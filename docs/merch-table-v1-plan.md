@@ -65,7 +65,7 @@
   - Entitlements are unlimited; buyer receives email magic-link to library with re-download access.
   - Download endpoint (`GET /api/download/:entitlementToken/:assetId`) validates that the token is not revoked and not expired, then generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused; the buyer always hits this endpoint first. The signed URL includes a `Content-Disposition: attachment` header with a human-readable filename derived from artist, release, and track title (e.g., `Artist - Track Title.flac`), so browsers save the file with a meaningful name rather than a storage key or UUID.
 - File upload:
-  - Admin requests a presigned PUT URL via `POST /api/admin/assets/upload-url`; browser uploads directly to MinIO/S3, bypassing the Next.js server.
+  - Admin requests a presigned PUT URL via `POST /api/admin/upload/upload-url`; browser uploads directly to MinIO/S3, bypassing the Next.js server.
   - Upload UI shows filename, file size, and progress; save action is disabled while an upload is in progress.
   - On upload failure: retry button is shown without losing other form state.
   - Client-side validation of file type and minimum bitrate/sample rate before upload begins.
@@ -85,7 +85,7 @@
   - Rate-limited endpoints and default thresholds:
     - `POST /api/checkout/free` (free release email capture): strict limit to prevent email-bombing and entitlement spam.
     - `GET /api/download/:entitlementToken/:assetId` (download): moderate limit to prevent bulk scraping of signed URLs.
-    - `POST /api/admin/assets/upload-url` (presigned upload URL generation): moderate limit per admin session.
+    - `POST /api/admin/upload/upload-url` (presigned upload URL generation): moderate limit per admin session.
     - `POST /api/checkout/session` (Stripe session creation): moderate limit to prevent session flooding.
   - Rate limit thresholds are configurable via env vars with sensible defaults.
   - Exceeded limits return `429 Too Many Requests` with a `Retry-After` header.
@@ -141,7 +141,7 @@
   - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
   - `GET /api/library/:token` (resolve buyer library).
   - `GET /api/download/:entitlementToken/:assetId` (validate token, generate fresh signed URL, redirect).
-  - `POST /api/admin/assets/upload-url` (generate presigned PUT URL for direct-to-storage upload).
+  - `POST /api/admin/upload/upload-url` (generate presigned PUT URL for direct-to-storage upload).
   - `GET /api/health/live` (app is running).
   - `GET /api/health/ready` (app is running and all dependencies — database, Redis, storage — are reachable; returns component-level status JSON).
 - Core enums/types:

@@ -41,7 +41,7 @@ function readPolicy(
 
 export const adminRateLimitPolicies = {
   uploadUrl: readPolicy(
-    "admin-assets-upload-url",
+    "admin-upload-url",
     { maxRequests: 60, windowSeconds: 3600 },
     "RATE_LIMIT_UPLOAD_URL",
   ),

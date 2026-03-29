@@ -130,7 +130,7 @@ export async function POST(request: Request) {
   });
   if (!setup?.setupComplete) {
     return NextResponse.json(
-      { ok: false, error: "Setup must be complete before uploading assets." },
+      { ok: false, error: "Setup must be complete before uploading files." },
       { status: 409 },
     );
   }

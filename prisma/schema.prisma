@@ -143,7 +143,9 @@ model Release {
   pricingMode       PricingMode           @default(FREE)
   fixedPriceCents   Int?
   minimumPriceCents Int?
+  isLossyOnly       Boolean               @default(false)
   status            ReleaseStatus         @default(DRAFT)
+  releaseDate       DateTime              @default(now())
   publishedAt       DateTime?
   deletedAt         DateTime?
   organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)

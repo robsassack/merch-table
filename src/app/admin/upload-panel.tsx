@@ -264,7 +264,7 @@ function uploadViaSignedPut(input: {
   });
 }
 
-export function AssetUploadPanel() {
+export function UploadPanel() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -406,7 +406,7 @@ export function AssetUploadPanel() {
               ? selectedFile.type
               : "application/octet-stream";
 
-          const uploadUrlResponse = await fetch("/api/admin/assets/upload-url", {
+          const uploadUrlResponse = await fetch("/api/admin/upload/upload-url", {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({
@@ -547,7 +547,7 @@ export function AssetUploadPanel() {
 
     try {
       window.sessionStorage.setItem(
-        "admin:last-uploaded-asset-draft",
+        "admin:last-upload-draft",
         JSON.stringify(uploadedAssets),
       );
       setSaveNotice("Saved upload draft in this browser session.");
@@ -561,7 +561,7 @@ export function AssetUploadPanel() {
   return (
     <section className="mt-6 rounded-2xl border border-slate-700/80 bg-slate-950/60 p-5">
       <h2 className="text-xl font-semibold tracking-tight text-zinc-100">
-        Asset Upload
+        Upload
       </h2>
       <p className="mt-1 text-sm text-zinc-600">
         Select a file, upload directly to storage, then save the draft metadata.

@@ -71,7 +71,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 > Goal: Admin can upload audio files to MinIO/S3 via presigned URLs.
 
 - [x] Storage adapter abstraction supporting MinIO and external S3 via env config
-- [x] `POST /api/admin/assets/upload-url` — generate presigned PUT URL for direct-to-storage upload
+- [x] `POST /api/admin/upload/upload-url` — generate presigned PUT URL for direct-to-storage upload
 - [x] Client-side upload UI: filename, file size, progress bar; save disabled during upload
 - [x] Ability to upload multiple files at once
 - [x] Ability to drag and drop uploads
@@ -94,14 +94,14 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Release management
 
-- [ ] Release CRUD with pricing setup (`FREE`, `FIXED`, `PWYW`)
-- [ ] System minimum price floor enforcement (env var, default $0.50)
-- [ ] Pricing UI: inline Stripe fee estimate and net payout, updates dynamically
-- [ ] Pricing UI: warning when price is below system minimum floor
-- [ ] Upload workflow: prompt for lossless masters first; if missing, mark lossy-only with confirmation
-- [ ] Quality disclosure flag when only lossy files are available
-- [ ] Soft delete with `deletedAt`; "deleted" badge in admin; restore action
-- [ ] Permanent purge action (removes storage assets, requires confirmation)
+- [x] Release CRUD with pricing setup (`FREE`, `FIXED`, `PWYW`)
+- [x] System minimum price floor enforcement (env var, default $0.50)
+- [x] Pricing UI: inline Stripe fee estimate and net payout, updates dynamically
+- [x] Pricing UI: warning when price is below system minimum floor
+- [x] Upload workflow: prompt for lossless masters first; if missing, mark lossy-only with confirmation
+- [x] Quality disclosure flag when only lossy files are available
+- [x] Soft delete with `deletedAt`; "deleted" badge in admin; restore action
+- [x] Permanent purge action (removes storage assets, requires confirmation)
 
 ### Track management
 
@@ -262,7 +262,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [ ] `POST /api/checkout/free` — strict limit
 - [ ] `GET /api/download/:entitlementToken/:assetId` — moderate limit
-- [ ] `POST /api/admin/assets/upload-url` — moderate limit
+- [ ] `POST /api/admin/upload/upload-url` — moderate limit
 - [ ] `POST /api/checkout/session` — moderate limit
 - [ ] Thresholds configurable via env vars
 - [ ] 429 response with `Retry-After` header on exceeded limits

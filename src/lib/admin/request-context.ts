@@ -35,7 +35,7 @@ export async function requireAdminRequestContext() {
     return {
       ok: false as const,
       response: NextResponse.json(
-        { ok: false, error: "Setup must be complete before managing artists." },
+        { ok: false, error: "Setup must be complete before using admin management." },
         { status: 409 },
       ),
     };

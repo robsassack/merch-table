@@ -1,18 +1,18 @@
-"use client";
-
-import { useState } from "react";
+import Link from "next/link";
 
 import type { StoreStatus } from "@/generated/prisma/enums";
 
 import { ArtistManagementPanel } from "./artist-management-panel";
-import { AssetUploadPanel } from "./asset-upload-panel";
+import { ReleaseManagementPanel } from "./release-management-panel";
+import { UploadPanel } from "./upload-panel";
 
 type AdminWorkspaceProps = {
   storeStatus: StoreStatus;
   storeName: string | null;
+  activeTab: AdminTab;
 };
 
-type AdminTab = "artists" | "assets";
+export type AdminTab = "artists" | "releases" | "upload";
 
 const tabClassName =
   "inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition";
@@ -41,9 +41,7 @@ function getStatusLabel(status: StoreStatus) {
   return "Setup";
 }
 
-export function AdminWorkspace({ storeStatus, storeName }: AdminWorkspaceProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>("artists");
-
+export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorkspaceProps) {
   return (
     <>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/80 bg-slate-950/50 p-3">
@@ -59,42 +57,47 @@ export function AdminWorkspace({ storeStatus, storeName }: AdminWorkspaceProps) 
           </div>
         </div>
 
-        <div
-          className="inline-flex rounded-xl border border-slate-700 bg-slate-900/70 p-1"
-          role="tablist"
-          aria-label="Admin sections"
-        >
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "artists"}
+        <div className="inline-flex rounded-xl border border-slate-700 bg-slate-900/70 p-1">
+          <Link
+            href="/admin/artists"
+            aria-current={activeTab === "artists" ? "page" : undefined}
             className={`${tabClassName} ${
               activeTab === "artists"
                 ? "bg-slate-700 text-zinc-100"
                 : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
             }`}
-            onClick={() => setActiveTab("artists")}
           >
             Artists
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={activeTab === "assets"}
+          </Link>
+          <Link
+            href="/admin/releases"
+            aria-current={activeTab === "releases" ? "page" : undefined}
             className={`${tabClassName} ${
-              activeTab === "assets"
+              activeTab === "releases"
                 ? "bg-slate-700 text-zinc-100"
                 : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
             }`}
-            onClick={() => setActiveTab("assets")}
           >
-            Assets
-          </button>
+            Releases
+          </Link>
+          <Link
+            href="/admin/upload"
+            aria-current={activeTab === "upload" ? "page" : undefined}
+            className={`${tabClassName} ${
+              activeTab === "upload"
+                ? "bg-slate-700 text-zinc-100"
+                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
+            }`}
+          >
+            Upload
+          </Link>
         </div>
       </div>
 
-      <div role="tabpanel" className="mt-4">
-        {activeTab === "artists" ? <ArtistManagementPanel /> : <AssetUploadPanel />}
+      <div className="mt-4">
+        {activeTab === "artists" ? <ArtistManagementPanel /> : null}
+        {activeTab === "releases" ? <ReleaseManagementPanel /> : null}
+        {activeTab === "upload" ? <UploadPanel /> : null}
       </div>
     </>
   );
