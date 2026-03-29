@@ -69,6 +69,7 @@ export async function proxy(request: NextRequest) {
   const isSetupPath = pathname.startsWith("/setup") || pathname.startsWith("/api/setup");
   const isAdminAuthPath = pathname.startsWith("/admin/auth");
   const isAdminPath = pathname.startsWith("/admin");
+  const isApiPath = pathname.startsWith("/api/");
   const isMaintenancePath = pathname === "/coming-soon";
   const isSetupMagicLinkPath = pathname.startsWith("/admin/auth/magic-link");
 
@@ -86,7 +87,7 @@ export async function proxy(request: NextRequest) {
   }
 
   if (setup.storeStatus === "PRIVATE") {
-    if (!isAdminPath && !isMaintenancePath) {
+    if (!isAdminPath && !isMaintenancePath && !isApiPath) {
       return NextResponse.redirect(new URL("/coming-soon", request.url));
     }
   }

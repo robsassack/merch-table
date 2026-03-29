@@ -1,3 +1,5 @@
+import { AssetUploadPanel } from "./asset-upload-panel";
+
 export default function AdminPage() {
   return (
     <main className="operator-theme min-h-screen w-full px-4 py-10 sm:px-6 sm:py-16">
@@ -7,6 +9,8 @@ export default function AdminPage() {
           <p className="mt-2 text-sm text-zinc-600">
             Setup is complete and the store is currently private.
           </p>
+
+          <AssetUploadPanel />
         </section>
       </div>
     </main>

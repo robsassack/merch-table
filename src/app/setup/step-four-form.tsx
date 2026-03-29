@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
+
 import {
   setupContinueButtonClassName,
   setupPrimaryButtonClassName,
@@ -267,7 +269,9 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
       {verified ? (
         <p className="text-sm text-green-700">
           Stripe connection verified.
-          {verifiedAt ? ` Last verified: ${new Date(verifiedAt).toLocaleString()}.` : ""}
+          {verifiedAt
+            ? ` Last verified: ${formatIsoTimestampForDisplay(verifiedAt)}.`
+            : ""}
         </p>
       ) : (
         <p className="text-sm text-amber-700">

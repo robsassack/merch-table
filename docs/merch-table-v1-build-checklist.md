@@ -70,13 +70,15 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Admin can upload audio files to MinIO/S3 via presigned URLs.
 
-- [ ] Storage adapter abstraction supporting MinIO and external S3 via env config
-- [ ] `POST /api/admin/assets/upload-url` — generate presigned PUT URL for direct-to-storage upload
-- [ ] Client-side upload UI: filename, file size, progress bar; save disabled during upload
-- [ ] Client-side validation of file type and minimum bitrate/sample rate before upload
-- [ ] Retry button on upload failure without losing other form state
-- [ ] Server-side file size limit configurable via env var (default 2 GB)
-- [ ] Rate limiting on upload URL endpoint (moderate per admin session)
+- [x] Storage adapter abstraction supporting MinIO and external S3 via env config
+- [x] `POST /api/admin/assets/upload-url` — generate presigned PUT URL for direct-to-storage upload
+- [x] Client-side upload UI: filename, file size, progress bar; save disabled during upload
+- [x] Ability to upload multiple files at once
+- [x] Ability to drag and drop uploads
+- [x] Client-side validation of file type and minimum bitrate/sample rate before upload
+- [x] Retry button on upload failure without losing other form state
+- [x] Server-side file size limit configurable via env var (default 2 GB)
+- [x] Rate limiting on upload URL endpoint (moderate per admin session)
 
 ---
 
@@ -351,6 +353,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] `PRIVATE` store → maintenance page for public visitors
 - [ ] Admin sets `PUBLIC` → storefront accessible
 - [ ] Admin creates release with lossless masters (including >100 MB file)
+- [ ] Admin uploads multiple files in one action (batch upload) successfully
+- [ ] Admin drag-and-drop upload works (including progress and completion state)
 - [ ] Admin creates lossy-only release → quality warning on storefront
 - [ ] Buyer claims free release with email → receives library link (no Stripe)
 - [ ] Buyer purchases fixed-price → receives magic link → downloads multiple times

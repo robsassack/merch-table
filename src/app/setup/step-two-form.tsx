@@ -4,6 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { SMTP_PRESETS } from "@/lib/setup/smtp-presets";
+import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 
 import {
   setupContinueButtonClassName,
@@ -429,7 +430,9 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
       {testPassed ? (
         <p className="text-sm text-green-700">
           SMTP verified. You can continue to the next step.
-          {lastTestedAt ? ` Last success: ${new Date(lastTestedAt).toLocaleString()}.` : ""}
+          {lastTestedAt
+            ? ` Last success: ${formatIsoTimestampForDisplay(lastTestedAt)}.`
+            : ""}
         </p>
       ) : (
         <p className="text-sm text-amber-700">

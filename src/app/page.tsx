@@ -1,30 +1,63 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 type StorefrontTheme = "light" | "dark";
 
 const STOREFRONT_THEME_KEY = "storefront-theme";
+const STOREFRONT_THEME_EVENT = "storefront-theme-change";
+
+function readThemeFromBrowser(): StorefrontTheme {
+  if (typeof window === "undefined") {
+    return "light";
+  }
+
+  const saved = window.localStorage.getItem(STOREFRONT_THEME_KEY);
+  if (saved === "light" || saved === "dark") {
+    return saved;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "dark"
+    : "light";
+}
+
+function subscribeToThemeStore(listener: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  const onStorage = (event: StorageEvent) => {
+    if (!event.key || event.key === STOREFRONT_THEME_KEY) {
+      listener();
+    }
+  };
+  const onThemeChange = () => listener();
+
+  window.addEventListener("storage", onStorage);
+  window.addEventListener(STOREFRONT_THEME_EVENT, onThemeChange);
+
+  return () => {
+    window.removeEventListener("storage", onStorage);
+    window.removeEventListener(STOREFRONT_THEME_EVENT, onThemeChange);
+  };
+}
 
 export default function Home() {
-  const [theme, setTheme] = useState<StorefrontTheme>(() => {
+  const theme = useSyncExternalStore(
+    subscribeToThemeStore,
+    readThemeFromBrowser,
+    () => "light",
+  );
+
+  const setTheme = (nextTheme: StorefrontTheme) => {
     if (typeof window === "undefined") {
-      return "light";
+      return;
     }
 
-    const saved = window.localStorage.getItem(STOREFRONT_THEME_KEY);
-    if (saved === "light" || saved === "dark") {
-      return saved;
-    }
-
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem(STOREFRONT_THEME_KEY, theme);
-  }, [theme]);
+    window.localStorage.setItem(STOREFRONT_THEME_KEY, nextTheme);
+    window.dispatchEvent(new Event(STOREFRONT_THEME_EVENT));
+  };
 
   const isDark = theme === "dark";
 

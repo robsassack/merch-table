@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
+
 import {
   setupContinueButtonClassName,
   setupPrimaryButtonClassName,
@@ -221,7 +223,7 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
         <p className="text-sm text-green-700">
           Admin magic link sent.
           {magicLinkSentAt
-            ? ` Last sent: ${new Date(magicLinkSentAt).toLocaleString()}.`
+            ? ` Last sent: ${formatIsoTimestampForDisplay(magicLinkSentAt)}.`
             : ""}
         </p>
       ) : (

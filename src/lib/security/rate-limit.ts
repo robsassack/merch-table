@@ -6,6 +6,10 @@ type RateLimitPolicy = {
   windowMs: number;
 };
 
+type RateLimitOptions = {
+  key?: string;
+};
+
 type RateLimitBucket = {
   count: number;
   resetAt: number;
@@ -57,7 +61,11 @@ function cleanupExpiredBuckets(store: RateLimitStore, now: number) {
   }
 }
 
-export function enforceRateLimit(request: Request, policy: RateLimitPolicy) {
+export function enforceRateLimit(
+  request: Request,
+  policy: RateLimitPolicy,
+  options: RateLimitOptions = {},
+) {
   const now = Date.now();
   const store = getStore();
 
@@ -67,7 +75,7 @@ export function enforceRateLimit(request: Request, policy: RateLimitPolicy) {
 
   store.operations += 1;
 
-  const key = `${policy.id}:${getClientIp(request)}`;
+  const key = `${policy.id}:${options.key ?? getClientIp(request)}`;
   const existing = store.buckets.get(key);
   const bucket =
     existing && existing.resetAt > now

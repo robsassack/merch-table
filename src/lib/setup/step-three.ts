@@ -1,8 +1,8 @@
-import { HeadBucketCommand, S3Client } from "@aws-sdk/client-s3";
 import { z } from "zod";
 
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { prisma } from "@/lib/prisma";
+import { createStorageAdapter } from "@/lib/storage/adapter";
 
 const storageModeEnum = z.enum(["MINIO", "S3"]);
 
@@ -222,17 +222,17 @@ export async function validateExternalS3Credentials() {
     throw new Error("External S3 settings are incomplete.");
   }
 
-  const client = new S3Client({
+  const adapter = createStorageAdapter({
+    provider: "S3",
+    bucket: state.storageBucket,
     region: state.storageRegion,
     endpoint: state.storageEndpoint,
-    forcePathStyle: state.storageUsePathStyle,
-    credentials: {
-      accessKeyId: state.storageAccessKeyId,
-      secretAccessKey: storageSecretAccessKey,
-    },
+    usePathStyle: state.storageUsePathStyle,
+    accessKeyId: state.storageAccessKeyId,
+    secretAccessKey: storageSecretAccessKey,
   });
 
-  await client.send(new HeadBucketCommand({ Bucket: state.storageBucket }));
+  await adapter.validateAccess();
 
   const now = new Date();
   await prisma.setupWizardState.update({

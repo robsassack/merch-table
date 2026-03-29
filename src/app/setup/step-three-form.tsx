@@ -3,6 +3,8 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
+
 import {
   setupContinueButtonClassName,
   setupPrimaryButtonClassName,
@@ -350,7 +352,9 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
       {validated ? (
         <p className="text-sm text-green-700">
           Storage ready.
-          {validatedAt ? ` Last validated: ${new Date(validatedAt).toLocaleString()}.` : ""}
+          {validatedAt
+            ? ` Last validated: ${formatIsoTimestampForDisplay(validatedAt)}.`
+            : ""}
         </p>
       ) : externalMode ? (
         <p className="text-sm text-amber-700">
