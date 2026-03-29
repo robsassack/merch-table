@@ -88,9 +88,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Artist management
 
-- [ ] Artist CRUD (create, read, update)
-- [ ] Soft delete with `deletedAt`; "deleted" badge in admin; restore action
-- [ ] Permanent purge action with confirmation
+- [x] Artist CRUD (create, read, update)
+- [x] Soft delete with `deletedAt`; "deleted" badge in admin; restore action
+- [x] Permanent purge action with confirmation
 
 ### Release management
 

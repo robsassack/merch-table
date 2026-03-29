@@ -117,6 +117,7 @@ model Artist {
   ownerId        String?
   name           String
   slug           String
+  location       String?
   bio            String?
   deletedAt      DateTime?
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
