@@ -1,5 +1,12 @@
 import type { Prisma } from "@/generated/prisma/client";
 
+import type {
+  AssetRole,
+  PreviewMode,
+  TranscodeStatus,
+} from "@/generated/prisma/enums";
+import { adminTrackSelect, toAdminTrackRecord } from "@/lib/admin/track-management";
+
 const adminReleaseSelectShared = {
   id: true,
   artistId: true,
@@ -26,15 +33,7 @@ const adminReleaseSelectShared = {
     },
   },
   tracks: {
-    select: {
-      id: true,
-      assets: {
-        select: {
-          id: true,
-          isLossless: true,
-        },
-      },
-    },
+    select: adminTrackSelect,
   },
   _count: {
     select: {
@@ -91,11 +90,54 @@ export type AdminReleaseRecord = {
     name: string;
     deletedAt: string | null;
   };
+  tracks: AdminReleaseTrackRecord[];
   _count: {
     tracks: number;
     files: number;
     orderItems: number;
   };
+};
+
+export type AdminTrackAssetRecord = {
+  id: string;
+  storageKey: string;
+  format: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  bitrateKbps: number | null;
+  sampleRateHz: number | null;
+  channels: number | null;
+  isLossless: boolean;
+  assetRole: AssetRole;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminTrackTranscodeJobRecord = {
+  id: string;
+  sourceAssetId: string;
+  status: TranscodeStatus;
+  errorMessage: string | null;
+  queuedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AdminReleaseTrackRecord = {
+  id: string;
+  title: string;
+  trackNumber: number;
+  durationMs: number | null;
+  lyrics: string | null;
+  credits: string | null;
+  previewMode: PreviewMode;
+  previewSeconds: number | null;
+  createdAt: string;
+  updatedAt: string;
+  assets: AdminTrackAssetRecord[];
+  transcodeJobs: AdminTrackTranscodeJobRecord[];
 };
 
 type RuntimeModelField = { name?: string };
@@ -150,6 +192,9 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
     release.releaseDate instanceof Date
       ? release.releaseDate
       : release.createdAt;
+  const tracks = release.tracks
+    .map((track) => toAdminTrackRecord(track))
+    .sort((a, b) => a.trackNumber - b.trackNumber || a.createdAt.localeCompare(b.createdAt));
 
   return {
     id: release.id,
@@ -178,6 +223,7 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
       name: release.artist.name,
       deletedAt: release.artist.deletedAt?.toISOString() ?? null,
     },
+    tracks,
     _count: {
       tracks: release._count.tracks,
       files: release._count.files,

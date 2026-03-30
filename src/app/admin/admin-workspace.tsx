@@ -4,7 +4,6 @@ import type { StoreStatus } from "@/generated/prisma/enums";
 
 import { ArtistManagementPanel } from "./artist-management-panel";
 import { ReleaseManagementPanel } from "./release-management-panel";
-import { UploadPanel } from "./upload-panel";
 
 type AdminWorkspaceProps = {
   storeStatus: StoreStatus;
@@ -12,7 +11,7 @@ type AdminWorkspaceProps = {
   activeTab: AdminTab;
 };
 
-export type AdminTab = "artists" | "releases" | "upload";
+export type AdminTab = "artists" | "releases";
 
 const tabClassName =
   "inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition";
@@ -80,24 +79,12 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
           >
             Releases
           </Link>
-          <Link
-            href="/admin/upload"
-            aria-current={activeTab === "upload" ? "page" : undefined}
-            className={`${tabClassName} ${
-              activeTab === "upload"
-                ? "bg-slate-700 text-zinc-100"
-                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
-            }`}
-          >
-            Upload
-          </Link>
         </div>
       </div>
 
       <div className="mt-4">
         {activeTab === "artists" ? <ArtistManagementPanel /> : null}
         {activeTab === "releases" ? <ReleaseManagementPanel /> : null}
-        {activeTab === "upload" ? <UploadPanel /> : null}
       </div>
     </>
   );

@@ -1,0 +1,338 @@
+import path from "node:path";
+
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { prisma } from "@/lib/prisma";
+import { enforceCsrfProtection } from "@/lib/security/csrf";
+import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import {
+  isAllowedUploadContentType,
+  normalizeContentType,
+} from "@/lib/storage/upload-policy";
+
+export const runtime = "nodejs";
+
+const commitTrackAssetSchema = z.object({
+  releaseId: z.string().trim().min(1),
+  trackId: z.string().trim().min(1),
+  fileName: z.string().trim().min(1).max(255),
+  storageKey: z.string().trim().min(1).max(500),
+  contentType: z.string().trim().min(1).max(255),
+  sizeBytes: z.number().int().positive(),
+  assetRole: z.enum(["MASTER", "DELIVERY"]),
+  format: z.string().trim().min(1).max(40).optional(),
+  bitrateKbps: z.number().int().positive().nullable().optional(),
+  sampleRateHz: z.number().int().positive().nullable().optional(),
+  channels: z.number().int().positive().nullable().optional(),
+  isLossless: z.boolean().optional(),
+});
+
+const MIME_TO_FORMAT: Record<string, string> = {
+  "audio/mpeg": "mp3",
+  "audio/mp3": "mp3",
+  "audio/wav": "wav",
+  "audio/x-wav": "wav",
+  "audio/wave": "wav",
+  "audio/flac": "flac",
+  "audio/x-flac": "flac",
+  "audio/aac": "aac",
+  "audio/mp4": "m4a",
+  "audio/x-m4a": "m4a",
+  "audio/ogg": "ogg",
+  "audio/webm": "webm",
+  "audio/aiff": "aiff",
+  "audio/x-aiff": "aiff",
+};
+
+const LOSSLESS_FORMATS = new Set(["flac", "wav", "aiff", "aif", "alac"]);
+
+function isValidUploadedAudioStorageKey(storageKey: string) {
+  if (storageKey.includes("..")) {
+    return false;
+  }
+
+  return storageKey.startsWith("admin/uploads/");
+}
+
+function inferFormatFromFileName(fileName: string) {
+  const extension = path.extname(fileName).toLowerCase().replace(".", "");
+  if (!extension) {
+    return null;
+  }
+
+  return extension;
+}
+
+function resolveTrackAssetFormat(input: {
+  explicitFormat: string | undefined;
+  fileName: string;
+  mimeType: string;
+}) {
+  if (input.explicitFormat && input.explicitFormat.length > 0) {
+    return input.explicitFormat.toLowerCase();
+  }
+
+  const fromName = inferFormatFromFileName(input.fileName);
+  if (fromName) {
+    return fromName;
+  }
+
+  return MIME_TO_FORMAT[input.mimeType] ?? "bin";
+}
+
+function inferLosslessStatus(input: {
+  explicit: boolean | undefined;
+  format: string;
+  mimeType: string;
+}) {
+  if (typeof input.explicit === "boolean") {
+    return input.explicit;
+  }
+
+  if (LOSSLESS_FORMATS.has(input.format)) {
+    return true;
+  }
+
+  return (
+    input.mimeType.includes("flac") ||
+    input.mimeType.includes("wav") ||
+    input.mimeType.includes("aiff")
+  );
+}
+
+function normalizeOptionalPositiveInt(value: number | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (!Number.isFinite(value) || value <= 0) {
+    return null;
+  }
+
+  return Math.round(value);
+}
+
+export async function POST(request: Request) {
+  const csrfError = enforceCsrfProtection(request);
+  if (csrfError) {
+    return csrfError;
+  }
+
+  const auth = await requireAdminRequestContext();
+  if (!auth.ok) {
+    return auth.response;
+  }
+
+  try {
+    const payload = await request.json();
+    const parsed = commitTrackAssetSchema.parse(payload);
+    const mimeType = normalizeContentType(parsed.contentType);
+    if (!isAllowedUploadContentType(mimeType)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: `Unsupported audio content type "${parsed.contentType}".`,
+        },
+        { status: 415 },
+      );
+    }
+
+    if (!isValidUploadedAudioStorageKey(parsed.storageKey)) {
+      return NextResponse.json(
+        { ok: false, error: "Invalid storage key for uploaded track asset." },
+        { status: 400 },
+      );
+    }
+
+    const track = await prisma.releaseTrack.findFirst({
+      where: {
+        id: parsed.trackId,
+        releaseId: parsed.releaseId,
+        release: {
+          organizationId: auth.context.organizationId,
+        },
+      },
+      select: {
+        id: true,
+        releaseId: true,
+        previewMode: true,
+      },
+    });
+
+    if (!track) {
+      return NextResponse.json(
+        { ok: false, error: "Track not found for this release." },
+        { status: 404 },
+      );
+    }
+
+    const format = resolveTrackAssetFormat({
+      explicitFormat: parsed.format,
+      fileName: parsed.fileName,
+      mimeType,
+    });
+    const isLossless = inferLosslessStatus({
+      explicit: parsed.isLossless,
+      format,
+      mimeType,
+    });
+
+    const result = await prisma.$transaction(async (tx) => {
+      const existing = await tx.trackAsset.findFirst({
+        where: {
+          trackId: track.id,
+          storageKey: parsed.storageKey,
+        },
+        select: {
+          id: true,
+          trackId: true,
+          storageKey: true,
+          format: true,
+          mimeType: true,
+          fileSizeBytes: true,
+          bitrateKbps: true,
+          sampleRateHz: true,
+          channels: true,
+          isLossless: true,
+          assetRole: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+
+      const asset = existing
+        ? await tx.trackAsset.update({
+            where: { id: existing.id },
+            data: {
+              format,
+              mimeType,
+              fileSizeBytes: parsed.sizeBytes,
+              bitrateKbps: normalizeOptionalPositiveInt(parsed.bitrateKbps),
+              sampleRateHz: normalizeOptionalPositiveInt(parsed.sampleRateHz),
+              channels: normalizeOptionalPositiveInt(parsed.channels),
+              isLossless,
+              assetRole: parsed.assetRole,
+            },
+            select: {
+              id: true,
+              trackId: true,
+              storageKey: true,
+              format: true,
+              mimeType: true,
+              fileSizeBytes: true,
+              bitrateKbps: true,
+              sampleRateHz: true,
+              channels: true,
+              isLossless: true,
+              assetRole: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          })
+        : await tx.trackAsset.create({
+            data: {
+              trackId: track.id,
+              storageKey: parsed.storageKey,
+              format,
+              mimeType,
+              fileSizeBytes: parsed.sizeBytes,
+              bitrateKbps: normalizeOptionalPositiveInt(parsed.bitrateKbps),
+              sampleRateHz: normalizeOptionalPositiveInt(parsed.sampleRateHz),
+              channels: normalizeOptionalPositiveInt(parsed.channels),
+              isLossless,
+              assetRole: parsed.assetRole,
+            },
+            select: {
+              id: true,
+              trackId: true,
+              storageKey: true,
+              format: true,
+              mimeType: true,
+              fileSizeBytes: true,
+              bitrateKbps: true,
+              sampleRateHz: true,
+              channels: true,
+              isLossless: true,
+              assetRole: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          });
+
+      let previewJobQueued = false;
+      let previewJobId: string | null = null;
+
+      if (asset.assetRole === "MASTER" && track.previewMode === "CLIP") {
+        const pendingJob = await tx.transcodeJob.findFirst({
+          where: {
+            organizationId: auth.context.organizationId,
+            trackId: track.id,
+            sourceAssetId: asset.id,
+            status: {
+              in: ["QUEUED", "RUNNING"],
+            },
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (pendingJob) {
+          previewJobId = pendingJob.id;
+        } else {
+          const queuedJob = await tx.transcodeJob.create({
+            data: {
+              organizationId: auth.context.organizationId,
+              trackId: track.id,
+              sourceAssetId: asset.id,
+              status: "QUEUED",
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          previewJobQueued = true;
+          previewJobId = queuedJob.id;
+        }
+      }
+
+      return {
+        asset,
+        previewJobQueued,
+        previewJobId,
+      };
+    });
+
+    return NextResponse.json({
+      ok: true,
+      asset: {
+        ...result.asset,
+        createdAt: result.asset.createdAt.toISOString(),
+        updatedAt: result.asset.updatedAt.toISOString(),
+      },
+      previewJobQueued: result.previewJobQueued,
+      previewJobId: result.previewJobId,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { ok: false, error: "Provide valid release, track, and asset metadata." },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof Error) {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 400 },
+      );
+    }
+
+    return NextResponse.json(
+      { ok: false, error: "Could not commit track asset." },
+      { status: 500 },
+    );
+  }
+}

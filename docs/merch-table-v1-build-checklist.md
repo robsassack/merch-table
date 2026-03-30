@@ -105,10 +105,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Track management
 
-- [ ] Track CRUD within a release (title, track number, duration, lyrics/credits)
-- [ ] Associate `TrackAsset` records on upload (master, delivery roles)
-- [ ] Preview mode controls per track (`CLIP` / `FULL`, `previewSeconds`)
-- [ ] Automatic preview clip generation queued on asset upload when `previewMode` is `CLIP`
+- [x] Track CRUD within a release (title, track number, duration, lyrics/credits)
+- [x] Associate `TrackAsset` records on upload (master, delivery roles)
+- [x] Preview mode controls per track (`CLIP` / `FULL`, `previewSeconds`)
+- [x] Automatic preview clip generation queued on asset upload when `previewMode` is `CLIP`
 
 ---
 
