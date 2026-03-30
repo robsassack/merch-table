@@ -14,7 +14,7 @@ import type {
 import { getTodayDateInputValue, isBlobObjectUrl } from "./utils";
 
 export function useReleaseManagementState() {
-  const [isHydrated, setIsHydrated] = useState(false);
+  const isHydrated = true;
   const localObjectUrlsRef = useRef<Set<string>>(new Set());
 
   const [artists, setArtists] = useState<ArtistOption[]>([]);
@@ -171,10 +171,6 @@ export function useReleaseManagementState() {
     },
     [],
   );
-
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
 
   return {
     isHydrated,

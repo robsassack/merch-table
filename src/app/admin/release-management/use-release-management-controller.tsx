@@ -49,7 +49,7 @@ export function useReleaseManagementController() {
     setSelectedReleaseId,
     setCreateComposerOpen,
   } = state;
-  const syncDrafts = (list: ReleaseRecord[]) => {
+  const syncDrafts = useCallback((list: ReleaseRecord[]) => {
     setDraftsById((previous) => {
       const next: Record<string, ReleaseDraft> = {};
       for (const release of list) {
@@ -57,7 +57,7 @@ export function useReleaseManagementController() {
       }
       return next;
     });
-  };
+  }, [setDraftsById]);
 
   const syncTrackDrafts = useCallback((list: ReleaseRecord[]) => {
     setTrackDraftsById((previous) => {
@@ -123,7 +123,15 @@ export function useReleaseManagementController() {
       }
       return next;
     });
-  }, []);
+  }, [
+    setTrackDraftsById,
+    setNewTrackByReleaseId,
+    setTrackUploadRoleById,
+    setExpandedTrackIdByReleaseId,
+    setDraggingTrackIdByReleaseId,
+    setDragOverTrackIdByReleaseId,
+    setPreviewByReleaseId,
+  ]);
 
   const loadReleases = useCallback(async () => {
     setLoading(true);
@@ -162,7 +170,19 @@ export function useReleaseManagementController() {
     } finally {
       setLoading(false);
     }
-  }, [syncTrackDrafts]);
+  }, [
+    setLoading,
+    setError,
+    setReleases,
+    setArtists,
+    syncDrafts,
+    syncTrackDrafts,
+    setMinimumPriceFloorCents,
+    setStoreCurrency,
+    setStripeFeePercentBps,
+    setStripeFeeFixedCents,
+    setNewArtistId,
+  ]);
 
   useEffect(() => {
     void loadReleases();
@@ -180,13 +200,13 @@ export function useReleaseManagementController() {
 
       return releases[0].id;
     });
-  }, [releases]);
+  }, [releases, setSelectedReleaseId]);
 
   useEffect(() => {
     if (!loading && releases.length === 0) {
       setCreateComposerOpen(true);
     }
-  }, [loading, releases.length]);
+  }, [loading, releases.length, setCreateComposerOpen]);
 
   const replaceRelease = (updated: ReleaseRecord) => {
     const normalized = withReleaseDerivedTrackStats(updated);
