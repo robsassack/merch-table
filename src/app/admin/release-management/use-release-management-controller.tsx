@@ -1,0 +1,371 @@
+import { useCallback, useEffect } from "react";
+
+import { createReleaseActions } from "./use-release-management-release-actions";
+import { createTrackEditActions } from "./use-release-management-track-edit-actions";
+import { createTrackImportUploadActions } from "./use-release-management-track-import-upload-actions";
+import { useReleaseManagementState } from "./use-release-management-state";
+import type {
+  NewTrackDraft,
+  ReleaseDraft,
+  ReleasePreviewDraft,
+  ReleaseRecord,
+  ReleasesListResponse,
+  TrackDraft,
+  TrackRecordPatch,
+} from "./types";
+import {
+  formatCurrency,
+  sortTracks,
+  toNewTrackDraft,
+  toReleaseDraft,
+  toReleasePreviewDraft,
+  toTrackDraft,
+  withReleaseDerivedTrackStats,
+} from "./utils";
+
+export function useReleaseManagementController() {
+  const state = useReleaseManagementState();
+  const {
+    releases,
+    loading,
+    minimumPriceFloorCents,
+    setDraftsById,
+    setTrackDraftsById,
+    setNewTrackByReleaseId,
+    setTrackUploadRoleById,
+    setExpandedTrackIdByReleaseId,
+    setDraggingTrackIdByReleaseId,
+    setDragOverTrackIdByReleaseId,
+    setPreviewByReleaseId,
+    setLoading,
+    setError,
+    setReleases,
+    setArtists,
+    setMinimumPriceFloorCents,
+    setStoreCurrency,
+    setStripeFeePercentBps,
+    setStripeFeeFixedCents,
+    setNewArtistId,
+    setSelectedReleaseId,
+    setCreateComposerOpen,
+  } = state;
+  const syncDrafts = (list: ReleaseRecord[]) => {
+    setDraftsById((previous) => {
+      const next: Record<string, ReleaseDraft> = {};
+      for (const release of list) {
+        next[release.id] = previous[release.id] ?? toReleaseDraft(release);
+      }
+      return next;
+    });
+  };
+
+  const syncTrackDrafts = useCallback((list: ReleaseRecord[]) => {
+    setTrackDraftsById((previous) => {
+      const next: Record<string, TrackDraft> = {};
+      for (const release of list) {
+        for (const track of release.tracks) {
+          next[track.id] = previous[track.id] ?? toTrackDraft(track);
+        }
+      }
+      return next;
+    });
+
+    setNewTrackByReleaseId((previous) => {
+      const next: Record<string, NewTrackDraft> = {};
+      for (const release of list) {
+        next[release.id] = previous[release.id] ?? toNewTrackDraft(release);
+      }
+      return next;
+    });
+
+    setTrackUploadRoleById((previous) => {
+      const next: Record<string, "MASTER" | "DELIVERY"> = {};
+      for (const release of list) {
+        for (const track of release.tracks) {
+          next[track.id] = previous[track.id] ?? "MASTER";
+        }
+      }
+      return next;
+    });
+
+    setExpandedTrackIdByReleaseId((previous) => {
+      const next: Record<string, string | null> = {};
+      for (const release of list) {
+        const previousExpanded = previous[release.id] ?? null;
+        const stillExists =
+          previousExpanded !== null &&
+          release.tracks.some((track) => track.id === previousExpanded);
+        next[release.id] = stillExists ? previousExpanded : null;
+      }
+      return next;
+    });
+
+    setDraggingTrackIdByReleaseId((previous) => {
+      const next: Record<string, string | null> = {};
+      for (const release of list) {
+        next[release.id] = previous[release.id] ?? null;
+      }
+      return next;
+    });
+
+    setDragOverTrackIdByReleaseId((previous) => {
+      const next: Record<string, string | null> = {};
+      for (const release of list) {
+        next[release.id] = previous[release.id] ?? null;
+      }
+      return next;
+    });
+
+    setPreviewByReleaseId((previous) => {
+      const next: Record<string, ReleasePreviewDraft> = {};
+      for (const release of list) {
+        next[release.id] = previous[release.id] ?? toReleasePreviewDraft(release);
+      }
+      return next;
+    });
+  }, []);
+
+  const loadReleases = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/admin/releases", { method: "GET" });
+      const body = (await response.json().catch(() => null)) as ReleasesListResponse | null;
+      if (!response.ok || !body?.ok || !body.releases || !body.artists) {
+        throw new Error(body?.error ?? "Could not load releases.");
+      }
+
+      const hydratedReleases = body.releases.map((release) =>
+        withReleaseDerivedTrackStats(release),
+      );
+      setReleases(hydratedReleases);
+      setArtists(body.artists);
+      syncDrafts(hydratedReleases);
+      syncTrackDrafts(hydratedReleases);
+      setMinimumPriceFloorCents(body.minimumPriceFloorCents ?? 50);
+      setStoreCurrency(body.storeCurrency ?? "USD");
+      setStripeFeePercentBps(body.stripeFeeEstimate?.percentBps ?? 290);
+      setStripeFeeFixedCents(body.stripeFeeEstimate?.fixedFeeCents ?? 30);
+      const artistList = body.artists;
+
+      setNewArtistId((current) => {
+        if (current.length > 0) {
+          return current;
+        }
+
+        const firstArtist = artistList.find((artist) => artist.deletedAt === null);
+        return firstArtist?.id ?? current;
+      });
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Could not load releases.");
+    } finally {
+      setLoading(false);
+    }
+  }, [syncTrackDrafts]);
+
+  useEffect(() => {
+    void loadReleases();
+  }, [loadReleases]);
+
+  useEffect(() => {
+    setSelectedReleaseId((current) => {
+      if (releases.length === 0) {
+        return null;
+      }
+
+      if (current && releases.some((release) => release.id === current)) {
+        return current;
+      }
+
+      return releases[0].id;
+    });
+  }, [releases]);
+
+  useEffect(() => {
+    if (!loading && releases.length === 0) {
+      setCreateComposerOpen(true);
+    }
+  }, [loading, releases.length]);
+
+  const replaceRelease = (updated: ReleaseRecord) => {
+    const normalized = withReleaseDerivedTrackStats(updated);
+    setReleases((previous) =>
+      previous.map((release) => (release.id === normalized.id ? normalized : release)),
+    );
+    setDraftsById((previous) => ({
+      ...previous,
+      [normalized.id]: toReleaseDraft(normalized),
+    }));
+    setTrackDraftsById((previous) => {
+      const next = { ...previous };
+      for (const track of normalized.tracks) {
+        next[track.id] = previous[track.id] ?? toTrackDraft(track);
+      }
+      return next;
+    });
+    setNewTrackByReleaseId((previous) => ({
+      ...previous,
+      [normalized.id]: previous[normalized.id] ?? toNewTrackDraft(normalized),
+    }));
+    setPreviewByReleaseId((previous) => ({
+      ...previous,
+      [normalized.id]: previous[normalized.id] ?? toReleasePreviewDraft(normalized),
+    }));
+  };
+
+  const applyTrackPatchToRelease = (releaseId: string, track: TrackRecordPatch) => {
+    let nextTracksForDraftSync: TrackRecordPatch[] | null = null;
+
+    setReleases((previous) =>
+      previous.map((release) => {
+        if (release.id !== releaseId) {
+          return release;
+        }
+
+        const sorted = sortTracks(release.tracks);
+        const existingIndex = sorted.findIndex((entry) => entry.id === track.id);
+        const withoutTrack =
+          existingIndex >= 0
+            ? sorted.filter((entry) => entry.id !== track.id)
+            : [...sorted];
+
+        const targetIndex = Math.max(
+          0,
+          Math.min(withoutTrack.length, track.trackNumber - 1),
+        );
+        const nextTracks = [
+          ...withoutTrack.slice(0, targetIndex),
+          track,
+          ...withoutTrack.slice(targetIndex),
+        ].map((entry, index) => ({
+          ...entry,
+          trackNumber: index + 1,
+        }));
+        nextTracksForDraftSync = nextTracks;
+
+        return withReleaseDerivedTrackStats({
+          ...release,
+          tracks: nextTracks,
+        });
+      }),
+    );
+
+    setTrackDraftsById((previous) => {
+      if (!nextTracksForDraftSync) {
+        return {
+          ...previous,
+          [track.id]: toTrackDraft(track),
+        };
+      }
+
+      const next = { ...previous };
+      for (const nextTrack of nextTracksForDraftSync) {
+        next[nextTrack.id] = toTrackDraft(nextTrack);
+      }
+      return next;
+    });
+  };
+
+  const {
+    getPricingEstimate,
+    onNewCoverFileChange,
+    onExistingCoverFileChange,
+    onCreateRelease,
+    onUpdateRelease,
+    onSoftDeleteOrRestoreRelease,
+    onPurgeRelease,
+    onHardDeleteRelease,
+    newCoverPreviewSrc,
+  } = createReleaseActions({
+    ...state,
+    replaceRelease,
+  });
+
+  const { onImportTrackFiles, onInlineTrackFileChange } =
+    createTrackImportUploadActions({
+      ...state,
+      loadReleases,
+    });
+
+  const {
+    onApplyReleasePreviewToTracks,
+    onCreateTrack,
+    onUpdateTrack,
+    onReorderTrackDrop,
+    onDeleteTrack,
+  } = createTrackEditActions({
+    ...state,
+    loadReleases,
+    applyTrackPatchToRelease,
+  });
+
+  const renderPricingDetails = (draft: ReleaseDraft, currency: string) => {
+    if (draft.pricingMode === "FREE") {
+      return (
+        <p className="mt-2 text-xs text-zinc-500">
+          Free release. Stripe is bypassed and no minimum floor applies.
+        </p>
+      );
+    }
+
+    const estimate = getPricingEstimate(draft, currency);
+
+    return (
+      <>
+        <p className="mt-2 text-xs text-zinc-500">
+          Minimum system floor:{" "}
+          {draft.pricingMode === "PWYW" && draft.allowFreeCheckout
+            ? `${formatCurrency(0, currency)} (free checkout enabled) or ${formatCurrency(minimumPriceFloorCents, currency)}+`
+            : formatCurrency(minimumPriceFloorCents, currency)}
+          .
+        </p>
+        {estimate ? (
+          <p className="mt-1 text-xs text-zinc-400">
+            At {estimate.grossLabel}, Stripe fees are ~{estimate.feeLabel} and payout is ~
+            {estimate.netLabel}.
+          </p>
+        ) : draft.pricingMode === "PWYW" && draft.allowFreeCheckout ? (
+          <p className="mt-1 text-xs text-zinc-400">
+            Free checkout is enabled. Buyers can check out at{" "}
+            {formatCurrency(0, currency)}.
+          </p>
+        ) : (
+          <p className="mt-1 text-xs text-zinc-500">
+            Enter a price to preview Stripe fee and net payout.
+          </p>
+        )}
+        {estimate?.belowFloor ? (
+          <p className="mt-2 rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
+            Price is below the minimum floor of {formatCurrency(minimumPriceFloorCents, currency)}.
+          </p>
+        ) : null}
+      </>
+    );
+  };
+
+  return {
+    ...state,
+    onNewCoverFileChange,
+    onExistingCoverFileChange,
+    onCreateRelease,
+    onUpdateRelease,
+    onSoftDeleteOrRestoreRelease,
+    onPurgeRelease,
+    onHardDeleteRelease,
+    onImportTrackFiles,
+    onApplyReleasePreviewToTracks,
+    onCreateTrack,
+    onUpdateTrack,
+    onReorderTrackDrop,
+    onDeleteTrack,
+    onInlineTrackFileChange,
+    getPricingEstimate,
+    renderPricingDetails,
+    newCoverPreviewSrc,
+  };
+}
+
+export type ReleaseManagementController = ReturnType<
+  typeof useReleaseManagementController
+>;
