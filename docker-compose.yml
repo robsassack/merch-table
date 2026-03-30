@@ -8,10 +8,10 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
       REDIS_URL: redis://redis:6379
-      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ENDPOINT: http://garage:3900
       STORAGE_BUCKET: media
-      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
-      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-secret-access-key}
       STORAGE_USE_PATH_STYLE: "true"
     ports:
       - "3000:3000"
@@ -20,7 +20,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      garage:
         condition: service_healthy
 
   worker:
@@ -72,20 +72,21 @@ services:
       retries: 5
       start_period: 5s
 
-  minio:
-    image: minio/minio:latest
-    container_name: merchtable-minio
-    command: server /data --console-address ":9001"
+  garage:
+    image: dxflrs/garage:v2.2.0
+    container_name: merchtable-garage
     environment:
-      MINIO_ROOT_USER: ${STORAGE_ACCESS_KEY_ID:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${STORAGE_SECRET_ACCESS_KEY:-minioadmin}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-media}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-secret-access-key}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "3900:3900"
+      - "3902:3902"
     volumes:
-      - minio_data:/data
+      - ./infra/garage/garage.toml:/etc/garage.toml:ro
+      - garage_data:/var/lib/garage
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "/garage", "-c", "/etc/garage.toml", "status"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -94,4 +95,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  minio_data:
+  garage_data:

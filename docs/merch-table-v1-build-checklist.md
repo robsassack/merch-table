@@ -10,7 +10,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [x] Rotate all existing local secrets; create `.env.example` with documented values
 - [x] Define all env vars (required + optional) and their defaults in `.env.example`
-- [x] Verify Docker Compose brings up `postgres`, `redis`, `minio` with named volumes
+- [x] Verify Docker Compose brings up `postgres`, `redis`, `garage` with named volumes
 - [x] Add `web` and `worker` service stubs to Docker Compose
 
 ### Schema migration
@@ -43,7 +43,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Middleware: check `StoreSettings.setupComplete`; if false, redirect all routes to `/setup`
 - [x] Step 1 — Store basics: org name, store name, contact email, currency (ISO code, default USD)
 - [x] Step 2 — SMTP config: host, port, credentials + "send test email" action; block progression on failure
-- [x] Step 3 — Storage: choose bundled MinIO (default) or external S3; validate credentials if external
+- [x] Step 3 — Storage: choose bundled Garage (default) or external S3; validate credentials if external
 - [x] Step 4 — Stripe: API key + webhook secret; display exact webhook URL; "verify connection" check
 - [x] Step 5 — Admin account: enter admin email; send first magic-link using SMTP from Step 2
 - [x] Step 6 — Confirmation: set `setupComplete = true`, `storeStatus = PRIVATE`, redirect to admin
@@ -68,9 +68,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ## Phase 2: Storage & File Upload
 
-> Goal: Admin can upload audio files to MinIO/S3 via presigned URLs.
+> Goal: Admin can upload audio files to Garage/S3 via presigned URLs.
 
-- [x] Storage adapter abstraction supporting MinIO and external S3 via env config
+- [x] Storage adapter abstraction supporting Garage and external S3 via env config
 - [x] `POST /api/admin/upload/upload-url` — generate presigned PUT URL for direct-to-storage upload
 - [x] Client-side upload UI: filename, file size, progress bar; save disabled during upload
 - [x] Ability to upload multiple files at once
@@ -241,7 +241,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Settings UI: allow updating SMTP/email configuration
 - [ ] Settings UI: allow updating Stripe API key + webhook secret
 - [ ] Settings UI: allow updating admin email
-- [ ] Storage safety guardrail: disallow switching `MINIO` ↔ `S3` after assets exist
+- [ ] Storage safety guardrail: disallow switching `GARAGE` ↔ `S3` after assets exist
 - [ ] Storage migration path (optional later): explicit, guided migration job with confirmation + validation
 - [ ] "Factory reset" option in settings (re-triggers wizard; does not wipe data without explicit confirmation)
 
@@ -285,9 +285,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Single `docker compose up` gets a working stack.
 
-- [ ] Docker Compose profile: `web`, `postgres`, `minio`, `redis`, `worker` with named volumes
+- [ ] Docker Compose profile: `web`, `postgres`, `garage`, `redis`, `worker` with named volumes
 - [ ] Container entrypoint runs `prisma migrate deploy`; exits non-zero on failure
-- [ ] Storage adapter works with both bundled MinIO and external S3 via env config
+- [ ] Storage adapter works with both bundled Garage and external S3 via env config
 - [ ] Worker processes transcode jobs via FFmpeg
 - [ ] Dockerfile builds and runs cleanly
 - [ ] `docker compose up` from scratch → bootstrap token in logs → setup wizard → working store
@@ -304,10 +304,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] SMTP provider recommendations (Resend primary, Postmark/SES alternatives, Gmail discouraged)
 - [ ] SPF/DKIM note for email deliverability
 - [ ] Postgres backup instructions (scheduled `pg_dump` example)
-- [ ] MinIO asset backup (`mc mirror` example)
-- [ ] Migration from bundled MinIO to external S3
+- [ ] Garage asset backup (`mc mirror` example)
+- [ ] Migration from bundled Garage to external S3
 - [ ] Upgrading section: `docker compose pull && up -d`, snapshot before upgrade, rollback instructions
-- [ ] What must survive a container wipe (Postgres volume, MinIO volume / S3 bucket, `.env`)
+- [ ] What must survive a container wipe (Postgres volume, Garage volume / S3 bucket, `.env`)
 - [ ] Auth secret rotation note (invalidates sessions/magic links)
 
 ---
@@ -372,7 +372,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Deployment verification
 
-- [ ] Compose up succeeds with bundled MinIO
+- [ ] Compose up succeeds with bundled Garage
 - [ ] External S3 config validated
 - [ ] Worker processes a transcode job
 - [ ] Container upgrade applies migrations and starts

@@ -12,7 +12,7 @@ import {
 } from "./button-styles";
 
 type StepThreeInitialValues = {
-  storageMode: "MINIO" | "S3";
+  storageMode: "GARAGE" | "S3";
   storageEndpoint: string;
   storageRegion: string;
   storageBucket: string;
@@ -47,7 +47,7 @@ type ValidateStepThreeResponse = {
 
 export function StepThreeForm({ initialValues }: StepThreeFormProps) {
   const router = useRouter();
-  const [storageMode, setStorageMode] = useState<"MINIO" | "S3">(
+  const [storageMode, setStorageMode] = useState<"GARAGE" | "S3">(
     initialValues.storageMode,
   );
   const [storageEndpoint, setStorageEndpoint] = useState(initialValues.storageEndpoint);
@@ -214,10 +214,10 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
           <input
             type="radio"
             name="storage-mode"
-            checked={storageMode === "MINIO"}
-            onChange={() => setStorageMode("MINIO")}
+            checked={storageMode === "GARAGE"}
+            onChange={() => setStorageMode("GARAGE")}
           />
-          Bundled MinIO (default)
+          Bundled Garage (default)
         </label>
         <label className="flex items-center gap-2 text-sm text-zinc-700">
           <input
@@ -303,7 +303,7 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
         </>
       ) : (
         <p className="text-sm text-zinc-600">
-          Bundled MinIO requires no additional credentials for setup.
+          Bundled Garage requires no additional credentials for setup.
         </p>
       )}
 

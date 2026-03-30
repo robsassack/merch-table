@@ -144,7 +144,7 @@ type TrackMutationResponse = {
 type UploadUrlResponse = {
   ok?: boolean;
   error?: string;
-  storageProvider?: "MINIO" | "S3";
+  storageProvider?: "GARAGE" | "S3";
   bucket?: string;
   storageKey?: string;
   uploadUrl?: string;

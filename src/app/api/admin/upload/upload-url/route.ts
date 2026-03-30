@@ -15,6 +15,7 @@ import { adminRateLimitPolicies } from "@/lib/security/admin-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
+import { ensureGarageBucketCors } from "@/lib/storage/cors";
 import {
   isAllowedUploadContentType,
   normalizeContentType,
@@ -52,7 +53,7 @@ function getHttpStatusCode(error: unknown) {
 }
 
 async function ensureBucketExists(input: {
-  provider: "MINIO" | "S3";
+  provider: "GARAGE" | "S3";
   bucket: string;
   client: ReturnType<typeof getStorageAdapterFromEnv>["getClient"];
 }) {
@@ -69,7 +70,7 @@ async function ensureBucketExists(input: {
       throw error;
     }
 
-    if (input.provider !== "MINIO") {
+    if (input.provider !== "GARAGE") {
       throw new Error(
         `Storage bucket "${input.bucket}" was not found. Create it first and try again.`,
       );
@@ -153,6 +154,12 @@ export async function POST(request: Request) {
       provider: storage.provider,
       bucket: storage.bucket,
       client: storage.getClient,
+    });
+    await ensureGarageBucketCors({
+      provider: storage.provider,
+      bucket: storage.bucket,
+      client: storage.getClient,
+      requestOrigin: request.headers.get("origin"),
     });
     const expiresInSeconds = Math.min(
       readIntegerEnv(

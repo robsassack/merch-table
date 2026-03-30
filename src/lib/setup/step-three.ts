@@ -4,11 +4,11 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
 import { prisma } from "@/lib/prisma";
 import { createStorageAdapter } from "@/lib/storage/adapter";
 
-const storageModeEnum = z.enum(["MINIO", "S3"]);
+const storageModeEnum = z.enum(["GARAGE", "S3"]);
 
 export const stepThreeSchema = z
   .object({
-    storageMode: storageModeEnum.default("MINIO"),
+    storageMode: storageModeEnum.default("GARAGE"),
     storageEndpoint: z.string().trim().max(512).optional(),
     storageRegion: z.string().trim().max(255).optional(),
     storageBucket: z.string().trim().max(255).optional(),
@@ -17,7 +17,7 @@ export const stepThreeSchema = z
     storageUsePathStyle: z.boolean().default(false),
   })
   .superRefine((value, ctx) => {
-    if (value.storageMode === "MINIO") {
+    if (value.storageMode === "GARAGE") {
       return;
     }
 
@@ -57,7 +57,7 @@ export const stepThreeSchema = z
 export type StepThreeInput = z.infer<typeof stepThreeSchema>;
 
 export type StepThreeState = {
-  storageMode: "MINIO" | "S3";
+  storageMode: "GARAGE" | "S3";
   storageEndpoint: string;
   storageRegion: string;
   storageBucket: string;
@@ -70,7 +70,7 @@ export type StepThreeState = {
 };
 
 const defaultState: StepThreeState = {
-  storageMode: "MINIO",
+  storageMode: "GARAGE",
   storageEndpoint: process.env.STORAGE_ENDPOINT ?? "",
   storageRegion: process.env.STORAGE_REGION ?? "us-east-1",
   storageBucket: process.env.STORAGE_BUCKET ?? "media",
@@ -102,10 +102,10 @@ export async function getStepThreeState(): Promise<StepThreeState> {
     return defaultState;
   }
 
-  const storageMode = (state.storageMode === "S3" ? "S3" : "MINIO") as
-    | "MINIO"
+  const storageMode = (state.storageMode === "S3" ? "S3" : "GARAGE") as
+    | "GARAGE"
     | "S3";
-  const validated = storageMode === "MINIO" ? true : Boolean(state.storageValidatedAt);
+  const validated = storageMode === "GARAGE" ? true : Boolean(state.storageValidatedAt);
 
   return {
     storageMode,
@@ -134,7 +134,7 @@ export async function saveStepThreeState(input: StepThreeInput) {
       : decryptSecret(existing?.storageSecretAccessKey) ?? null;
 
   const validationData =
-    parsed.storageMode === "MINIO"
+    parsed.storageMode === "GARAGE"
       ? {
           storageValidatedAt: new Date(),
           storageLastError: null,
@@ -203,7 +203,7 @@ export async function validateExternalS3Credentials() {
 
     return {
       validatedAt: now.toISOString(),
-      message: "Bundled MinIO selected. Validation is complete.",
+      message: "Bundled Garage selected. Validation is complete.",
     };
   }
 
@@ -260,7 +260,7 @@ export async function markStorageValidationFailed(errorMessage: string) {
 }
 
 export function isStepThreeComplete(state: StepThreeState) {
-  if (state.storageMode === "MINIO") {
+  if (state.storageMode === "GARAGE") {
     return true;
   }
 

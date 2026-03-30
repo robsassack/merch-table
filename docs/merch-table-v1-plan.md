@@ -3,7 +3,7 @@
 ## Summary
 
 - Current stack snapshot: Next.js App Router + TypeScript + Tailwind 4 + Prisma/Postgres are set up; database schema already covers organizations, artists, releases, orders, and download entitlements; app/business logic is still scaffold-level.
-- Product direction locked: digital-only storefront, single-org per deployment, single-release-per-checkout (no cart), guest checkout with magic-link library, Stripe Checkout + Stripe Tax basic, S3-compatible storage with Docker Compose defaulting to bundled MinIO, release+track model, host-configurable preview mode (timed clip or full preview), Howler.js audio player, WCAG 2.1 AA accessibility baseline, and Redis-backed rate limiting.
+- Product direction locked: digital-only storefront, single-org per deployment, single-release-per-checkout (no cart), guest checkout with magic-link library, Stripe Checkout + Stripe Tax basic, S3-compatible storage with Docker Compose defaulting to bundled Garage, release+track model, host-configurable preview mode (timed clip or full preview), Howler.js audio player, WCAG 2.1 AA accessibility baseline, and Redis-backed rate limiting.
 - Security first step: rotate existing local secrets and replace with documented `.env.example` values before publishing/open-sourcing.
 
 ## Key Implementation Changes
@@ -65,7 +65,7 @@
   - Entitlements are unlimited; buyer receives email magic-link to library with re-download access.
   - Download endpoint (`GET /api/download/:entitlementToken/:assetId`) validates that the token is not revoked and not expired, then generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused; the buyer always hits this endpoint first. The signed URL includes a `Content-Disposition: attachment` header with a human-readable filename derived from artist, release, and track title (e.g., `Artist - Track Title.flac`), so browsers save the file with a meaningful name rather than a storage key or UUID.
 - File upload:
-  - Admin requests a presigned PUT URL via `POST /api/admin/upload/upload-url`; browser uploads directly to MinIO/S3, bypassing the Next.js server.
+  - Admin requests a presigned PUT URL via `POST /api/admin/assets/upload-url`; browser uploads directly to Garage/S3, bypassing the Next.js server.
   - Upload UI shows filename, file size, and progress; save action is disabled while an upload is in progress.
   - On upload failure: retry button is shown without losing other form state.
   - Client-side validation of file type and minimum bitrate/sample rate before upload begins.
@@ -85,21 +85,21 @@
   - Rate-limited endpoints and default thresholds:
     - `POST /api/checkout/free` (free release email capture): strict limit to prevent email-bombing and entitlement spam.
     - `GET /api/download/:entitlementToken/:assetId` (download): moderate limit to prevent bulk scraping of signed URLs.
-    - `POST /api/admin/upload/upload-url` (presigned upload URL generation): moderate limit per admin session.
+    - `POST /api/admin/assets/upload-url` (presigned upload URL generation): moderate limit per admin session.
     - `POST /api/checkout/session` (Stripe session creation): moderate limit to prevent session flooding.
   - Rate limit thresholds are configurable via env vars with sensible defaults.
   - Exceeded limits return `429 Too Many Requests` with a `Retry-After` header.
   - Rate limiting is not applied to the Stripe webhook endpoint (Stripe handles its own retry logic).
 - Self-host/deployment:
-  - Provide Docker Compose profile with `web`, `postgres`, `minio`, `redis`, `worker`.
+  - Provide Docker Compose profile with `web`, `postgres`, `garage`, `redis`, `worker`.
   - Worker handles transcoding jobs via FFmpeg.
-  - Storage adapter supports MinIO and external S3-compatible providers through env config.
+  - Storage adapter supports Garage and external S3-compatible providers through env config.
   - Add health/readiness endpoints (distinguishing app-running from database-reachable) and basic structured logs with a configurable log level env var.
   - Container entrypoint runs `prisma migrate deploy` before starting the Next.js server; container exits non-zero if migration fails.
 - Monitoring and admin status:
   - Admin dashboard includes a status panel showing operational health at a glance. No external monitoring stack required.
   - Status panel displays:
-    - Service connectivity: database, Redis, and storage (MinIO/S3) reachable or unreachable.
+    - Service connectivity: database, Redis, and storage (Garage/S3) reachable or unreachable.
     - Worker health: whether the worker process is connected, number of jobs in the transcode queue, and last completed job timestamp.
     - Email delivery: count of recent `FAILED` emails and a link to the orders panel for retry.
     - Storage usage: total asset size stored (sum of `TrackAsset` file sizes from the database, not a live bucket query).
@@ -115,7 +115,7 @@
 - Setup wizard (`/setup`) — six steps completed in-browser, no CLI required:
   - Step 1 — Store basics: org name, store name, contact email, store currency (three-letter ISO code, e.g., `USD`, `EUR`, `GBP`; defaults to `USD`). Initializes the org row and `StoreSettings` record. Currency is set once during setup and used for all Stripe Checkout sessions and storefront price display.
   - Step 2 — SMTP configuration: host, port, credentials. Includes a "send test email" action that must succeed before proceeding; on failure, surfaces a clear error rather than silently continuing.
-  - Step 3 — Storage: choose bundled MinIO (default, zero config) or external S3-compatible provider. If external, validates credentials and bucket access before proceeding.
+  - Step 3 — Storage: choose bundled Garage (default, zero config) or external S3-compatible provider. If external, validates credentials and bucket access before proceeding.
   - Step 4 — Stripe: API key and webhook secret entry. Displays the exact webhook URL to register in Stripe (`https://<domain>/api/webhooks/stripe`), lists the required event (`checkout.session.completed`), and includes a "verify connection" check.
   - Step 5 — Admin account: enter admin email. Sends first magic-link login email using the SMTP config validated in Step 2.
   - Step 6 — Confirmation: marks `setupComplete = true`, sets `storeStatus` to `PRIVATE`, and redirects to the admin dashboard.
@@ -141,7 +141,7 @@
   - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
   - `GET /api/library/:token` (resolve buyer library).
   - `GET /api/download/:entitlementToken/:assetId` (validate token, generate fresh signed URL, redirect).
-  - `POST /api/admin/upload/upload-url` (generate presigned PUT URL for direct-to-storage upload).
+  - `POST /api/admin/assets/upload-url` (generate presigned PUT URL for direct-to-storage upload).
   - `GET /api/health/live` (app is running).
   - `GET /api/health/ready` (app is running and all dependencies — database, Redis, storage — are reachable; returns component-level status JSON).
 - Core enums/types:
@@ -152,7 +152,7 @@
   - `StoreStatus`: `SETUP | PRIVATE | PUBLIC`.
   - `EmailStatus`: `PENDING | SENT | FAILED`.
 - Environment contract:
-  - Required: DB URL, auth secret, SMTP settings, Stripe keys/webhook secret, storage credentials, MinIO toggle.
+  - Required: DB URL, auth secret, SMTP settings, Stripe keys/webhook secret, storage credentials, Garage toggle.
   - Optional: Redis URL override, CDN base URL, transcoding concurrency, max upload size, default token TTL, signed URL expiry (default: 15 minutes), rate limit thresholds per endpoint, minimum price floor in cents (default: 50).
 
 ## Test Plan
@@ -204,7 +204,7 @@
   - Storefront pages pass automated accessibility audit (axe-core or equivalent) with no critical or serious violations at WCAG 2.1 AA level.
   - Audio player is fully operable via keyboard only: play, pause, and switch tracks without a mouse.
 - Deployment verification:
-  - Compose up succeeds with bundled MinIO.
+  - Compose up succeeds with bundled Garage.
   - External S3 configuration path validated.
   - Worker processes a transcoding job and outputs variants.
   - Container upgrade applies pending migrations and starts successfully.
@@ -218,11 +218,11 @@
   - Named Docker volume (not anonymous) required for the Postgres data directory to survive container recreation.
   - Recommended approach: scheduled `pg_dump` via cron or a sidecar container writing to a mounted volume. Example cron job documented in README.
 - Asset backup:
-  - Assets in MinIO can be mirrored to external S3 using `mc mirror` (MinIO Client). Example command documented in README.
-  - Moving from bundled MinIO to external S3 is supported by updating env vars; migration path documented explicitly.
+  - Assets in Garage can be mirrored to external S3 using `rclone` or the Garage CLI. Example command documented in README.
+  - Moving from bundled Garage to external S3 is supported by updating env vars; migration path documented explicitly.
 - What must survive a full container wipe:
   - Postgres named volume (all order, customer, release, and settings data).
-  - MinIO named volume or external S3 bucket (all uploaded audio assets).
+  - Garage named volume or external S3 bucket (all uploaded audio assets).
   - `.env` file or equivalent secret store (Stripe keys, SMTP credentials, auth secret).
   - Note: losing the auth secret invalidates all active sessions and magic links. Intentional rotation is fine; accidental loss is not.
 - Upgrade path:

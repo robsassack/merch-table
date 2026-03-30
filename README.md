@@ -6,7 +6,7 @@ Merch Table is a Next.js + Prisma app for running a digital music storefront.
 
 - Node.js 22+
 - npm 10+
-- Docker 24+ (recommended for local Postgres)
+- Docker 24+ (recommended for local Postgres + Garage)
 - PostgreSQL 15+ (local install or Docker)
 
 ## Initial Setup
@@ -23,7 +23,36 @@ npm install
 cp .env.example .env
 ```
 
-3. Update at least these values in `.env`:
+3. Copy local Garage config from template:
+
+```bash
+cp infra/garage/garage.toml.example infra/garage/garage.toml
+```
+
+4. Generate Garage secrets/tokens (recommended before first run):
+
+```bash
+RPC_SECRET="$(openssl rand -hex 32)"
+ADMIN_TOKEN="$(openssl rand -base64 32)"
+METRICS_TOKEN="$(openssl rand -base64 32)"
+
+sed -i \
+  -e "s|^rpc_secret = .*|rpc_secret = \"$RPC_SECRET\"|" \
+  -e "s|^admin_token = .*|admin_token = \"$ADMIN_TOKEN\"|" \
+  -e "s|^metrics_token = .*|metrics_token = \"$METRICS_TOKEN\"|" \
+  infra/garage/garage.toml
+```
+
+5. (Recommended) set storage credentials in `.env` (must match what bootstrap will import):
+
+```bash
+sed -i \
+  -e 's|^STORAGE_ACCESS_KEY_ID=.*|STORAGE_ACCESS_KEY_ID="your-access-key-id"|' \
+  -e 's|^STORAGE_SECRET_ACCESS_KEY=.*|STORAGE_SECRET_ACCESS_KEY="your-secret-access-key"|' \
+  .env
+```
+
+6. Update at least these values in `.env`:
 - `DATABASE_URL`
 - `AUTH_SECRET` (generate one with `openssl rand -base64 32`)
 - `APP_ENCRYPTION_KEY` (generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`)
@@ -35,13 +64,19 @@ This project is Docker-first. Start with Docker Postgres unless you already run 
 ### Option A: Docker Compose (recommended)
 
 ```bash
-docker compose up -d postgres redis minio
+docker compose up -d postgres redis garage
 ```
 
 Equivalent npm script:
 
 ```bash
 npm run infra:up:core
+```
+
+If you start services with plain `docker compose` commands, run this once after `garage` is up:
+
+```bash
+npm run infra:garage:bootstrap
 ```
 
 Use this URL in `.env`:
@@ -65,18 +100,28 @@ npm run infra:up:all
 ## Infra Scripts
 
 ```bash
-npm run infra:up        # core services (postgres, redis, minio)
+npm run infra:up        # core services (postgres, redis, garage)
 npm run infra:up:core   # same as infra:up
 npm run infra:up:web    # web + worker stubs
 npm run infra:up:all    # all services
 npm run infra:ps        # docker compose ps
 npm run infra:down      # stop and remove stack
+npm run infra:garage:bootstrap  # rerun Garage layout/key/bucket bootstrap
 ```
+
+### Bundled Garage Notes
+
+- Docker Compose runs Garage from `infra/garage/garage.toml`.
+- A template is tracked at `infra/garage/garage.toml.example`; your local `garage.toml` is ignored by git.
+- The template intentionally uses placeholder token values; replace them before use.
+- `npm run infra:up`, `npm run infra:up:core`, and `npm run infra:up:all` automatically run `scripts/bootstrap-garage.sh` after containers start.
+- The bootstrap script initializes a single-node layout, imports the S3 API key from `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY`, creates `STORAGE_BUCKET`, and grants key access to that bucket.
+- If you override the default key pair, use a Garage-compatible key ID + secret pair.
 
 ## Docker Networking Note
 
 - Use `localhost` in `.env` when running the Next.js app directly on your host machine.
-- Use Docker service names when one container talks to another (for example `postgres`, `redis`, `minio` instead of `localhost`).
+- Use Docker service names when one container talks to another (for example `postgres`, `redis`, `garage` instead of `localhost`).
 
 ### Option B: Local Postgres
 
@@ -143,7 +188,7 @@ GitHub Actions CI runs the same quality checks on:
 If you see a container name conflict (for example `merchtable-postgres is already in use`), remove old standalone containers from earlier `docker run` commands:
 
 ```bash
-docker rm -f merchtable-postgres merchtable-redis merchtable-minio
+docker rm -f merchtable-postgres merchtable-redis merchtable-garage
 ```
 
 ## Run the App
@@ -168,7 +213,7 @@ After app startup, complete setup at `/setup`.
 
 - Step 1: Store basics (org name, store name, contact email, currency)
 - Step 2: Email config (SMTP + send test email gate)
-- Step 3: Storage (Bundled MinIO or External S3, with validation gate for external)
+- Step 3: Storage (Bundled Garage or External S3-compatible provider, with validation gate for external)
 - Step 4: Stripe (secret key + webhook secret + verify connection)
 - Step 5: Admin account (admin email + send first one-time magic-link via Step 2 SMTP; opening the link finalizes setup and redirects to `/admin`)
 

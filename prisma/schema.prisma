@@ -398,7 +398,7 @@ model SetupWizardState {
   smtpTestRecipient String?
   smtpTestPassedAt  DateTime?
   smtpLastTestError String?
-  storageMode       String    @default("MINIO")
+  storageMode       String    @default("GARAGE")
   storageEndpoint   String?
   storageRegion     String?
   storageBucket     String?
