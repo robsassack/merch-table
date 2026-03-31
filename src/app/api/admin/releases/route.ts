@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  adminReleaseLegacyNoDeliveryFormatsSelect,
   adminReleaseLegacySelect,
+  adminReleaseNoDeliveryFormatsSelect,
   adminReleaseSelect,
   normalizeNullableText,
   prismaReleaseSupportsField,
@@ -26,7 +28,7 @@ export const runtime = "nodejs";
 
 const createReleaseSchema = z.object({
   artistId: z.string().trim().min(1),
-  title: z.string().trim().min(2).max(160),
+  title: z.string().trim().min(1).max(160),
   slug: z.string().trim().max(160).optional(),
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
@@ -34,6 +36,7 @@ const createReleaseSchema = z.object({
   pricingMode: z.enum(["FREE", "FIXED", "PWYW"]),
   fixedPriceCents: z.number().int().nullable().optional(),
   minimumPriceCents: z.number().int().nullable().optional(),
+  deliveryFormats: z.array(z.enum(["MP3", "M4A", "FLAC"])).min(1).optional(),
   allowFreeCheckout: z.boolean().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("PUBLISHED"),
   markLossyOnly: z.boolean().default(false),
@@ -93,6 +96,14 @@ export async function GET() {
     return auth.response;
   }
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
+  const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+  const releaseSelect = releaseDateSupported
+    ? deliveryFormatsSupported
+      ? adminReleaseSelect
+      : adminReleaseNoDeliveryFormatsSelect
+    : deliveryFormatsSupported
+      ? adminReleaseLegacySelect
+      : adminReleaseLegacyNoDeliveryFormatsSelect;
 
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const stripeFeeEstimate = readStripeFeeEstimateConfigFromEnv();
@@ -112,7 +123,7 @@ export async function GET() {
         organizationId: auth.context.organizationId,
       },
       orderBy: [{ createdAt: "desc" }],
-      select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+      select: releaseSelect,
     }),
     prisma.storeSettings.findFirst({
       where: { organizationId: auth.context.organizationId },
@@ -155,6 +166,14 @@ export async function POST(request: Request) {
 
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
+  const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+  const releaseSelect = releaseDateSupported
+    ? deliveryFormatsSupported
+      ? adminReleaseSelect
+      : adminReleaseNoDeliveryFormatsSelect
+    : deliveryFormatsSupported
+      ? adminReleaseLegacySelect
+      : adminReleaseLegacyNoDeliveryFormatsSelect;
 
   try {
     const payload = await request.json();
@@ -277,6 +296,9 @@ export async function POST(request: Request) {
         pricingMode: parsed.pricingMode,
         fixedPriceCents: normalizedPricing.value.fixedPriceCents,
         minimumPriceCents: normalizedPricing.value.minimumPriceCents,
+        ...(deliveryFormatsSupported
+          ? { deliveryFormats: parsed.deliveryFormats ?? ["MP3", "M4A", "FLAC"] }
+          : {}),
         priceCents: normalizedPricing.value.priceCents,
         currency: settings?.currency ?? "USD",
         status: parsed.status,
@@ -284,7 +306,7 @@ export async function POST(request: Request) {
         publishedAt: parsed.status === "PUBLISHED" ? new Date() : null,
         isLossyOnly: parsed.markLossyOnly,
       },
-      select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+      select: releaseSelect,
     });
 
     return NextResponse.json(

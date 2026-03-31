@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 
 import { createReleaseActions } from "./use-release-management-release-actions";
 import { createTrackEditActions } from "./use-release-management-track-edit-actions";
@@ -24,6 +24,8 @@ import {
 } from "./utils";
 
 export function useReleaseManagementController() {
+  const TRANSCODE_POLL_INTERVAL_MS = 4_000;
+
   const state = useReleaseManagementState();
   const {
     releases,
@@ -49,6 +51,13 @@ export function useReleaseManagementController() {
     setSelectedReleaseId,
     setCreateComposerOpen,
   } = state;
+  const pollingInFlightRef = useRef(false);
+
+  const hasActiveTranscodeJobs = releases.some((release) =>
+    release.tracks.some((track) =>
+      track.transcodeJobs.some((job) => job.status === "QUEUED" || job.status === "RUNNING"),
+    ),
+  );
   const syncDrafts = useCallback((list: ReleaseRecord[]) => {
     setDraftsById((previous) => {
       const next: Record<string, ReleaseDraft> = {};
@@ -133,9 +142,13 @@ export function useReleaseManagementController() {
     setPreviewByReleaseId,
   ]);
 
-  const loadReleases = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const loadReleases = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
 
     try {
       const response = await fetch("/api/admin/releases", { method: "GET" });
@@ -166,9 +179,13 @@ export function useReleaseManagementController() {
         return firstArtist?.id ?? current;
       });
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : "Could not load releases.");
+      if (!silent) {
+        setError(loadError instanceof Error ? loadError.message : "Could not load releases.");
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, [
     setLoading,
@@ -187,6 +204,46 @@ export function useReleaseManagementController() {
   useEffect(() => {
     void loadReleases();
   }, [loadReleases]);
+
+  useEffect(() => {
+    if (!hasActiveTranscodeJobs) {
+      return;
+    }
+
+    let isCancelled = false;
+    const runPoll = async () => {
+      if (isCancelled || typeof document === "undefined") {
+        return;
+      }
+
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      if (pollingInFlightRef.current) {
+        return;
+      }
+
+      pollingInFlightRef.current = true;
+      try {
+        await loadReleases({ silent: true });
+      } finally {
+        pollingInFlightRef.current = false;
+      }
+    };
+
+    const intervalId = window.setInterval(() => {
+      void runPoll();
+    }, TRANSCODE_POLL_INTERVAL_MS);
+
+    void runPoll();
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+      pollingInFlightRef.current = false;
+    };
+  }, [hasActiveTranscodeJobs, loadReleases]);
 
   useEffect(() => {
     setSelectedReleaseId((current) => {
@@ -296,13 +353,14 @@ export function useReleaseManagementController() {
     onSoftDeleteOrRestoreRelease,
     onPurgeRelease,
     onHardDeleteRelease,
+    onGenerateDownloadFormats,
     newCoverPreviewSrc,
   } = createReleaseActions({
     ...state,
     replaceRelease,
   });
 
-  const { onImportTrackFiles, onInlineTrackFileChange } =
+  const { onImportTrackFiles, onResolveImportConflict, onInlineTrackFileChange } =
     createTrackImportUploadActions({
       ...state,
       loadReleases,
@@ -373,7 +431,9 @@ export function useReleaseManagementController() {
     onSoftDeleteOrRestoreRelease,
     onPurgeRelease,
     onHardDeleteRelease,
+    onGenerateDownloadFormats,
     onImportTrackFiles,
+    onResolveImportConflict,
     onApplyReleasePreviewToTracks,
     onCreateTrack,
     onUpdateTrack,

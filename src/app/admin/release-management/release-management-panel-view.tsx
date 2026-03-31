@@ -1,7 +1,9 @@
 import { ReleaseManagementCreateForm } from "./release-management-create-form";
+import { ReleaseManagementImportConflictDialog } from "./release-management-import-conflict-dialog";
 import { ReleaseManagementPurgeDialog } from "./release-management-purge-dialog";
 import { ReleaseManagementReleaseStrip } from "./release-management-release-strip";
 import { ReleaseManagementSelectedReleaseList } from "./release-management-selected-release-list";
+import { ReleaseManagementTrackDeleteDialog } from "./release-management-track-delete-dialog";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 
 export function ReleaseManagementPanelView(props: {
@@ -65,6 +67,8 @@ export function ReleaseManagementPanelView(props: {
       )}
 
       <ReleaseManagementPurgeDialog controller={props.controller} />
+      <ReleaseManagementImportConflictDialog controller={props.controller} />
+      <ReleaseManagementTrackDeleteDialog controller={props.controller} />
     </section>
   );
 }

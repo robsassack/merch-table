@@ -56,6 +56,12 @@ enum TranscodeStatus {
   FAILED
 }
 
+enum DeliveryFormat {
+  MP3
+  M4A
+  FLAC
+}
+
 enum StoreStatus {
   SETUP
   PRIVATE
@@ -143,6 +149,7 @@ model Release {
   pricingMode       PricingMode           @default(FREE)
   fixedPriceCents   Int?
   minimumPriceCents Int?
+  deliveryFormats   DeliveryFormat[]      @default([MP3, M4A, FLAC])
   isLossyOnly       Boolean               @default(false)
   status            ReleaseStatus         @default(DRAFT)
   releaseDate       DateTime              @default(now())

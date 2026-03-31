@@ -2,12 +2,15 @@ import type { Prisma } from "@/generated/prisma/client";
 
 import type {
   AssetRole,
+  DeliveryFormat,
   PreviewMode,
   TranscodeStatus,
 } from "@/generated/prisma/enums";
 import { adminTrackSelect, toAdminTrackRecord } from "@/lib/admin/track-management";
 
-const adminReleaseSelectShared = {
+const DEFAULT_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
+
+const adminReleaseSelectSharedBase = {
   id: true,
   artistId: true,
   title: true,
@@ -45,12 +48,23 @@ const adminReleaseSelectShared = {
 } satisfies Prisma.ReleaseSelect;
 
 export const adminReleaseSelect = {
-  ...adminReleaseSelectShared,
+  ...adminReleaseSelectSharedBase,
+  deliveryFormats: true,
   releaseDate: true,
 } satisfies Prisma.ReleaseSelect;
 
 export const adminReleaseLegacySelect = {
-  ...adminReleaseSelectShared,
+  ...adminReleaseSelectSharedBase,
+  deliveryFormats: true,
+} satisfies Prisma.ReleaseSelect;
+
+export const adminReleaseNoDeliveryFormatsSelect = {
+  ...adminReleaseSelectSharedBase,
+  releaseDate: true,
+} satisfies Prisma.ReleaseSelect;
+
+export const adminReleaseLegacyNoDeliveryFormatsSelect = {
+  ...adminReleaseSelectSharedBase,
 } satisfies Prisma.ReleaseSelect;
 
 export type AdminReleaseRow = Prisma.ReleaseGetPayload<{
@@ -61,7 +75,19 @@ export type AdminReleaseLegacyRow = Prisma.ReleaseGetPayload<{
   select: typeof adminReleaseLegacySelect;
 }>;
 
-export type AdminReleaseAnyRow = AdminReleaseRow | AdminReleaseLegacyRow;
+export type AdminReleaseNoDeliveryFormatsRow = Prisma.ReleaseGetPayload<{
+  select: typeof adminReleaseNoDeliveryFormatsSelect;
+}>;
+
+export type AdminReleaseLegacyNoDeliveryFormatsRow = Prisma.ReleaseGetPayload<{
+  select: typeof adminReleaseLegacyNoDeliveryFormatsSelect;
+}>;
+
+export type AdminReleaseAnyRow =
+  | AdminReleaseRow
+  | AdminReleaseLegacyRow
+  | AdminReleaseNoDeliveryFormatsRow
+  | AdminReleaseLegacyNoDeliveryFormatsRow;
 
 export type AdminReleaseRecord = {
   id: string;
@@ -73,6 +99,7 @@ export type AdminReleaseRecord = {
   pricingMode: "FREE" | "FIXED" | "PWYW";
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
+  deliveryFormats: DeliveryFormat[];
   priceCents: number;
   currency: string;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -192,6 +219,12 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
     release.releaseDate instanceof Date
       ? release.releaseDate
       : release.createdAt;
+  const deliveryFormats =
+    "deliveryFormats" in release &&
+    Array.isArray(release.deliveryFormats) &&
+    release.deliveryFormats.length > 0
+      ? release.deliveryFormats
+      : DEFAULT_DELIVERY_FORMATS;
   const tracks = release.tracks
     .map((track) => toAdminTrackRecord(track))
     .sort((a, b) => a.trackNumber - b.trackNumber || a.createdAt.localeCompare(b.createdAt));
@@ -206,6 +239,7 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
     pricingMode: release.pricingMode,
     fixedPriceCents: release.fixedPriceCents,
     minimumPriceCents: release.minimumPriceCents,
+    deliveryFormats,
     priceCents: release.priceCents,
     currency: release.currency,
     status: release.status,

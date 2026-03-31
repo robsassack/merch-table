@@ -71,6 +71,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
 
     try {
       const updatedTracks: TrackRecordPatch[] = [];
+      let queuedPreviewJobs = 0;
       for (const track of tracks) {
         const response = await fetch(`/api/admin/releases/${release.id}/tracks/${track.id}`, {
           method: "PATCH",
@@ -87,6 +88,9 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         }
 
         updatedTracks.push(body.track);
+        if (body.previewJobQueued) {
+          queuedPreviewJobs += 1;
+        }
       }
 
       if (updatedTracks.length > 0) {
@@ -114,9 +118,18 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         });
       }
       if (!options?.silent) {
-        setNotice(
-          `Applied release preview settings to ${tracks.length} track${tracks.length === 1 ? "" : "s"}.`,
-        );
+        const baseNotice = `Applied release preview settings to ${tracks.length} track${
+          tracks.length === 1 ? "" : "s"
+        }.`;
+        if (queuedPreviewJobs > 0) {
+          setNotice(
+            `${baseNotice} Queued ${queuedPreviewJobs} new preview transcode job${
+              queuedPreviewJobs === 1 ? "" : "s"
+            }.`,
+          );
+        } else {
+          setNotice(baseNotice);
+        }
       }
     } catch (previewError) {
       setError(
@@ -220,7 +233,11 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
       }
 
       applyTrackPatchToRelease(releaseId, body.track);
-      setNotice(`Saved track "${body.track.title}".`);
+      if (body.previewJobQueued) {
+        setNotice(`Saved track "${body.track.title}" and queued a new preview transcode.`);
+      } else {
+        setNotice(`Saved track "${body.track.title}".`);
+      }
     } catch (trackError) {
       setError(trackError instanceof Error ? trackError.message : "Could not save track.");
     } finally {

@@ -145,13 +145,27 @@ export async function POST(request: Request, context: RouteContext) {
       );
 
       if (trackNumber <= existingCount) {
+        // Move affected rows out of range first, then normalize to +1.
+        // This avoids transient unique-index collisions on [releaseId, trackNumber].
+        const shiftOffset = existingCount + 1;
+
         await tx.releaseTrack.updateMany({
           where: {
             releaseId: release.id,
             trackNumber: { gte: trackNumber },
           },
           data: {
-            trackNumber: { increment: 1 },
+            trackNumber: { increment: shiftOffset },
+          },
+        });
+
+        await tx.releaseTrack.updateMany({
+          where: {
+            releaseId: release.id,
+            trackNumber: { gte: trackNumber + shiftOffset },
+          },
+          data: {
+            trackNumber: { decrement: shiftOffset - 1 },
           },
         });
       }

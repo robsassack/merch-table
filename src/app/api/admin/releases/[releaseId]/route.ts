@@ -4,7 +4,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  adminReleaseLegacyNoDeliveryFormatsSelect,
   adminReleaseLegacySelect,
+  adminReleaseNoDeliveryFormatsSelect,
   adminReleaseSelect,
   normalizeNullableText,
   prismaReleaseSupportsField,
@@ -19,6 +21,7 @@ import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import { enqueueDeliveryFormatsJob } from "@/lib/transcode/queue";
 import {
   extractStorageKeyFromCoverImageUrl,
   isValidCoverStorageKey,
@@ -34,7 +37,7 @@ type RouteContext = {
 const updateReleaseSchema = z.object({
   action: z.literal("update"),
   artistId: z.string().trim().min(1),
-  title: z.string().trim().min(2).max(160),
+  title: z.string().trim().min(1).max(160),
   slug: z.string().trim().max(160).optional(),
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
@@ -43,6 +46,7 @@ const updateReleaseSchema = z.object({
   pricingMode: z.enum(["FREE", "FIXED", "PWYW"]),
   fixedPriceCents: z.number().int().nullable().optional(),
   minimumPriceCents: z.number().int().nullable().optional(),
+  deliveryFormats: z.array(z.enum(["MP3", "M4A", "FLAC"])).min(1).optional(),
   allowFreeCheckout: z.boolean().optional(),
   status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]),
   markLossyOnly: z.boolean(),
@@ -55,6 +59,10 @@ const softDeleteSchema = z.object({
 
 const restoreSchema = z.object({
   action: z.literal("restore"),
+});
+
+const generateDownloadFormatsSchema = z.object({
+  action: z.literal("generate-download-formats"),
 });
 
 const purgeSchema = z.object({
@@ -71,53 +79,58 @@ const actionSchema = z.discriminatedUnion("action", [
   updateReleaseSchema,
   softDeleteSchema,
   restoreSchema,
+  generateDownloadFormatsSchema,
   purgeSchema,
   hardDeleteSchema,
 ]);
 
-const releaseForActionSelect = {
-  ...adminReleaseSelect,
-  files: {
-    select: {
-      id: true,
-      storageKey: true,
-    },
-  },
-  tracks: {
-    select: {
-      id: true,
-      assets: {
-        select: {
-          id: true,
-          isLossless: true,
-          storageKey: true,
-        },
-      },
-    },
-  },
-} satisfies Prisma.ReleaseSelect;
+function resolveReleaseSelect(input: {
+  releaseDateSupported: boolean;
+  deliveryFormatsSupported: boolean;
+}) {
+  if (input.releaseDateSupported && input.deliveryFormatsSupported) {
+    return adminReleaseSelect;
+  }
 
-const releaseForActionLegacySelect = {
-  ...adminReleaseLegacySelect,
-  files: {
-    select: {
-      id: true,
-      storageKey: true,
+  if (input.releaseDateSupported) {
+    return adminReleaseNoDeliveryFormatsSelect;
+  }
+
+  if (input.deliveryFormatsSupported) {
+    return adminReleaseLegacySelect;
+  }
+
+  return adminReleaseLegacyNoDeliveryFormatsSelect;
+}
+
+function resolveReleaseForActionSelect(input: {
+  releaseDateSupported: boolean;
+  deliveryFormatsSupported: boolean;
+}) {
+  const baseSelect = resolveReleaseSelect(input);
+  return {
+    ...baseSelect,
+    files: {
+      select: {
+        id: true,
+        storageKey: true,
+      },
     },
-  },
-  tracks: {
-    select: {
-      id: true,
-      assets: {
-        select: {
-          id: true,
-          isLossless: true,
-          storageKey: true,
+    tracks: {
+      select: {
+        id: true,
+        assets: {
+          select: {
+            id: true,
+            assetRole: true,
+            isLossless: true,
+            storageKey: true,
+          },
         },
       },
     },
-  },
-} satisfies Prisma.ReleaseSelect;
+  } satisfies Prisma.ReleaseSelect;
+}
 
 function isUniqueConstraintError(error: unknown) {
   return (
@@ -260,6 +273,15 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
+  const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+  const releaseSelect = resolveReleaseSelect({
+    releaseDateSupported,
+    deliveryFormatsSupported,
+  });
+  const releaseForActionSelect = resolveReleaseForActionSelect({
+    releaseDateSupported,
+    deliveryFormatsSupported,
+  });
 
   try {
     const payload = await request.json();
@@ -270,9 +292,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: releaseId,
         organizationId: auth.context.organizationId,
       },
-      select: releaseDateSupported
-        ? releaseForActionSelect
-        : releaseForActionLegacySelect,
+      select: releaseForActionSelect,
     });
 
     if (!release) {
@@ -416,6 +436,8 @@ export async function PATCH(request: Request, context: RouteContext) {
         where: {
           id: release.id,
         },
+        // Keep updates compatible with older generated clients that do not include
+        // release.deliveryFormats yet.
         data: {
           artistId: artist.id,
           title: parsed.title.trim(),
@@ -425,13 +447,24 @@ export async function PATCH(request: Request, context: RouteContext) {
           pricingMode: parsed.pricingMode,
           fixedPriceCents: normalizedPricing.value.fixedPriceCents,
           minimumPriceCents: normalizedPricing.value.minimumPriceCents,
+          ...(deliveryFormatsSupported
+            ? {
+                deliveryFormats:
+                  parsed.deliveryFormats ??
+                  ("deliveryFormats" in release &&
+                  Array.isArray((release as { deliveryFormats?: unknown }).deliveryFormats)
+                    ? (release as { deliveryFormats: Array<"MP3" | "M4A" | "FLAC"> })
+                        .deliveryFormats
+                    : ["MP3", "M4A", "FLAC"]),
+              }
+            : {}),
           priceCents: normalizedPricing.value.priceCents,
           status: parsed.status,
           ...(releaseDateSupported && releaseDate ? { releaseDate } : {}),
           publishedAt,
           isLossyOnly: parsed.markLossyOnly,
         },
-        select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+        select: releaseSelect,
       });
 
       if (coverStorageKeyToDelete) {
@@ -449,7 +482,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         data: {
           deletedAt: release.deletedAt ? release.deletedAt : new Date(),
         },
-        select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+        select: releaseSelect,
       });
 
       return NextResponse.json({ ok: true, release: toAdminReleaseRecord(updated) });
@@ -463,10 +496,149 @@ export async function PATCH(request: Request, context: RouteContext) {
         data: {
           deletedAt: null,
         },
-        select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+        select: releaseSelect,
       });
 
       return NextResponse.json({ ok: true, release: toAdminReleaseRecord(updated) });
+    }
+
+    if (parsed.action === "generate-download-formats") {
+      if (
+        deliveryFormatsSupported &&
+        "deliveryFormats" in release &&
+        Array.isArray((release as { deliveryFormats?: unknown }).deliveryFormats) &&
+        (release as { deliveryFormats: unknown[] }).deliveryFormats.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "No delivery formats are enabled for this release. Select at least one format and save first.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const losslessMasters = release.tracks
+        .map((track) => {
+          const sourceAsset = track.assets.find(
+            (asset) => asset.assetRole === "MASTER" && asset.isLossless,
+          );
+
+          if (!sourceAsset) {
+            return null;
+          }
+
+          return {
+            trackId: track.id,
+            sourceAssetId: sourceAsset.id,
+          };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            trackId: string;
+            sourceAssetId: string;
+          } => entry !== null,
+        );
+
+      if (losslessMasters.length === 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "No lossless master assets were found on this release. Upload at least one lossless master first.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const enqueueSummary = await prisma.$transaction(async (tx) => {
+        const queuedJobIds: string[] = [];
+        let alreadyQueuedJobs = 0;
+
+        for (const candidate of losslessMasters) {
+          const pendingJob = await tx.transcodeJob.findFirst({
+            where: {
+              organizationId: auth.context.organizationId,
+              trackId: candidate.trackId,
+              sourceAssetId: candidate.sourceAssetId,
+              status: {
+                in: ["QUEUED", "RUNNING"],
+              },
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          if (pendingJob) {
+            alreadyQueuedJobs += 1;
+            continue;
+          }
+
+          const queuedJob = await tx.transcodeJob.create({
+            data: {
+              organizationId: auth.context.organizationId,
+              trackId: candidate.trackId,
+              sourceAssetId: candidate.sourceAssetId,
+              status: "QUEUED",
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          queuedJobIds.push(queuedJob.id);
+        }
+
+        return {
+          queuedJobIds,
+          alreadyQueuedJobs,
+        };
+      });
+
+      let queuedTranscodeJobs = 0;
+      for (const jobId of enqueueSummary.queuedJobIds) {
+        try {
+          await enqueueDeliveryFormatsJob(jobId);
+          queuedTranscodeJobs += 1;
+        } catch {
+          await prisma.transcodeJob
+            .update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorMessage: "Could not enqueue delivery transcode job.",
+                finishedAt: new Date(),
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      const refreshed = await prisma.release.findFirst({
+        where: {
+          id: release.id,
+          organizationId: auth.context.organizationId,
+        },
+        select: releaseSelect,
+      });
+
+      if (!refreshed) {
+        return NextResponse.json(
+          { ok: false, error: "Release not found after queuing transcode jobs." },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        release: toAdminReleaseRecord(refreshed),
+        queuedTranscodeJobs,
+        alreadyQueuedJobs: enqueueSummary.alreadyQueuedJobs,
+      });
     }
 
     if (parsed.confirmTitle.trim() !== release.title) {
@@ -546,7 +718,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: release.id,
         organizationId: auth.context.organizationId,
       },
-      select: releaseDateSupported ? adminReleaseSelect : adminReleaseLegacySelect,
+      select: releaseSelect,
     });
 
     if (!refreshed) {

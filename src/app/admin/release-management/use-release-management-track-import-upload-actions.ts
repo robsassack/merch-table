@@ -23,7 +23,6 @@ import {
   formatTrackDuration,
   resolveAudioMimeType,
   resolvePreviewPayload,
-  sortTracks,
   toReleasePreviewDraft,
   uploadViaSignedPut,
 } from "./utils";
@@ -34,6 +33,7 @@ type TrackImportUploadActionsInput = ReleaseManagementState & {
 
 export function createTrackImportUploadActions(input: TrackImportUploadActionsInput) {
   const {
+    releases,
     previewByReleaseId,
     pendingPreviewApplyReleaseId,
     pendingTrackImportReleaseId,
@@ -45,6 +45,8 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
     setNotice,
     setPendingTrackImportReleaseId,
     setTrackImportJobsByReleaseId,
+    importConflictDialog,
+    setImportConflictDialog,
     setPendingTrackUploadId,
     setTrackUploadProgressById,
     trackUploadRoleById,
@@ -100,24 +102,6 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
     }
 
     return body.track;
-  };
-
-  const deleteTrackForRelease = async (inputValue: { releaseId: string; trackId: string }) => {
-    const response = await fetch(
-      `/api/admin/releases/${inputValue.releaseId}/tracks/${inputValue.trackId}`,
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "delete",
-        }),
-      },
-    );
-
-    const body = (await response.json().catch(() => null)) as TrackMutationResponse | null;
-    if (!response.ok || !body?.ok || !body.deletedTrackId) {
-      throw new Error(body?.error ?? "Could not delete track.");
-    }
   };
 
   const updateTrackMetadataFromAudio = async (inputValue: {
@@ -212,27 +196,12 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
     return commitBody;
   };
 
-  const onImportTrackFiles = async (
-    release: ReleaseRecord,
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const selectedFiles = Array.from(event.target.files ?? []);
-    event.target.value = "";
-    if (selectedFiles.length === 0) {
-      return;
-    }
-
-    if (
-      pendingPreviewApplyReleaseId ||
-      pendingTrackImportReleaseId ||
-      pendingTrackUploadId ||
-      pendingTrackId ||
-      pendingReleaseId ||
-      createPending
-    ) {
-      return;
-    }
-
+  const runTrackImport = async (inputValue: {
+    release: ReleaseRecord;
+    selectedFiles: File[];
+    mode: TrackImportMode;
+  }) => {
+    const { release, selectedFiles, mode } = inputValue;
     const prepared = selectedFiles.map((file) => {
       const contentType = resolveAudioMimeType(file);
       return {
@@ -249,23 +218,6 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
         `${unsupported.file.name}: unsupported file type (${unsupported.contentType || "unknown"}).`,
       );
       return;
-    }
-
-    let mode: TrackImportMode = "append";
-    if (release.tracks.length > 0) {
-      const replaceSelected = window.confirm(
-        `Import mode for "${release.title}": press OK to REPLACE existing tracks, or Cancel to APPEND.`,
-      );
-      if (replaceSelected) {
-        const confirmed = window.confirm(
-          `Replace will permanently delete ${release.tracks.length} existing track${release.tracks.length === 1 ? "" : "s"} and their linked assets/jobs. Continue?`,
-        );
-        if (!confirmed) {
-          return;
-        }
-
-        mode = "replace";
-      }
     }
 
     setError(null);
@@ -292,7 +244,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       );
 
       const orderedMetadata = orderedCandidates.map((candidate) => parsedMetadata[candidate.id]);
-      const startTrackNumber = mode === "replace" ? 1 : release.tracks.length + 1;
+      const startTrackNumber = mode === "insert" ? 1 : release.tracks.length + 1;
       const plannedImports: PlannedTrackImport[] = assignSequentialTrackNumbers(
         orderedMetadata,
         startTrackNumber,
@@ -318,19 +270,10 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
         })),
       }));
 
-      if (mode === "replace") {
-        const existingTracks = sortTracks(release.tracks);
-        for (const track of existingTracks) {
-          await deleteTrackForRelease({
-            releaseId: release.id,
-            trackId: track.id,
-          });
-        }
-      }
-
       let completed = 0;
       let failed = 0;
       let previewQueuedCount = 0;
+      let deliveryQueuedCount = 0;
 
       for (const plannedImport of plannedImports) {
         try {
@@ -355,6 +298,9 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
 
           if (commit.previewJobQueued) {
             previewQueuedCount += 1;
+          }
+          if (commit.deliveryJobQueued) {
+            deliveryQueuedCount += 1;
           }
 
           // Always refresh title/duration from uploaded file metadata.
@@ -382,7 +328,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       setNotice(
         `Imported ${completed}/${plannedImports.length} track${plannedImports.length === 1 ? "" : "s"} for "${release.title}".${
           previewQueuedCount > 0 ? ` Preview jobs queued: ${previewQueuedCount}.` : ""
-        }`,
+        }${deliveryQueuedCount > 0 ? ` Delivery jobs queued: ${deliveryQueuedCount}.` : ""}`,
       );
 
       if (failed > 0) {
@@ -393,6 +339,68 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
     } finally {
       setPendingTrackImportReleaseId(null);
     }
+  };
+
+  const onImportTrackFiles = async (
+    release: ReleaseRecord,
+    event: ChangeEvent<HTMLInputElement>,
+  ) => {
+    const selectedFiles = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    if (
+      pendingPreviewApplyReleaseId ||
+      pendingTrackImportReleaseId ||
+      pendingTrackUploadId ||
+      pendingTrackId ||
+      pendingReleaseId ||
+      createPending
+    ) {
+      return;
+    }
+
+    if (release.tracks.length > 0) {
+      setImportConflictDialog({
+        releaseId: release.id,
+        releaseTitle: release.title,
+        existingTrackCount: release.tracks.length,
+        selectedFiles,
+      });
+      return;
+    }
+
+    await runTrackImport({
+      release,
+      selectedFiles,
+      mode: "append",
+    });
+  };
+
+  const onResolveImportConflict = async (mode: TrackImportMode | "cancel") => {
+    const conflict = importConflictDialog;
+    if (!conflict) {
+      return;
+    }
+
+    setImportConflictDialog(null);
+    if (mode === "cancel") {
+      return;
+    }
+
+    const release = releases.find((entry) => entry.id === conflict.releaseId);
+    if (!release) {
+      setError("Release no longer exists. Refresh and try importing again.");
+      return;
+    }
+
+    await runTrackImport({
+      release,
+      selectedFiles: conflict.selectedFiles,
+      mode,
+    });
   };
 
   const onInlineTrackFileChange = async (
@@ -460,7 +468,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       setNotice(
         `Uploaded "${file.name}" as ${uploadRole.toLowerCase()} for "${track.title}" (synced metadata to "${metadata.resolvedTitle}", ${formatTrackDuration(metadata.durationMs)}).${
           commitBody.previewJobQueued ? " Preview job queued." : ""
-        }`,
+        }${commitBody.deliveryJobQueued ? " Delivery job queued." : ""}`,
       );
     } catch (uploadError) {
       setError(
@@ -480,6 +488,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
 
   return {
     onImportTrackFiles,
+    onResolveImportConflict,
     onInlineTrackFileChange,
   };
 }

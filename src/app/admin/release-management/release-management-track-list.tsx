@@ -1,7 +1,16 @@
+import { useState } from "react";
+
 import { buttonClassName, dangerButtonClassName } from "./constants";
 import type { ReleaseRecord } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
-import { formatTrackDuration, getTrackPreviewStatus, sortTracks, toTrackDraft } from "./utils";
+import {
+  formatTrackDuration,
+  getTrackDeliveryStatus,
+  getTrackPreviewStatus,
+  resolveUploadedFileNameFromStorageKey,
+  sortTracks,
+  toTrackDraft,
+} from "./utils";
 
 export function ReleaseManagementTrackList(props: {
   controller: ReleaseManagementController;
@@ -14,6 +23,9 @@ export function ReleaseManagementTrackList(props: {
   draggingTrackIdForRelease: string | null;
   dragOverTrackIdForRelease: string | null;
 }) {
+  const [deliveryDownloadAssetIdByTrackId, setDeliveryDownloadAssetIdByTrackId] =
+    useState<Record<string, string>>({});
+
   const {
     release,
     isPending,
@@ -33,13 +45,13 @@ export function ReleaseManagementTrackList(props: {
     trackUploadProgressById,
     trackUploadRoleById,
     setTrackUploadRoleById,
+    setTrackDeleteDialog,
     setExpandedTrackIdByReleaseId,
     setDraggingTrackIdByReleaseId,
     setDragOverTrackIdByReleaseId,
     onReorderTrackDrop,
     onInlineTrackFileChange,
     onUpdateTrack,
-    onDeleteTrack,
   } = props.controller;
 
   return (
@@ -54,6 +66,10 @@ export function ReleaseManagementTrackList(props: {
                           const trackUploadProgress = trackUploadProgressById[track.id] ?? 0;
                           const trackUploadRole = trackUploadRoleById[track.id] ?? "MASTER";
                           const previewStatus = getTrackPreviewStatus(track);
+                          const deliveryStatus = getTrackDeliveryStatus(
+                            track,
+                            release.deliveryFormats,
+                          );
                           const masterCount = track.assets.filter(
                             (asset) => asset.assetRole === "MASTER",
                           ).length;
@@ -63,6 +79,54 @@ export function ReleaseManagementTrackList(props: {
                           const previewCount = track.assets.filter(
                             (asset) => asset.assetRole === "PREVIEW",
                           ).length;
+                          const latestMasterAsset = track.assets
+                            .filter((asset) => asset.assetRole === "MASTER")
+                            .sort(
+                              (a, b) =>
+                                new Date(b.updatedAt).getTime() -
+                                new Date(a.updatedAt).getTime(),
+                            )[0];
+                          const deliveryAssetsByFormat = new Map<
+                            string,
+                            (typeof track.assets)[number]
+                          >();
+                          for (const asset of track.assets
+                            .filter((entry) => entry.assetRole === "DELIVERY")
+                            .sort(
+                              (a, b) =>
+                                new Date(b.updatedAt).getTime() -
+                                new Date(a.updatedAt).getTime(),
+                            )) {
+                            const normalizedFormat = asset.format.trim().toUpperCase();
+                            const formatLabel =
+                              normalizedFormat === "AAC" || normalizedFormat === "MP4"
+                                ? "M4A"
+                                : normalizedFormat;
+                            if (!deliveryAssetsByFormat.has(formatLabel)) {
+                              deliveryAssetsByFormat.set(formatLabel, asset);
+                            }
+                          }
+                          const deliveryDownloadOptions = Array.from(
+                            deliveryAssetsByFormat.entries(),
+                          ).map(([format, asset]) => ({
+                            id: asset.id,
+                            label: format,
+                          }));
+                          const selectedDeliveryAssetId = (() => {
+                            const selected = deliveryDownloadAssetIdByTrackId[track.id];
+                            if (
+                              selected &&
+                              deliveryDownloadOptions.some((option) => option.id === selected)
+                            ) {
+                              return selected;
+                            }
+                            return deliveryDownloadOptions[0]?.id ?? "";
+                          })();
+                          const masterDownloadAssetId = latestMasterAsset?.id ?? "";
+                          const deliveryDownloadAssetId = selectedDeliveryAssetId;
+                          const uploadedMasterFileName = latestMasterAsset
+                            ? resolveUploadedFileNameFromStorageKey(latestMasterAsset.storageKey)
+                            : "";
                           const lastFailedJob = track.transcodeJobs
                             .filter((job) => job.status === "FAILED")
                             .sort(
@@ -130,30 +194,114 @@ export function ReleaseManagementTrackList(props: {
                                   >
                                     ||
                                   </span>
+                                  <p className="text-left text-xs font-medium text-zinc-200">
+                                    Track {track.trackNumber} • {track.title} •{" "}
+                                    {formatTrackDuration(track.durationMs)}
+                                  </p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
                                   <button
                                     type="button"
+                                    className={`${dangerButtonClassName} px-2 py-1.5`}
+                                    aria-label={trackPending ? "Deleting track" : "Delete track"}
+                                    title={trackPending ? "Deleting..." : "Delete track"}
+                                    disabled={
+                                      isPending ||
+                                      trackPending ||
+                                      importTrackPending ||
+                                      previewApplyPending ||
+                                      reorderTrackPending ||
+                                      trackUploadPending
+                                    }
+                                    onClick={() => {
+                                      setTrackDeleteDialog({
+                                        releaseId: release.id,
+                                        releaseTitle: release.title,
+                                        track,
+                                      });
+                                    }}
+                                  >
+                                    <span className="sr-only">
+                                      {trackPending ? "Deleting..." : "Delete"}
+                                    </span>
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      className="h-4 w-4"
+                                      aria-hidden="true"
+                                    >
+                                      <path d="M3 6h18" />
+                                      <path d="M8 6V4h8v2" />
+                                      <path d="M19 6l-1 14H6L5 6" />
+                                      <path d="M10 11v6" />
+                                      <path d="M14 11v6" />
+                                    </svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`${buttonClassName} px-2 py-1.5`}
+                                    aria-label={
+                                      isTrackExpanded ? "Hide track details" : "Show track details"
+                                    }
+                                    title={
+                                      isTrackExpanded ? "Hide track details" : "Show track details"
+                                    }
+                                    disabled={
+                                      isPending ||
+                                      trackPending ||
+                                      importTrackPending ||
+                                      previewApplyPending ||
+                                      reorderTrackPending ||
+                                      trackUploadPending
+                                    }
                                     onClick={() =>
                                       setExpandedTrackIdByReleaseId((previous) => ({
                                         ...previous,
                                         [release.id]: isTrackExpanded ? null : track.id,
                                       }))
                                     }
-                                    className="text-left text-xs font-medium text-zinc-200 hover:text-zinc-100"
                                   >
-                                    Track {track.trackNumber} • {track.title} •{" "}
-                                    {formatTrackDuration(track.durationMs)} •{" "}
-                                    {isTrackExpanded ? "Hide details" : "Edit details"}
+                                    <span className="sr-only">
+                                      {isTrackExpanded ? "Hide details" : "Show details"}
+                                    </span>
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 24 24"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                      className={`h-4 w-4 transition-transform ${
+                                        isTrackExpanded ? "rotate-180" : ""
+                                      }`}
+                                      aria-hidden="true"
+                                    >
+                                      <path d="m6 9 6 6 6-6" />
+                                    </svg>
                                   </button>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className={previewStatus.className}>
-                                    {previewStatus.label}
+                              </div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">
+                                <span className={previewStatus.className}>
+                                  {previewStatus.label}
+                                </span>
+                                <span className={deliveryStatus.className}>
+                                  {deliveryStatus.label}
+                                </span>
+                                <span className="text-[11px] text-zinc-500">
+                                  assets: {masterCount} master, {deliveryCount} delivery,{" "}
+                                  {previewCount} preview
+                                </span>
+                                {uploadedMasterFileName ? (
+                                  <span className="max-w-full truncate text-[11px] text-zinc-500">
+                                    uploaded:{" "}
+                                    <span className="font-medium text-zinc-300">
+                                      {uploadedMasterFileName}
+                                    </span>
                                   </span>
-                                  <span className="text-[11px] text-zinc-500">
-                                    assets: {masterCount} master, {deliveryCount} delivery,{" "}
-                                    {previewCount} preview
-                                  </span>
-                                </div>
+                                ) : null}
                               </div>
 
                               {isTrackExpanded ? (
@@ -300,6 +448,58 @@ export function ReleaseManagementTrackList(props: {
                                     ? `Uploading ${trackUploadProgress}%`
                                     : `Upload ${trackUploadRole === "MASTER" ? "Master" : "Delivery"}`}
                                 </label>
+                                {trackUploadRole === "DELIVERY" &&
+                                deliveryDownloadOptions.length > 1 ? (
+                                  <select
+                                    value={deliveryDownloadAssetId}
+                                    onChange={(event) =>
+                                      setDeliveryDownloadAssetIdByTrackId((previous) => ({
+                                        ...previous,
+                                        [track.id]: event.target.value,
+                                      }))
+                                    }
+                                    className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
+                                    aria-label={`Delivery format download for ${track.title}`}
+                                  >
+                                    {deliveryDownloadOptions.map((option) => (
+                                      <option key={option.id} value={option.id}>
+                                        {option.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : null}
+                                {trackUploadRole === "MASTER" && masterDownloadAssetId ? (
+                                  <a
+                                    href={`/api/admin/tracks/assets/${masterDownloadAssetId}/download`}
+                                    className={buttonClassName}
+                                  >
+                                    Download Master
+                                  </a>
+                                ) : null}
+                                {trackUploadRole === "MASTER" && !masterDownloadAssetId ? (
+                                  <span
+                                    className={`${buttonClassName} cursor-not-allowed opacity-50`}
+                                    aria-disabled="true"
+                                  >
+                                    No Master
+                                  </span>
+                                ) : null}
+                                {trackUploadRole === "DELIVERY" && deliveryDownloadAssetId ? (
+                                  <a
+                                    href={`/api/admin/tracks/assets/${deliveryDownloadAssetId}/download`}
+                                    className={buttonClassName}
+                                  >
+                                    Download Delivery
+                                  </a>
+                                ) : null}
+                                {trackUploadRole === "DELIVERY" && !deliveryDownloadAssetId ? (
+                                  <span
+                                    className={`${buttonClassName} cursor-not-allowed opacity-50`}
+                                    aria-disabled="true"
+                                  >
+                                    No Delivery
+                                  </span>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => void onUpdateTrack(release.id, track.id)}
@@ -318,15 +518,11 @@ export function ReleaseManagementTrackList(props: {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    if (
-                                      track.assets.length > 0 &&
-                                      !window.confirm(
-                                        "Deleting this track also removes its linked assets and preview jobs. Continue?",
-                                      )
-                                    ) {
-                                      return;
-                                    }
-                                    void onDeleteTrack(release.id, track);
+                                    setTrackDeleteDialog({
+                                      releaseId: release.id,
+                                      releaseTitle: release.title,
+                                      track,
+                                    });
                                   }}
                                   disabled={
                                     isPending ||

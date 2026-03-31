@@ -1,4 +1,5 @@
 import type {
+  DeliveryFormat,
   NewTrackDraft,
   ReleaseDraft,
   ReleaseMutationResponse,
@@ -7,6 +8,8 @@ import type {
   TrackDraft,
   TrackRecord,
 } from "./types";
+
+const DEFAULT_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
 
 export function moveItemInArray<T>(items: T[], fromIndex: number, toIndex: number) {
   if (fromIndex === toIndex) {
@@ -94,6 +97,30 @@ export function getFileExtension(fileName: string) {
   }
 
   return fileName.slice(dotIndex + 1).toLowerCase();
+}
+
+export function resolveUploadedFileNameFromStorageKey(storageKey: string) {
+  const trimmed = storageKey.trim();
+  if (trimmed.length === 0) {
+    return "";
+  }
+
+  const lastSegment = trimmed.split("/").pop() ?? trimmed;
+  const decoded = (() => {
+    try {
+      return decodeURIComponent(lastSegment);
+    } catch {
+      return lastSegment;
+    }
+  })();
+
+  // Upload keys currently prefix original file names with a UUID token.
+  const withoutUuidPrefix = decoded.replace(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}-/i,
+    "",
+  );
+
+  return withoutUuidPrefix.length > 0 ? withoutUuidPrefix : decoded;
 }
 
 export function resolveAudioMimeType(file: File) {
@@ -216,6 +243,10 @@ export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
     pricingMode: release.pricingMode,
     fixedPrice: centsToDecimalString(release.fixedPriceCents),
     minimumPrice: centsToDecimalString(release.minimumPriceCents),
+    deliveryFormats:
+      Array.isArray(release.deliveryFormats) && release.deliveryFormats.length > 0
+        ? release.deliveryFormats
+        : DEFAULT_DELIVERY_FORMATS,
     allowFreeCheckout:
       release.pricingMode === "PWYW" && (release.minimumPriceCents ?? null) === 0,
     status: release.status,
@@ -322,30 +353,62 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     };
   }
 
-  const previewAsset = track.assets.find((asset) => asset.assetRole === "PREVIEW");
-  if (previewAsset) {
-    return {
-      label: "preview ready",
-      className:
-        "rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300",
-    };
-  }
+  const previewAsset = track.assets
+    .filter((asset) => asset.assetRole === "PREVIEW")
+    .sort(
+      (a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    )[0];
+  const configuredPreviewSeconds = track.previewSeconds ?? 30;
+  const encodedPreviewSeconds = (() => {
+    if (!previewAsset) {
+      return null;
+    }
+
+    const match = previewAsset.storageKey.match(/-(\d+)s\.mp3$/i);
+    if (!match || !match[1]) {
+      return null;
+    }
+
+    const parsed = Number(match[1]);
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : null;
+  })();
+  const previewMatchesCurrentConfig =
+    !previewAsset ||
+    encodedPreviewSeconds === null ||
+    encodedPreviewSeconds === configuredPreviewSeconds;
 
   const runningJob = track.transcodeJobs.find((job) => job.status === "RUNNING");
-  if (runningJob) {
+  if (runningJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
-      label: "preview running",
+      label: previewAsset ? "preview updating" : "preview running",
       className:
         "rounded-full border border-indigo-700/70 bg-indigo-950/40 px-2 py-0.5 text-[11px] font-medium text-indigo-300",
     };
   }
 
   const queuedJob = track.transcodeJobs.find((job) => job.status === "QUEUED");
-  if (queuedJob) {
+  if (queuedJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
-      label: "preview queued",
+      label: previewAsset ? "preview updating" : "preview queued",
       className:
         "rounded-full border border-blue-700/70 bg-blue-950/40 px-2 py-0.5 text-[11px] font-medium text-blue-300",
+    };
+  }
+
+  if (previewAsset) {
+    if (!previewMatchesCurrentConfig) {
+      return {
+        label: "preview pending update",
+        className:
+          "rounded-full border border-amber-700/70 bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-300",
+      };
+    }
+
+    return {
+      label: "preview ready",
+      className:
+        "rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300",
     };
   }
 
@@ -362,6 +425,85 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     label: "no preview",
     className:
       "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
+  };
+}
+
+function normalizeDeliveryAssetFormat(format: string): DeliveryFormat | null {
+  const normalized = format.trim().toUpperCase();
+  if (normalized === "MP3") {
+    return "MP3";
+  }
+
+  if (normalized === "M4A" || normalized === "AAC" || normalized === "MP4") {
+    return "M4A";
+  }
+
+  if (normalized === "FLAC") {
+    return "FLAC";
+  }
+
+  return null;
+}
+
+export function getTrackDeliveryStatus(
+  track: TrackRecord,
+  enabledFormats: DeliveryFormat[],
+) {
+  const hasLosslessMaster = track.assets.some(
+    (asset) => asset.assetRole === "MASTER" && asset.isLossless,
+  );
+
+  if (!hasLosslessMaster) {
+    return {
+      label: "delivery n/a",
+      className:
+        "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
+    };
+  }
+
+  const enabled = new Set(
+    enabledFormats.length > 0 ? enabledFormats : DEFAULT_DELIVERY_FORMATS,
+  );
+  const available = new Set<DeliveryFormat>();
+
+  for (const asset of track.assets) {
+    if (asset.assetRole !== "DELIVERY") {
+      continue;
+    }
+
+    const normalized = normalizeDeliveryAssetFormat(asset.format);
+    if (normalized && enabled.has(normalized)) {
+      available.add(normalized);
+    }
+  }
+
+  // A lossless master can fulfill FLAC availability even when a dedicated
+  // DELIVERY FLAC transcode has not been generated yet.
+  if (hasLosslessMaster && enabled.has("FLAC")) {
+    available.add("FLAC");
+  }
+
+  const completeLabel = `${available.size}/${enabled.size}`;
+  if (available.size >= enabled.size) {
+    return {
+      label: `delivery ready ${completeLabel}`,
+      className:
+        "rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300",
+    };
+  }
+
+  if (available.size > 0) {
+    return {
+      label: `delivery partial ${completeLabel}`,
+      className:
+        "rounded-full border border-amber-700/70 bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-300",
+    };
+  }
+
+  return {
+    label: `delivery pending ${completeLabel}`,
+    className:
+      "rounded-full border border-blue-700/70 bg-blue-950/40 px-2 py-0.5 text-[11px] font-medium text-blue-300",
   };
 }
 

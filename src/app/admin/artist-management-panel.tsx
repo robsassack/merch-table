@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
+import { AdminDialogPortal } from "./dialog-portal";
 
 type ArtistRecord = {
   id: string;
@@ -575,60 +576,64 @@ export function ArtistManagementPanel() {
       )}
 
       {purgeDialogArtist ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/75 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm permanent artist purge"
-        >
-          <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-            <h3 className="text-lg font-semibold text-zinc-100">Confirm permanent purge</h3>
-            <p className="mt-2 text-sm text-zinc-400">
-              This will permanently remove <span className="font-semibold">{purgeDialogArtist.name}</span>.
-              Type the artist name to confirm.
-            </p>
+        <AdminDialogPortal>
+          <div
+            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Confirm permanent artist purge"
+          >
+            <div className="flex min-h-full items-center justify-center p-4">
+              <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+                <h3 className="text-lg font-semibold text-zinc-100">Confirm permanent purge</h3>
+                <p className="mt-2 text-sm text-zinc-400">
+                  This will permanently remove <span className="font-semibold">{purgeDialogArtist.name}</span>.
+                  Type the artist name to confirm.
+                </p>
 
-            <label className="mt-4 flex flex-col gap-1 text-xs text-zinc-500">
-              Artist name confirmation
-              <input
-                value={purgeConfirmInput}
-                onChange={(event) => setPurgeConfirmInput(event.target.value)}
-                className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                placeholder={purgeDialogArtist.name}
-              />
-            </label>
+                <label className="mt-4 flex flex-col gap-1 text-xs text-zinc-500">
+                  Artist name confirmation
+                  <input
+                    value={purgeConfirmInput}
+                    onChange={(event) => setPurgeConfirmInput(event.target.value)}
+                    className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+                    placeholder={purgeDialogArtist.name}
+                  />
+                </label>
 
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className={buttonClassName}
-                onClick={() => {
-                  if (pendingArtistId) {
-                    return;
-                  }
-                  setPurgeDialogArtist(null);
-                  setPurgeConfirmInput("");
-                }}
-                disabled={Boolean(pendingArtistId)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className={dangerButtonClassName}
-                disabled={
-                  Boolean(pendingArtistId) ||
-                  purgeConfirmInput.trim() !== purgeDialogArtist.name
-                }
-                onClick={() =>
-                  void onPurgeArtist(purgeDialogArtist, purgeConfirmInput)
-                }
-              >
-                {pendingArtistId ? "Purging..." : "Confirm Purge"}
-              </button>
+                <div className="mt-4 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className={buttonClassName}
+                    onClick={() => {
+                      if (pendingArtistId) {
+                        return;
+                      }
+                      setPurgeDialogArtist(null);
+                      setPurgeConfirmInput("");
+                    }}
+                    disabled={Boolean(pendingArtistId)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={dangerButtonClassName}
+                    disabled={
+                      Boolean(pendingArtistId) ||
+                      purgeConfirmInput.trim() !== purgeDialogArtist.name
+                    }
+                    onClick={() =>
+                      void onPurgeArtist(purgeDialogArtist, purgeConfirmInput)
+                    }
+                  >
+                    {pendingArtistId ? "Purging..." : "Confirm Purge"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </AdminDialogPortal>
       ) : null}
     </section>
   );

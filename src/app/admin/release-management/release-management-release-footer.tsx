@@ -26,6 +26,7 @@ export function ReleaseManagementReleaseFooter(props: {
     setAdvancedById,
     onUpdateRelease,
     onSoftDeleteOrRestoreRelease,
+    onGenerateDownloadFormats,
     setPurgeDialogRelease,
     setPurgeConfirmInput,
   } = props.controller;
@@ -71,6 +72,7 @@ export function ReleaseManagementReleaseFooter(props: {
             isPending ||
             createPending ||
             coverUploadTarget === release.id ||
+            draft.deliveryFormats.length === 0 ||
             (draft.markLossyOnly && !draft.confirmLossyOnly)
           }
           onClick={() => void onUpdateRelease(release.id)}
@@ -78,6 +80,17 @@ export function ReleaseManagementReleaseFooter(props: {
         >
           {isPending ? "Saving..." : "Save"}
         </button>
+
+        {release.hasLosslessMasters && !release.deletedAt ? (
+          <button
+            type="button"
+            disabled={isPending || createPending}
+            onClick={() => void onGenerateDownloadFormats(release)}
+            className={buttonClassName}
+          >
+            {isPending ? "Queueing..." : "Generate Download Formats"}
+          </button>
+        ) : null}
 
         <button
           type="button"

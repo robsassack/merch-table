@@ -70,7 +70,7 @@ docker compose up -d postgres redis garage
 Equivalent npm script:
 
 ```bash
-npm run infra:up:core
+npm run infra:up
 ```
 
 If you start services with plain `docker compose` commands, run this once after `garage` is up:
@@ -91,23 +91,50 @@ Check service status:
 docker compose ps
 ```
 
-To start all services (including `web` and `worker` stubs):
+To start all services (including the `web` stub and transcode `worker`):
 
 ```bash
 npm run infra:up:all
 ```
 
-## Infra Scripts
+## Primary Scripts
 
 ```bash
-npm run infra:up        # core services (postgres, redis, garage)
-npm run infra:up:core   # same as infra:up
-npm run infra:up:web    # web + worker stubs
-npm run infra:up:all    # all services
-npm run infra:ps        # docker compose ps
-npm run infra:down      # stop and remove stack
-npm run infra:garage:bootstrap  # rerun Garage layout/key/bucket bootstrap
+npm run dev             # Next.js app
+npm run worker          # transcode worker (uses .env)
+npm run infra:up        # postgres + redis + garage + garage bootstrap
+npm run infra:up:web    # web stub + worker container
+npm run infra:down      # stop/remove compose stack
+npm run infra:ps        # compose service status
+npm run check           # db validate + lint + typecheck + tests
 ```
+
+## Additional Scripts
+
+```bash
+npm run db:generate
+npm run db:validate
+npm run db:status
+npm run db:migrate
+npm run db:deploy
+npm run db:studio
+npm run infra:garage:bootstrap
+npm run infra:up:all
+npm run infra:up:core   # compatibility alias for infra:up
+npm run stripe:listen
+npm run stripe:trigger:checkout-complete
+```
+
+## Transcode Worker
+
+- Uploading a master track queues transcode work in Redis (`TranscodeJob` starts as `QUEUED`).
+- A worker process must be running to move jobs to `RUNNING`/`SUCCEEDED` and create preview/delivery assets.
+- Delivery transcodes honor per-release format settings (`MP3`, `M4A`, `FLAC`), with all three enabled by default for new releases.
+- If jobs stay queued:
+  - Start worker locally: `npm run worker`
+  - Or run Docker worker: `docker compose up -d --build worker`
+  - Check worker logs: `docker compose logs -f worker`
+- Docker worker image includes static `ffmpeg`/`ffprobe` binaries (no host mounts needed).
 
 ### Bundled Garage Notes
 
@@ -166,10 +193,7 @@ If this command succeeds and shows your migration state, your database connectio
 Run local checks:
 
 ```bash
-npm run db:validate
-npm run -s lint
-npm run -s typecheck
-npm test
+npm run check
 npm run -s build
 ```
 

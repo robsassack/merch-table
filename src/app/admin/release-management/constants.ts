@@ -1,4 +1,9 @@
-import type { PreviewMode, PricingMode, ReleaseStatus } from "./types";
+import type {
+  DeliveryFormat,
+  PreviewMode,
+  PricingMode,
+  ReleaseStatus,
+} from "./types";
 
 export const buttonClassName =
   "inline-flex items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-slate-700 hover:text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50";
@@ -24,6 +29,15 @@ export const statusOptions: Array<{ value: ReleaseStatus; label: string }> = [
 export const previewModeOptions: Array<{ value: PreviewMode; label: string }> = [
   { value: "CLIP", label: "Clip" },
   { value: "FULL", label: "Full" },
+];
+
+export const deliveryFormatOptions: Array<{
+  value: DeliveryFormat;
+  label: string;
+}> = [
+  { value: "MP3", label: "MP3 (320 kbps)" },
+  { value: "M4A", label: "M4A (AAC 256 kbps)" },
+  { value: "FLAC", label: "FLAC (Lossless)" },
 ];
 
 export const ALLOWED_COVER_MIME_TYPES = new Set([

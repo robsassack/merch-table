@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type {
   ArtistOption,
+  DeliveryFormat,
+  ImportConflictDialogState,
   NewTrackDraft,
   PricingMode,
   ReleaseDraft,
+  TrackDeleteDialogState,
   ReleasePreviewDraft,
   ReleaseRecord,
   ReleaseStatus,
@@ -50,6 +53,11 @@ export function useReleaseManagementState() {
   const [newPricingMode, setNewPricingMode] = useState<PricingMode>("FREE");
   const [newFixedPrice, setNewFixedPrice] = useState("");
   const [newMinimumPrice, setNewMinimumPrice] = useState("");
+  const [newDeliveryFormats, setNewDeliveryFormats] = useState<DeliveryFormat[]>([
+    "MP3",
+    "M4A",
+    "FLAC",
+  ]);
   const [newAllowFreeCheckout, setNewAllowFreeCheckout] = useState(false);
   const [newStatus, setNewStatus] = useState<ReleaseStatus>("PUBLISHED");
   const [newReleaseDate, setNewReleaseDate] = useState(getTodayDateInputValue());
@@ -99,6 +107,10 @@ export function useReleaseManagementState() {
 
   const [purgeDialogRelease, setPurgeDialogRelease] = useState<ReleaseRecord | null>(null);
   const [purgeConfirmInput, setPurgeConfirmInput] = useState("");
+  const [importConflictDialog, setImportConflictDialog] =
+    useState<ImportConflictDialogState | null>(null);
+  const [trackDeleteDialog, setTrackDeleteDialog] =
+    useState<TrackDeleteDialogState | null>(null);
 
   const activeArtists = useMemo(
     () => artists.filter((artist) => artist.deletedAt === null),
@@ -222,6 +234,8 @@ export function useReleaseManagementState() {
     setNewFixedPrice,
     newMinimumPrice,
     setNewMinimumPrice,
+    newDeliveryFormats,
+    setNewDeliveryFormats,
     newAllowFreeCheckout,
     setNewAllowFreeCheckout,
     newStatus,
@@ -276,6 +290,10 @@ export function useReleaseManagementState() {
     setPurgeDialogRelease,
     purgeConfirmInput,
     setPurgeConfirmInput,
+    importConflictDialog,
+    setImportConflictDialog,
+    trackDeleteDialog,
+    setTrackDeleteDialog,
     activeArtists,
     deletedCount,
     trackLocalObjectUrl,

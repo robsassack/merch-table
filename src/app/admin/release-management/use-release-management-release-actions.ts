@@ -46,6 +46,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newPricingMode,
     newFixedPrice,
     newMinimumPrice,
+    newDeliveryFormats,
     newAllowFreeCheckout,
     newStatus,
     newReleaseDate,
@@ -68,6 +69,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setNewPricingMode,
     setNewFixedPrice,
     setNewMinimumPrice,
+    setNewDeliveryFormats,
     setPendingReleaseId,
     setTrackDraftsById,
     setTrackImportJobsByReleaseId,
@@ -212,6 +214,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
               ? (parseCurrencyInputToCents(newMinimumPrice) ??
                 (newAllowFreeCheckout ? 0 : null))
               : null,
+          deliveryFormats: newDeliveryFormats,
           allowFreeCheckout: newPricingMode === "PWYW" ? newAllowFreeCheckout : false,
           status: newStatus,
           releaseDate: newReleaseDate,
@@ -247,6 +250,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
       setNewPricingMode("FREE");
       setNewFixedPrice("");
       setNewMinimumPrice("");
+      setNewDeliveryFormats(["MP3", "M4A", "FLAC"]);
       setNewAllowFreeCheckout(false);
       setNewStatus("PUBLISHED");
       setNewReleaseDate(getTodayDateInputValue());
@@ -296,6 +300,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
               ? (parseCurrencyInputToCents(draft.minimumPrice) ??
                 (draft.allowFreeCheckout ? 0 : null))
               : null,
+          deliveryFormats: draft.deliveryFormats,
           allowFreeCheckout: draft.pricingMode === "PWYW" ? draft.allowFreeCheckout : false,
           status: draft.status,
           releaseDate: draft.releaseDate,
@@ -467,6 +472,52 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     }
   };
 
+  const onGenerateDownloadFormats = async (release: ReleaseRecord) => {
+    setError(null);
+    setNotice(null);
+    setPendingReleaseId(release.id);
+
+    try {
+      const response = await fetch(`/api/admin/releases/${release.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "generate-download-formats",
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
+      if (!response.ok || !body?.ok || !body.release) {
+        throw new Error(getMutationError(body, "Could not queue download format jobs."));
+      }
+
+      replaceRelease(body.release);
+      const queuedCount = body.queuedTranscodeJobs ?? 0;
+      const existingCount = body.alreadyQueuedJobs ?? 0;
+
+      if (queuedCount === 0 && existingCount > 0) {
+        setNotice(
+          `All eligible tracks already had queued/running transcode jobs (${existingCount}).`,
+        );
+      } else if (queuedCount > 0 && existingCount > 0) {
+        setNotice(
+          `Queued ${queuedCount} transcode job${queuedCount === 1 ? "" : "s"} (${existingCount} already queued/running).`,
+        );
+      } else {
+        setNotice(
+          `Queued ${queuedCount} transcode job${queuedCount === 1 ? "" : "s"} for download formats.`,
+        );
+      }
+    } catch (queueError) {
+      setError(
+        queueError instanceof Error
+          ? queueError.message
+          : "Could not queue download format jobs.",
+      );
+    } finally {
+      setPendingReleaseId(null);
+    }
+  };
+
   const newCoverPreviewSrc = newCoverPreviewUrl ?? newCoverImageUrl;
 
   return {
@@ -478,6 +529,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     onSoftDeleteOrRestoreRelease,
     onPurgeRelease,
     onHardDeleteRelease,
+    onGenerateDownloadFormats,
     newCoverPreviewSrc,
   };
 }

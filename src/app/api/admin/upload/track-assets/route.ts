@@ -6,6 +6,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import { enqueueDeliveryFormatsJob, enqueuePreviewClipJob } from "@/lib/transcode/queue";
 import {
   isAllowedUploadContentType,
   normalizeContentType,
@@ -260,17 +261,34 @@ export async function POST(request: Request) {
             },
           });
 
-      let previewJobQueued = false;
       let previewJobId: string | null = null;
+      let deliveryJobId: string | null = null;
 
       if (asset.assetRole === "MASTER" && track.previewMode === "CLIP") {
-        const pendingJob = await tx.transcodeJob.findFirst({
-          where: {
+        const queuedJob = await tx.transcodeJob.create({
+          data: {
             organizationId: auth.context.organizationId,
             trackId: track.id,
             sourceAssetId: asset.id,
-            status: {
-              in: ["QUEUED", "RUNNING"],
+            status: "QUEUED",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        previewJobId = queuedJob.id;
+      }
+
+      if (asset.assetRole === "MASTER" && asset.isLossless) {
+        const hasDeliveryOutput = await tx.transcodeOutput.findFirst({
+          where: {
+            job: {
+              trackId: track.id,
+              sourceAssetId: asset.id,
+            },
+            outputAsset: {
+              assetRole: "DELIVERY",
             },
           },
           select: {
@@ -278,10 +296,8 @@ export async function POST(request: Request) {
           },
         });
 
-        if (pendingJob) {
-          previewJobId = pendingJob.id;
-        } else {
-          const queuedJob = await tx.transcodeJob.create({
+        if (!hasDeliveryOutput) {
+          const queuedDeliveryJob = await tx.transcodeJob.create({
             data: {
               organizationId: auth.context.organizationId,
               trackId: track.id,
@@ -293,17 +309,54 @@ export async function POST(request: Request) {
             },
           });
 
-          previewJobQueued = true;
-          previewJobId = queuedJob.id;
+          deliveryJobId = queuedDeliveryJob.id;
         }
       }
 
       return {
         asset,
-        previewJobQueued,
         previewJobId,
+        deliveryJobId,
       };
     });
+
+    let previewJobQueued = false;
+    if (result.previewJobId) {
+      try {
+        await enqueuePreviewClipJob(result.previewJobId);
+        previewJobQueued = true;
+      } catch {
+        await prisma.transcodeJob
+          .update({
+            where: { id: result.previewJobId },
+            data: {
+              status: "FAILED",
+              errorMessage: "Could not enqueue preview transcode job.",
+              finishedAt: new Date(),
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
+
+    let deliveryJobQueued = false;
+    if (result.deliveryJobId) {
+      try {
+        await enqueueDeliveryFormatsJob(result.deliveryJobId);
+        deliveryJobQueued = true;
+      } catch {
+        await prisma.transcodeJob
+          .update({
+            where: { id: result.deliveryJobId },
+            data: {
+              status: "FAILED",
+              errorMessage: "Could not enqueue delivery transcode job.",
+              finishedAt: new Date(),
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
@@ -312,8 +365,10 @@ export async function POST(request: Request) {
         createdAt: result.asset.createdAt.toISOString(),
         updatedAt: result.asset.updatedAt.toISOString(),
       },
-      previewJobQueued: result.previewJobQueued,
+      previewJobQueued,
       previewJobId: result.previewJobId,
+      deliveryJobQueued,
+      deliveryJobId: result.deliveryJobId,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

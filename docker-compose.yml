@@ -24,19 +24,35 @@ services:
         condition: service_healthy
 
   worker:
-    image: node:22-alpine
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    image: merchtable-worker:local
     container_name: merchtable-worker
     working_dir: /app
-    command: ["sh", "-c", "echo 'worker service stub (replace in later phase)' && tail -f /dev/null"]
+    command: ["sh", "-c", "npm run -s worker"]
+    volumes:
+      - ./:/app
     environment:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
       REDIS_URL: redis://redis:6379
+      STORAGE_MODE: GARAGE
+      STORAGE_ENDPOINT: http://garage:3900
+      STORAGE_BUCKET: media
+      STORAGE_REGION: us-east-1
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-secret-access-key}
+      STORAGE_USE_PATH_STYLE: "true"
       TRANSCODE_CONCURRENCY: "1"
+      TRANSCODE_SOURCE_ROOT: /tmp/merch-table/source
+      TRANSCODE_OUTPUT_ROOT: /tmp/merch-table/output
     depends_on:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      garage:
         condition: service_healthy
 
   postgres:

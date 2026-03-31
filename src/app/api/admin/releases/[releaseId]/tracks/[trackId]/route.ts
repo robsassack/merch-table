@@ -4,6 +4,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import { enqueuePreviewClipJob } from "@/lib/transcode/queue";
 import {
   adminTrackSelect,
   normalizeTrackDurationMs,
@@ -146,7 +147,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       previewSeconds: settings?.defaultPreviewSeconds ?? 30,
     };
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const current = await tx.releaseTrack.findFirst({
         where: {
           id: existing.id,
@@ -187,6 +188,10 @@ export async function PATCH(request: Request, context: RouteContext) {
         fallbackMode: defaults.previewMode,
         fallbackSeconds: defaults.previewSeconds,
       });
+      const previewConfigChanged =
+        current.previewMode !== preview.previewMode ||
+        (preview.previewMode === "CLIP" &&
+          (current.previewSeconds ?? null) !== (preview.previewSeconds ?? null));
 
       const updateData = {
         title: parsed.title?.trim() ?? current.title,
@@ -244,7 +249,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
       }
 
-      return tx.releaseTrack.update({
+      const track = await tx.releaseTrack.update({
         where: { id: current.id },
         data: {
           ...updateData,
@@ -252,11 +257,68 @@ export async function PATCH(request: Request, context: RouteContext) {
         },
         select: adminTrackSelect,
       });
+
+      let previewJobId: string | null = null;
+
+      if (previewConfigChanged && preview.previewMode === "CLIP") {
+        const sourceAsset = await tx.trackAsset.findFirst({
+          where: {
+            trackId: current.id,
+            assetRole: "MASTER",
+          },
+          orderBy: [{ createdAt: "desc" }],
+          select: {
+            id: true,
+          },
+        });
+
+        if (sourceAsset) {
+          const queuedJob = await tx.transcodeJob.create({
+            data: {
+              organizationId: auth.context.organizationId,
+              trackId: current.id,
+              sourceAssetId: sourceAsset.id,
+              status: "QUEUED",
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          previewJobId = queuedJob.id;
+        }
+      }
+
+      return {
+        track,
+        previewJobId,
+      };
     });
+
+    let previewJobQueued = false;
+    if (result.previewJobId) {
+      try {
+        await enqueuePreviewClipJob(result.previewJobId);
+        previewJobQueued = true;
+      } catch {
+        await prisma.transcodeJob
+          .update({
+            where: { id: result.previewJobId },
+            data: {
+              status: "FAILED",
+              errorMessage: "Could not enqueue preview transcode job.",
+              finishedAt: new Date(),
+            },
+          })
+          .catch(() => undefined);
+      }
+    }
 
     return NextResponse.json({
       ok: true,
-      track: toAdminTrackRecord(updated),
+      track: toAdminTrackRecord(result.track),
+      previewJobQueued,
+      previewJobId: result.previewJobId,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

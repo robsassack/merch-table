@@ -5,6 +5,7 @@ export type ReleaseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 export type PreviewMode = "CLIP" | "FULL";
 export type AssetRole = "MASTER" | "PREVIEW" | "DELIVERY";
 export type TranscodeStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+export type DeliveryFormat = "MP3" | "M4A" | "FLAC";
 
 export type ArtistOption = {
   id: string;
@@ -22,6 +23,7 @@ export type ReleaseRecord = {
   pricingMode: PricingMode;
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
+  deliveryFormats: DeliveryFormat[];
   priceCents: number;
   currency: string;
   status: ReleaseStatus;
@@ -108,6 +110,8 @@ export type ReleaseMutationResponse = {
   release?: ReleaseRecord;
   hardDeletedReleaseId?: string;
   purgedAssetCount?: number;
+  queuedTranscodeJobs?: number;
+  alreadyQueuedJobs?: number;
 };
 
 export type TrackMutationResponse = {
@@ -115,6 +119,8 @@ export type TrackMutationResponse = {
   error?: string;
   track?: TrackRecord;
   deletedTrackId?: string;
+  previewJobQueued?: boolean;
+  previewJobId?: string | null;
 };
 
 export type UploadUrlResponse = {
@@ -132,6 +138,7 @@ export type TrackAssetCommitResponse = {
   ok?: boolean;
   error?: string;
   previewJobQueued?: boolean;
+  deliveryJobQueued?: boolean;
 };
 
 export type CoverUploadUrlResponse = {
@@ -154,6 +161,7 @@ export type ReleaseDraft = {
   pricingMode: PricingMode;
   fixedPrice: string;
   minimumPrice: string;
+  deliveryFormats: DeliveryFormat[];
   allowFreeCheckout: boolean;
   status: ReleaseStatus;
   releaseDate: string;
@@ -180,8 +188,21 @@ export type ReleasePreviewDraft = {
   previewSeconds: string;
 };
 
-export type TrackImportMode = "append" | "replace";
+export type TrackImportMode = "append" | "insert";
 export type TrackImportStatus = "pending" | "track-created" | "uploaded" | "failed";
+
+export type ImportConflictDialogState = {
+  releaseId: string;
+  releaseTitle: string;
+  existingTrackCount: number;
+  selectedFiles: File[];
+};
+
+export type TrackDeleteDialogState = {
+  releaseId: string;
+  releaseTitle: string;
+  track: TrackRecord;
+};
 
 export type TrackImportJob = {
   id: string;

@@ -1,7 +1,12 @@
-import { buttonClassName, pricingModeOptions, statusOptions } from "./constants";
+import {
+  buttonClassName,
+  deliveryFormatOptions,
+  pricingModeOptions,
+  statusOptions,
+} from "./constants";
 import { ReleaseManagementReleaseFooter } from "./release-management-release-footer";
 import { ReleaseManagementTrackManagement } from "./release-management-track-management";
-import type { PricingMode, ReleaseStatus } from "./types";
+import type { DeliveryFormat, PricingMode, ReleaseStatus } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 import {
   getReleaseUrlPreview,
@@ -425,6 +430,56 @@ export function ReleaseManagementSelectedReleaseList(props: {
                           disclosure.
                         </span>
                       </label>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                    <p className="font-medium text-zinc-300">Download formats</p>
+                    <p className="mt-1">
+                      Choose which transcode formats are available for buyer downloads.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      {deliveryFormatOptions.map((formatOption) => {
+                        const checked = draft.deliveryFormats.includes(formatOption.value);
+
+                        return (
+                          <label
+                            key={formatOption.value}
+                            className="inline-flex items-center gap-2 text-zinc-300"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(event) => {
+                                const nextFormats: DeliveryFormat[] = event.target.checked
+                                  ? Array.from(
+                                      new Set<DeliveryFormat>([
+                                        ...draft.deliveryFormats,
+                                        formatOption.value,
+                                      ]),
+                                    )
+                                  : draft.deliveryFormats.filter(
+                                      (value) => value !== formatOption.value,
+                                    );
+
+                                setDraftsById((previous) => ({
+                                  ...previous,
+                                  [release.id]: {
+                                    ...draft,
+                                    deliveryFormats: nextFormats,
+                                  },
+                                }));
+                              }}
+                            />
+                            <span>{formatOption.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {draft.deliveryFormats.length === 0 ? (
+                      <p className="mt-2 text-xs text-amber-300">
+                        Select at least one delivery format before saving.
+                      </p>
                     ) : null}
                   </div>
 
