@@ -116,11 +116,27 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Worker process runs FFmpeg jobs; preview clips are generated automatically.
 
-- [ ] Worker service in Docker Compose consuming job queue (Redis-backed)
-- [ ] Preview clip generation job: extracts clip from master, stores as `TrackAsset` with `assetRole: PREVIEW`
-- [ ] Optional "generate download formats" action when lossless masters exist (queues transcode)
-- [ ] `TranscodeJob` status tracking (`QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`)
-- [ ] `TranscodeOutput` records created on success
+- [x] Worker service in Docker Compose consuming job queue (Redis-backed)
+- [x] Preview clip generation job: extracts clip from master, stores as `TrackAsset` with `assetRole: PREVIEW`
+- [x] Optional "generate download formats" action when lossless masters exist (queues transcode)
+- [x] `TranscodeJob` status tracking (`QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED`)
+- [x] `TranscodeOutput` records created on success
+
+### Edge cases (Priority 1)
+
+- [ ] Add stale-job recovery: detect `QUEUED` jobs older than threshold and auto-requeue or mark failed with actionable reason
+- [ ] Ensure delivery job dedupe is race-safe (no duplicate queued jobs for same source + kind under concurrent requests)
+- [ ] Add worker health visibility in admin/status view (queue depth, worker up/down, last successful job time)
+
+### Edge cases (Priority 2)
+
+- [ ] Add `jobKind` on `TranscodeJob` (`PREVIEW_CLIP`, `DELIVERY_FORMATS`) to avoid ambiguous retries and status badges
+- [ ] Add retry policy for transient failures (storage/network/temporary ffmpeg errors), with capped attempts and backoff
+- [ ] Handle format changes during active delivery transcode (`release.deliveryFormats` changed while job is `RUNNING`)
+- [ ] Ensure partial output cleanup behavior is consistent when one delivery format fails after others succeed
+- [ ] Add explicit requeue action for failed jobs from admin UI (single track + bulk release)
+- [ ] Add automated test coverage for preview requeue flow when `previewSeconds` is changed repeatedly
+- [ ] Add automated test coverage for duplicate queue messages and worker concurrency >1
 
 ---
 
