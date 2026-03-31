@@ -110,4 +110,24 @@ describe("track import ordering", () => {
       ],
     );
   });
+
+  it("keeps non-conflicting metadata track numbers even when they are beyond contiguous range", () => {
+    const appendNumbers = assignAppendTrackNumbers(
+      [
+        {
+          item: { id: "bonus" },
+          metadataTrackNumber: 10,
+        },
+      ],
+      [1, 2, 3],
+    );
+
+    assert.deepEqual(
+      appendNumbers.map((entry) => ({
+        id: entry.item.id,
+        trackNumber: entry.trackNumber,
+      })),
+      [{ id: "bonus", trackNumber: 10 }],
+    );
+  });
 });

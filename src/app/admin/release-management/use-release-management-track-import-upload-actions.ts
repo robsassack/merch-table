@@ -32,6 +32,40 @@ type TrackImportUploadActionsInput = ReleaseManagementState & {
   loadReleases: (options?: { silent?: boolean }) => Promise<void>;
 };
 
+function hasMetadataTrackNumberConflict(input: {
+  existingTrackNumbers: number[];
+  importedMetadataTrackNumbers: Array<number | null | undefined>;
+}) {
+  const existingTrackNumbers = new Set(
+    input.existingTrackNumbers
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => Math.round(value)),
+  );
+
+  const seenImported = new Set<number>();
+  for (const importedTrackNumber of input.importedMetadataTrackNumbers) {
+    if (typeof importedTrackNumber !== "number" || !Number.isFinite(importedTrackNumber)) {
+      continue;
+    }
+
+    const normalizedTrackNumber = Math.round(importedTrackNumber);
+    if (normalizedTrackNumber <= 0) {
+      continue;
+    }
+
+    if (
+      existingTrackNumbers.has(normalizedTrackNumber) ||
+      seenImported.has(normalizedTrackNumber)
+    ) {
+      return true;
+    }
+
+    seenImported.add(normalizedTrackNumber);
+  }
+
+  return false;
+}
+
 export function createTrackImportUploadActions(input: TrackImportUploadActionsInput) {
   const {
     releases,
@@ -371,13 +405,25 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
     }
 
     if (release.tracks.length > 0) {
-      setImportConflictDialog({
-        releaseId: release.id,
-        releaseTitle: release.title,
-        existingTrackCount: release.tracks.length,
-        selectedFiles,
+      const parsedMetadata = await Promise.all(
+        selectedFiles.map((file) => parseTrackImportFileMetadata(file)),
+      );
+      const hasConflict = hasMetadataTrackNumberConflict({
+        existingTrackNumbers: release.tracks.map((track) => track.trackNumber),
+        importedMetadataTrackNumbers: parsedMetadata.map(
+          (entry) => entry.metadataTrackNumber,
+        ),
       });
-      return;
+
+      if (hasConflict) {
+        setImportConflictDialog({
+          releaseId: release.id,
+          releaseTitle: release.title,
+          existingTrackCount: release.tracks.length,
+          selectedFiles,
+        });
+        return;
+      }
     }
 
     await runTrackImport({
