@@ -344,6 +344,14 @@ export function withReleaseDerivedTrackStats(release: ReleaseRecord): ReleaseRec
   };
 }
 
+export function areAllMasterAssetsLossless(release: ReleaseRecord) {
+  const masterAssets = release.tracks.flatMap((track) =>
+    track.assets.filter((asset) => asset.assetRole === "MASTER"),
+  );
+
+  return masterAssets.length > 0 && masterAssets.every((asset) => asset.isLossless);
+}
+
 export function getTrackPreviewStatus(track: TrackRecord) {
   if (track.previewMode === "FULL") {
     return {
@@ -453,14 +461,6 @@ export function getTrackDeliveryStatus(
     (asset) => asset.assetRole === "MASTER" && asset.isLossless,
   );
 
-  if (!hasLosslessMaster) {
-    return {
-      label: "delivery n/a",
-      className:
-        "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
-    };
-  }
-
   const enabled = new Set(
     enabledFormats.length > 0 ? enabledFormats : DEFAULT_DELIVERY_FORMATS,
   );
@@ -477,10 +477,29 @@ export function getTrackDeliveryStatus(
     }
   }
 
+  for (const asset of track.assets) {
+    if (asset.assetRole !== "MASTER" || asset.isLossless) {
+      continue;
+    }
+
+    const normalized = normalizeDeliveryAssetFormat(asset.format);
+    if (normalized && enabled.has(normalized)) {
+      available.add(normalized);
+    }
+  }
+
   // A lossless master can fulfill FLAC availability even when a dedicated
   // DELIVERY FLAC transcode has not been generated yet.
   if (hasLosslessMaster && enabled.has("FLAC")) {
     available.add("FLAC");
+  }
+
+  if (!hasLosslessMaster && available.size === 0) {
+    return {
+      label: "delivery n/a",
+      className:
+        "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
+    };
   }
 
   const completeLabel = `${available.size}/${enabled.size}`;

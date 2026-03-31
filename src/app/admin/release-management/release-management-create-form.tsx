@@ -62,8 +62,6 @@ export function ReleaseManagementCreateForm(props: {
     renderPricingDetails,
     newMarkLossyOnly,
     setNewMarkLossyOnly,
-    newConfirmLossyOnly,
-    setNewConfirmLossyOnly,
     activeArtists,
   } = props.controller;
 
@@ -330,7 +328,7 @@ export function ReleaseManagementCreateForm(props: {
                 status: newStatus,
                 releaseDate: newReleaseDate,
                 markLossyOnly: newMarkLossyOnly,
-                confirmLossyOnly: newConfirmLossyOnly,
+                confirmLossyOnly: false,
               },
               storeCurrency,
             )}
@@ -340,7 +338,7 @@ export function ReleaseManagementCreateForm(props: {
             <p className="font-medium text-zinc-300">Master quality workflow</p>
             <p className="mt-1">
               Upload lossless masters first when possible. If you only have lossy files, mark this
-              release as lossy-only and confirm disclosure.
+              release as using lossy masters.
             </p>
 
             <div className="mt-3 flex flex-col gap-2">
@@ -351,41 +349,22 @@ export function ReleaseManagementCreateForm(props: {
                   checked={!newMarkLossyOnly}
                   onChange={() => {
                     setNewMarkLossyOnly(false);
-                    setNewConfirmLossyOnly(false);
                   }}
                   className="mt-0.5"
                 />
-                <span className="text-zinc-300">Lossless masters available</span>
+                <span className="text-zinc-300">Lossless masters</span>
               </label>
               <label className="inline-flex items-start gap-2">
                 <input
                   type="radio"
                   name="new-lossless"
                   checked={newMarkLossyOnly}
-                  onChange={() => {
-                    setNewMarkLossyOnly(true);
-                    setNewConfirmLossyOnly(false);
-                  }}
+                  onChange={() => setNewMarkLossyOnly(true)}
                   className="mt-0.5"
                 />
-                <span className="text-zinc-300">Lossy-only for now</span>
+                <span className="text-zinc-300">Lossy masters</span>
               </label>
             </div>
-
-            {newMarkLossyOnly ? (
-              <label className="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-amber-200">
-                <input
-                  type="checkbox"
-                  checked={newConfirmLossyOnly}
-                  onChange={(event) => setNewConfirmLossyOnly(event.target.checked)}
-                  className="mt-0.5"
-                />
-                <span>
-                  I confirm this release currently has no lossless masters and should show a quality
-                  disclosure.
-                </span>
-              </label>
-            ) : null}
           </div>
 
           <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
@@ -440,8 +419,7 @@ export function ReleaseManagementCreateForm(props: {
               createPending ||
               coverUploadTarget === "new" ||
               activeArtists.length === 0 ||
-              newDeliveryFormats.length === 0 ||
-              (newMarkLossyOnly && !newConfirmLossyOnly)
+              newDeliveryFormats.length === 0
             }
             className={primaryButtonClassName}
           >

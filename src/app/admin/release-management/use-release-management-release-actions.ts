@@ -518,6 +518,60 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     }
   };
 
+  const onForceRequeueTranscodes = async (release: ReleaseRecord) => {
+    setError(null);
+    setNotice(null);
+    setPendingReleaseId(release.id);
+
+    try {
+      const response = await fetch(`/api/admin/releases/${release.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "force-requeue-transcodes",
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
+      if (!response.ok || !body?.ok || !body.release) {
+        throw new Error(getMutationError(body, "Could not force requeue transcode jobs."));
+      }
+
+      replaceRelease(body.release);
+      const queuedPreviewJobs = body.queuedPreviewJobs ?? 0;
+      const queuedDeliveryJobs = body.queuedDeliveryJobs ?? 0;
+      const queuedTotal = body.queuedTranscodeJobs ?? queuedPreviewJobs + queuedDeliveryJobs;
+
+      if (queuedTotal === 0) {
+        setNotice("No eligible tracks were found to queue preview or delivery jobs.");
+        return;
+      }
+
+      if (queuedPreviewJobs > 0 && queuedDeliveryJobs > 0) {
+        setNotice(
+          `Queued ${queuedPreviewJobs} preview and ${queuedDeliveryJobs} delivery transcode jobs.`,
+        );
+        return;
+      }
+
+      if (queuedPreviewJobs > 0) {
+        setNotice(`Queued ${queuedPreviewJobs} preview transcode job${queuedPreviewJobs === 1 ? "" : "s"}.`);
+        return;
+      }
+
+      setNotice(
+        `Queued ${queuedDeliveryJobs} delivery transcode job${queuedDeliveryJobs === 1 ? "" : "s"}.`,
+      );
+    } catch (queueError) {
+      setError(
+        queueError instanceof Error
+          ? queueError.message
+          : "Could not force requeue transcode jobs.",
+      );
+    } finally {
+      setPendingReleaseId(null);
+    }
+  };
+
   const newCoverPreviewSrc = newCoverPreviewUrl ?? newCoverImageUrl;
 
   return {
@@ -530,6 +584,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onForceRequeueTranscodes,
     newCoverPreviewSrc,
   };
 }

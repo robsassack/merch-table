@@ -18,6 +18,8 @@ type RedisConnectionOptions = {
 
 const REDIS_TIMEOUT_MS = 2_500;
 const DEFAULT_TRANSCODE_QUEUE_KEY = "merch-table:transcode:queue";
+const DEFAULT_TRANSCODE_WORKER_HEARTBEAT_KEY = "merch-table:transcode:worker:heartbeat";
+const DEFAULT_TRANSCODE_WORKER_HEARTBEAT_TTL_SECONDS = 30;
 
 export type TranscodeQueueMessage =
   | {
@@ -372,6 +374,62 @@ function buildRedisCommandSet(commands: string[][]) {
 export function getTranscodeQueueKey() {
   const raw = process.env.TRANSCODE_QUEUE_KEY?.trim();
   return raw && raw.length > 0 ? raw : DEFAULT_TRANSCODE_QUEUE_KEY;
+}
+
+export function getTranscodeWorkerHeartbeatKey() {
+  const raw = process.env.TRANSCODE_WORKER_HEARTBEAT_KEY?.trim();
+  return raw && raw.length > 0 ? raw : DEFAULT_TRANSCODE_WORKER_HEARTBEAT_KEY;
+}
+
+export function getTranscodeWorkerHeartbeatTtlSeconds() {
+  return parseInteger(
+    process.env.TRANSCODE_WORKER_HEARTBEAT_TTL_SECONDS,
+    DEFAULT_TRANSCODE_WORKER_HEARTBEAT_TTL_SECONDS,
+  );
+}
+
+export async function getTranscodeQueueDepth() {
+  const queueKey = getTranscodeQueueKey();
+  const request = buildRedisCommandSet([["LLEN", queueKey]]);
+  const responses = await runRedisCommands(request.options, request.commands);
+  const result = responses[responses.length - 1];
+  if (typeof result !== "number" || !Number.isFinite(result)) {
+    throw new Error("Redis queue returned a non-numeric LLEN response.");
+  }
+
+  return result;
+}
+
+export async function reportTranscodeWorkerHeartbeat(input?: {
+  at?: Date;
+  ttlSeconds?: number;
+}) {
+  const heartbeatKey = getTranscodeWorkerHeartbeatKey();
+  const at = input?.at ?? new Date();
+  const ttlSeconds = Math.max(
+    5,
+    Math.floor(input?.ttlSeconds ?? getTranscodeWorkerHeartbeatTtlSeconds()),
+  );
+  const request = buildRedisCommandSet([
+    ["SET", heartbeatKey, at.toISOString(), "EX", String(ttlSeconds)],
+  ]);
+  await runRedisCommands(request.options, request.commands);
+}
+
+export async function readTranscodeWorkerHeartbeat() {
+  const heartbeatKey = getTranscodeWorkerHeartbeatKey();
+  const request = buildRedisCommandSet([["GET", heartbeatKey]]);
+  const responses = await runRedisCommands(request.options, request.commands);
+  const result = responses[responses.length - 1];
+  if (result === null) {
+    return null;
+  }
+
+  if (typeof result !== "string") {
+    throw new Error("Redis heartbeat key returned a non-string response.");
+  }
+
+  return result;
 }
 
 export async function enqueueTranscodeQueueMessage(message: Omit<TranscodeQueueMessage, "version" | "enqueuedAt">) {

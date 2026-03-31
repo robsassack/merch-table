@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { prismaModelSupportsField } from "@/lib/prisma/runtime-support";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import { createTranscodeJobWithActiveDedupe } from "@/lib/transcode/job-dedupe";
 import { enqueueDeliveryFormatsJob, enqueuePreviewClipJob } from "@/lib/transcode/queue";
 import {
   isAllowedUploadContentType,
@@ -180,6 +182,12 @@ export async function POST(request: Request) {
     });
 
     const result = await prisma.$transaction(async (tx) => {
+      const transcodeJobKindSupported = prismaModelSupportsField(
+        tx,
+        "TranscodeJob",
+        "kind",
+      );
+
       const existing = await tx.trackAsset.findFirst({
         where: {
           trackId: track.id,
@@ -263,15 +271,90 @@ export async function POST(request: Request) {
 
       let previewJobId: string | null = null;
       let deliveryJobId: string | null = null;
+      let forcedLossyOnly = false;
+      let forcedLosslessOnly = false;
+      let removedDeliveryAssetCount = 0;
+
+      if (asset.assetRole === "MASTER" && !asset.isLossless) {
+        const releaseUpdate = await tx.release.updateMany({
+          where: {
+            id: track.releaseId,
+            organizationId: auth.context.organizationId,
+            isLossyOnly: false,
+          },
+          data: {
+            isLossyOnly: true,
+          },
+        });
+        forcedLossyOnly = releaseUpdate.count > 0;
+
+        const deliveryAssetsToRemove = await tx.trackAsset.findMany({
+          where: {
+            trackId: track.id,
+            assetRole: "DELIVERY",
+          },
+          select: {
+            id: true,
+          },
+        });
+
+        if (deliveryAssetsToRemove.length > 0) {
+          await tx.trackAsset.deleteMany({
+            where: {
+              id: {
+                in: deliveryAssetsToRemove.map((entry) => entry.id),
+              },
+            },
+          });
+          removedDeliveryAssetCount = deliveryAssetsToRemove.length;
+        }
+      }
+
+      if (asset.assetRole === "MASTER" && asset.isLossless) {
+        const releaseMasterAssets = await tx.trackAsset.findMany({
+          where: {
+            assetRole: "MASTER",
+            track: {
+              releaseId: track.releaseId,
+            },
+          },
+          select: {
+            isLossless: true,
+          },
+        });
+
+        const allMastersLossless =
+          releaseMasterAssets.length > 0 &&
+          releaseMasterAssets.every((entry) => entry.isLossless);
+
+        if (allMastersLossless) {
+          const releaseUpdate = await tx.release.updateMany({
+            where: {
+              id: track.releaseId,
+              organizationId: auth.context.organizationId,
+              isLossyOnly: true,
+            },
+            data: {
+              isLossyOnly: false,
+            },
+          });
+          forcedLosslessOnly = releaseUpdate.count > 0;
+        }
+      }
 
       if (asset.assetRole === "MASTER" && track.previewMode === "CLIP") {
+        const previewJobData: Record<string, unknown> = {
+          organizationId: auth.context.organizationId,
+          trackId: track.id,
+          sourceAssetId: asset.id,
+          status: "QUEUED",
+        };
+        if (transcodeJobKindSupported) {
+          previewJobData.kind = "PREVIEW_CLIP";
+        }
+
         const queuedJob = await tx.transcodeJob.create({
-          data: {
-            organizationId: auth.context.organizationId,
-            trackId: track.id,
-            sourceAssetId: asset.id,
-            status: "QUEUED",
-          },
+          data: previewJobData as never,
           select: {
             id: true,
           },
@@ -281,35 +364,31 @@ export async function POST(request: Request) {
       }
 
       if (asset.assetRole === "MASTER" && asset.isLossless) {
-        const hasDeliveryOutput = await tx.transcodeOutput.findFirst({
-          where: {
-            job: {
-              trackId: track.id,
-              sourceAssetId: asset.id,
-            },
-            outputAsset: {
-              assetRole: "DELIVERY",
-            },
-          },
-          select: {
-            id: true,
-          },
-        });
-
-        if (!hasDeliveryOutput) {
+        if (!transcodeJobKindSupported) {
           const queuedDeliveryJob = await tx.transcodeJob.create({
             data: {
               organizationId: auth.context.organizationId,
               trackId: track.id,
               sourceAssetId: asset.id,
               status: "QUEUED",
-            },
+            } as never,
             select: {
               id: true,
             },
           });
-
           deliveryJobId = queuedDeliveryJob.id;
+        } else {
+        const queuedDeliveryJob = await createTranscodeJobWithActiveDedupe(tx, {
+          organizationId: auth.context.organizationId,
+          trackId: track.id,
+          sourceAssetId: asset.id,
+          kind: "DELIVERY_FORMATS",
+          kindSupported: transcodeJobKindSupported,
+        });
+
+        if (queuedDeliveryJob.created) {
+          deliveryJobId = queuedDeliveryJob.jobId;
+        }
         }
       }
 
@@ -317,6 +396,9 @@ export async function POST(request: Request) {
         asset,
         previewJobId,
         deliveryJobId,
+        forcedLossyOnly,
+        forcedLosslessOnly,
+        removedDeliveryAssetCount,
       };
     });
 
@@ -369,6 +451,9 @@ export async function POST(request: Request) {
       previewJobId: result.previewJobId,
       deliveryJobQueued,
       deliveryJobId: result.deliveryJobId,
+      forcedLossyOnly: result.forcedLossyOnly,
+      forcedLosslessOnly: result.forcedLosslessOnly,
+      removedDeliveryAssetCount: result.removedDeliveryAssetCount,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {

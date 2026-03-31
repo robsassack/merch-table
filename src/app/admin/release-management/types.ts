@@ -104,6 +104,24 @@ export type ReleasesListResponse = {
   releases?: ReleaseRecord[];
 };
 
+export type TranscodeTasksStatus = {
+  queueDepth: number | null;
+  queuedJobs: number;
+  runningJobs: number;
+  workerUp: boolean | null;
+  lastWorkerHeartbeatAt: string | null;
+  workerStaleAfterSeconds: number;
+  lastSuccessfulJobAt: string | null;
+  checkedAt: string;
+  warnings: string[];
+};
+
+export type TranscodeTasksStatusResponse = {
+  ok?: boolean;
+  error?: string;
+  status?: TranscodeTasksStatus;
+};
+
 export type ReleaseMutationResponse = {
   ok?: boolean;
   error?: string;
@@ -111,6 +129,8 @@ export type ReleaseMutationResponse = {
   hardDeletedReleaseId?: string;
   purgedAssetCount?: number;
   queuedTranscodeJobs?: number;
+  queuedPreviewJobs?: number;
+  queuedDeliveryJobs?: number;
   alreadyQueuedJobs?: number;
 };
 
@@ -139,6 +159,9 @@ export type TrackAssetCommitResponse = {
   error?: string;
   previewJobQueued?: boolean;
   deliveryJobQueued?: boolean;
+  forcedLossyOnly?: boolean;
+  forcedLosslessOnly?: boolean;
+  removedDeliveryAssetCount?: number;
 };
 
 export type CoverUploadUrlResponse = {

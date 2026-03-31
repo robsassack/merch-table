@@ -385,7 +385,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                           }
                           className="mt-0.5"
                         />
-                        <span className="text-zinc-300">Lossless masters available</span>
+                        <span className="text-zinc-300">Lossless masters</span>
                       </label>
                       <label className="inline-flex items-start gap-2">
                         <input
@@ -398,40 +398,15 @@ export function ReleaseManagementSelectedReleaseList(props: {
                               [release.id]: {
                                 ...draft,
                                 markLossyOnly: true,
-                                confirmLossyOnly: release.isLossyOnly
-                                  ? draft.confirmLossyOnly
-                                  : false,
+                                confirmLossyOnly: false,
                               },
                             }))
                           }
                           className="mt-0.5"
                         />
-                        <span className="text-zinc-300">Lossy-only for now</span>
+                        <span className="text-zinc-300">Lossy masters</span>
                       </label>
                     </div>
-
-                    {draft.markLossyOnly ? (
-                      <label className="mt-3 inline-flex items-start gap-2 rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-amber-200">
-                        <input
-                          type="checkbox"
-                          checked={draft.confirmLossyOnly}
-                          onChange={(event) =>
-                            setDraftsById((previous) => ({
-                              ...previous,
-                              [release.id]: {
-                                ...draft,
-                                confirmLossyOnly: event.target.checked,
-                              },
-                            }))
-                          }
-                          className="mt-0.5"
-                        />
-                        <span>
-                          I confirm this release should be marked lossy-only and show quality
-                          disclosure.
-                        </span>
-                      </label>
-                    ) : null}
                   </div>
 
                   <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">

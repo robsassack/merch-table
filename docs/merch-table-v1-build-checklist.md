@@ -124,9 +124,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Edge cases (Priority 1)
 
-- [ ] Add stale-job recovery: detect `QUEUED` jobs older than threshold and auto-requeue or mark failed with actionable reason
-- [ ] Ensure delivery job dedupe is race-safe (no duplicate queued jobs for same source + kind under concurrent requests)
-- [ ] Add worker health visibility in admin/status view (queue depth, worker up/down, last successful job time)
+- [x] Add stale-job recovery: detect `QUEUED` jobs older than threshold and auto-requeue or mark failed with actionable reason
+- [x] Ensure delivery job dedupe is race-safe (no duplicate queued jobs for same source + kind under concurrent requests)
+- [x] Add worker health visibility in admin/status view (queue depth, worker up/down, last successful job time)
 
 ### Edge cases (Priority 2)
 

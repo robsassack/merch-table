@@ -131,3 +131,73 @@ export function assignSequentialTrackNumbers<T>(items: T[], startAt: number) {
     trackNumber: safeStart + index,
   }));
 }
+
+export function assignAppendTrackNumbers<T>(
+  input: Array<{
+    item: T;
+    metadataTrackNumber: number | null | undefined;
+  }>,
+  existingTrackNumbers: number[],
+) {
+  const occupied = new Set(
+    existingTrackNumbers
+      .filter((value) => Number.isFinite(value) && value > 0)
+      .map((value) => Math.round(value)),
+  );
+  const finalTrackCount = occupied.size + input.length;
+  const availableSlots: number[] = [];
+  for (let trackNumber = 1; trackNumber <= finalTrackCount; trackNumber += 1) {
+    if (!occupied.has(trackNumber)) {
+      availableSlots.push(trackNumber);
+    }
+  }
+
+  const preferredCounts = new Map<number, number>();
+  for (const entry of input) {
+    const preferred = normalizeMetadataTrackNumber(entry.metadataTrackNumber);
+    if (preferred === null || preferred > finalTrackCount) {
+      continue;
+    }
+
+    const count = preferredCounts.get(preferred) ?? 0;
+    preferredCounts.set(preferred, count + 1);
+  }
+
+  const availableSet = new Set(availableSlots);
+  const reservedTrackNumbersByIndex = new Map<number, number>();
+
+  for (const [index, entry] of input.entries()) {
+    const preferred = normalizeMetadataTrackNumber(entry.metadataTrackNumber);
+    if (
+      preferred === null ||
+      preferred > finalTrackCount ||
+      !availableSet.has(preferred) ||
+      (preferredCounts.get(preferred) ?? 0) > 1
+    ) {
+      continue;
+    }
+
+    reservedTrackNumbersByIndex.set(index, preferred);
+    availableSet.delete(preferred);
+  }
+
+  const fallbackSlots = availableSlots.filter((trackNumber) => availableSet.has(trackNumber));
+  let fallbackIndex = 0;
+
+  return input.map(({ item }, index) => {
+    const reserved = reservedTrackNumbersByIndex.get(index);
+    if (typeof reserved === "number") {
+      return {
+        item,
+        trackNumber: reserved,
+      };
+    }
+
+    const fallback = fallbackSlots[fallbackIndex] ?? finalTrackCount + fallbackIndex + 1;
+    fallbackIndex += 1;
+    return {
+      item,
+      trackNumber: fallback,
+    };
+  });
+}

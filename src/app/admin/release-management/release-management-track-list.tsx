@@ -12,6 +12,23 @@ import {
   toTrackDraft,
 } from "./utils";
 
+function normalizeDeliveryAssetFormat(format: string) {
+  const normalized = format.trim().toUpperCase();
+  if (normalized === "MP3") {
+    return "MP3";
+  }
+
+  if (normalized === "M4A" || normalized === "AAC" || normalized === "MP4") {
+    return "M4A";
+  }
+
+  if (normalized === "FLAC") {
+    return "FLAC";
+  }
+
+  return null;
+}
+
 export function ReleaseManagementTrackList(props: {
   controller: ReleaseManagementController;
   release: ReleaseRecord;
@@ -86,10 +103,12 @@ export function ReleaseManagementTrackList(props: {
                                 new Date(b.updatedAt).getTime() -
                                 new Date(a.updatedAt).getTime(),
                             )[0];
-                          const deliveryAssetsByFormat = new Map<
-                            string,
-                            (typeof track.assets)[number]
-                          >();
+                          const enabledDeliveryFormats = new Set(
+                            release.deliveryFormats.length > 0
+                              ? release.deliveryFormats
+                              : ["MP3", "M4A", "FLAC"],
+                          );
+                          const deliveryAssetsByFormat = new Map<string, (typeof track.assets)[number]>();
                           for (const asset of track.assets
                             .filter((entry) => entry.assetRole === "DELIVERY")
                             .sort(
@@ -97,20 +116,39 @@ export function ReleaseManagementTrackList(props: {
                                 new Date(b.updatedAt).getTime() -
                                 new Date(a.updatedAt).getTime(),
                             )) {
-                            const normalizedFormat = asset.format.trim().toUpperCase();
-                            const formatLabel =
-                              normalizedFormat === "AAC" || normalizedFormat === "MP4"
-                                ? "M4A"
-                                : normalizedFormat;
-                            if (!deliveryAssetsByFormat.has(formatLabel)) {
+                            const formatLabel = normalizeDeliveryAssetFormat(asset.format);
+                            if (
+                              formatLabel &&
+                              enabledDeliveryFormats.has(formatLabel) &&
+                              !deliveryAssetsByFormat.has(formatLabel)
+                            ) {
                               deliveryAssetsByFormat.set(formatLabel, asset);
                             }
                           }
+
+                          for (const asset of track.assets
+                            .filter((entry) => entry.assetRole === "MASTER" && !entry.isLossless)
+                            .sort(
+                              (a, b) =>
+                                new Date(b.updatedAt).getTime() -
+                                new Date(a.updatedAt).getTime(),
+                            )) {
+                            const formatLabel = normalizeDeliveryAssetFormat(asset.format);
+                            if (
+                              formatLabel &&
+                              enabledDeliveryFormats.has(formatLabel) &&
+                              !deliveryAssetsByFormat.has(formatLabel)
+                            ) {
+                              // Use lossy master as delivery fallback for matching format.
+                              deliveryAssetsByFormat.set(formatLabel, asset);
+                            }
+                          }
+
                           const deliveryDownloadOptions = Array.from(
                             deliveryAssetsByFormat.entries(),
                           ).map(([format, asset]) => ({
                             id: asset.id,
-                            label: format,
+                            label: asset.assetRole === "MASTER" ? `${format} (master)` : format,
                           }));
                           const selectedDeliveryAssetId = (() => {
                             const selected = deliveryDownloadAssetIdByTrackId[track.id];
@@ -124,6 +162,13 @@ export function ReleaseManagementTrackList(props: {
                           })();
                           const masterDownloadAssetId = latestMasterAsset?.id ?? "";
                           const deliveryDownloadAssetId = selectedDeliveryAssetId;
+                          const deliveryFallbackCount = Array.from(
+                            deliveryAssetsByFormat.values(),
+                          ).filter((asset) => asset.assetRole === "MASTER").length;
+                          const deliveryCountLabel =
+                            deliveryCount > 0 || deliveryFallbackCount > 0
+                              ? String(deliveryCount + deliveryFallbackCount)
+                              : "n/a";
                           const uploadedMasterFileName = latestMasterAsset
                             ? resolveUploadedFileNameFromStorageKey(latestMasterAsset.storageKey)
                             : "";
@@ -291,7 +336,7 @@ export function ReleaseManagementTrackList(props: {
                                   {deliveryStatus.label}
                                 </span>
                                 <span className="text-[11px] text-zinc-500">
-                                  assets: {masterCount} master, {deliveryCount} delivery,{" "}
+                                  assets: {masterCount} master, {deliveryCountLabel} delivery,{" "}
                                   {previewCount} preview
                                 </span>
                                 {uploadedMasterFileName ? (

@@ -13,6 +13,7 @@ import type {
   ReleaseStatus,
   TrackDraft,
   TrackImportJob,
+  TranscodeTasksStatus,
 } from "./types";
 import { getTodayDateInputValue, isBlobObjectUrl } from "./utils";
 
@@ -37,8 +38,11 @@ export function useReleaseManagementState() {
   const [stripeFeeFixedCents, setStripeFeeFixedCents] = useState(30);
 
   const [loading, setLoading] = useState(true);
+  const [tasksLoading, setTasksLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [tasksError, setTasksError] = useState<string | null>(null);
+  const [tasksStatus, setTasksStatus] = useState<TranscodeTasksStatus | null>(null);
 
   const [newArtistId, setNewArtistId] = useState("");
   const [newTitle, setNewTitle] = useState("");
@@ -209,10 +213,16 @@ export function useReleaseManagementState() {
     stripeFeeEstimateConfig,
     loading,
     setLoading,
+    tasksLoading,
+    setTasksLoading,
     error,
     setError,
     notice,
     setNotice,
+    tasksError,
+    setTasksError,
+    tasksStatus,
+    setTasksStatus,
     newArtistId,
     setNewArtistId,
     newTitle,

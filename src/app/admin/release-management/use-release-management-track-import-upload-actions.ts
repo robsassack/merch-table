@@ -1,6 +1,7 @@
 import type { ChangeEvent } from "react";
 
 import {
+  assignAppendTrackNumbers,
   assignSequentialTrackNumbers,
   resolveTrackImportOrder,
 } from "@/lib/audio/track-import";
@@ -244,11 +245,18 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       );
 
       const orderedMetadata = orderedCandidates.map((candidate) => parsedMetadata[candidate.id]);
-      const startTrackNumber = mode === "insert" ? 1 : release.tracks.length + 1;
-      const plannedImports: PlannedTrackImport[] = assignSequentialTrackNumbers(
-        orderedMetadata,
-        startTrackNumber,
-      ).map((assignment, index) => ({
+      const trackNumberAssignments =
+        mode === "append"
+          ? assignAppendTrackNumbers(
+              orderedMetadata.map((entry) => ({
+                item: entry,
+                metadataTrackNumber: entry.metadata.metadataTrackNumber,
+              })),
+              release.tracks.map((track) => track.trackNumber),
+            ).sort((a, b) => a.trackNumber - b.trackNumber)
+          : assignSequentialTrackNumbers(orderedMetadata, 1);
+
+      const plannedImports: PlannedTrackImport[] = trackNumberAssignments.map((assignment, index) => ({
         id: `${Date.now()}-${index}-${assignment.item.file.name}`,
         file: assignment.item.file,
         fileName: assignment.item.file.name,
@@ -460,15 +468,30 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       await updateTrackMetadataFromAudio({
         releaseId,
         trackId: track.id,
-        title: metadata.resolvedTitle,
+        // Preserve curated release-track titles on inline uploads/replacements.
+        title: track.title,
         durationMs: metadata.durationMs,
       });
 
       await loadReleases({ silent: true });
       setNotice(
-        `Uploaded "${file.name}" as ${uploadRole.toLowerCase()} for "${track.title}" (synced metadata to "${metadata.resolvedTitle}", ${formatTrackDuration(metadata.durationMs)}).${
+        `Uploaded "${file.name}" as ${uploadRole.toLowerCase()} for "${track.title}" (synced duration to ${formatTrackDuration(metadata.durationMs)}).${
           commitBody.previewJobQueued ? " Preview job queued." : ""
-        }${commitBody.deliveryJobQueued ? " Delivery job queued." : ""}`,
+        }${commitBody.deliveryJobQueued ? " Delivery job queued." : ""}${
+          commitBody.forcedLossyOnly
+            ? " Master quality workflow switched to lossy masters."
+            : ""
+        }${
+          commitBody.forcedLosslessOnly
+            ? " Master quality workflow switched to lossless masters."
+            : ""
+        }${
+          (commitBody.removedDeliveryAssetCount ?? 0) > 0
+            ? ` Removed ${commitBody.removedDeliveryAssetCount} delivery item${
+                commitBody.removedDeliveryAssetCount === 1 ? "" : "s"
+              } for this track.`
+            : ""
+        }`,
       );
     } catch (uploadError) {
       setError(

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import {
+  assignAppendTrackNumbers,
   assignSequentialTrackNumbers,
   normalizeDetectedDurationMs,
   resolveImportedTrackTitle,
@@ -76,6 +77,36 @@ describe("track import ordering", () => {
         { id: "second", trackNumber: 1 },
         { id: "first", trackNumber: 2 },
         { id: "third", trackNumber: 3 },
+      ],
+    );
+  });
+
+  it("keeps append imports on free metadata slots when they do not conflict", () => {
+    const ordered = resolveTrackImportOrder([
+      { id: "two", fileName: "02-two.wav", metadataTrackNumber: 2 },
+      { id: "three", fileName: "03-three.wav", metadataTrackNumber: 3 },
+      { id: "free", fileName: "04-free.wav", metadataTrackNumber: 4 },
+      { id: "none", fileName: "05-none.wav", metadataTrackNumber: null },
+    ]);
+
+    const appendNumbers = assignAppendTrackNumbers(
+      ordered.map((item) => ({
+        item,
+        metadataTrackNumber: item.metadataTrackNumber,
+      })),
+      [1, 2, 5],
+    );
+
+    assert.deepEqual(
+      appendNumbers.map((entry) => ({
+        id: entry.item.id,
+        trackNumber: entry.trackNumber,
+      })),
+      [
+        { id: "two", trackNumber: 6 },
+        { id: "three", trackNumber: 3 },
+        { id: "free", trackNumber: 4 },
+        { id: "none", trackNumber: 7 },
       ],
     );
   });

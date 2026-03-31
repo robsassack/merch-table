@@ -27,6 +27,7 @@ export function ReleaseManagementReleaseFooter(props: {
     onUpdateRelease,
     onSoftDeleteOrRestoreRelease,
     onGenerateDownloadFormats,
+    onForceRequeueTranscodes,
     setPurgeDialogRelease,
     setPurgeConfirmInput,
   } = props.controller;
@@ -72,8 +73,7 @@ export function ReleaseManagementReleaseFooter(props: {
             isPending ||
             createPending ||
             coverUploadTarget === release.id ||
-            draft.deliveryFormats.length === 0 ||
-            (draft.markLossyOnly && !draft.confirmLossyOnly)
+            draft.deliveryFormats.length === 0
           }
           onClick={() => void onUpdateRelease(release.id)}
           className={buttonClassName}
@@ -89,6 +89,17 @@ export function ReleaseManagementReleaseFooter(props: {
             className={buttonClassName}
           >
             {isPending ? "Queueing..." : "Generate Download Formats"}
+          </button>
+        ) : null}
+
+        {!release.deletedAt ? (
+          <button
+            type="button"
+            disabled={isPending || createPending || release.tracks.length === 0}
+            onClick={() => void onForceRequeueTranscodes(release)}
+            className={buttonClassName}
+          >
+            {isPending ? "Queueing..." : "Force Requeue Jobs"}
           </button>
         ) : null}
 

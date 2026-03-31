@@ -18,10 +18,12 @@ import {
   readMinimumPriceFloorCentsFromEnv,
 } from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
+import { prismaModelSupportsField } from "@/lib/prisma/runtime-support";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
-import { enqueueDeliveryFormatsJob } from "@/lib/transcode/queue";
+import { createTranscodeJobWithActiveDedupe } from "@/lib/transcode/job-dedupe";
+import { enqueueDeliveryFormatsJob, enqueuePreviewClipJob } from "@/lib/transcode/queue";
 import {
   extractStorageKeyFromCoverImageUrl,
   isValidCoverStorageKey,
@@ -65,6 +67,10 @@ const generateDownloadFormatsSchema = z.object({
   action: z.literal("generate-download-formats"),
 });
 
+const forceRequeueTranscodesSchema = z.object({
+  action: z.literal("force-requeue-transcodes"),
+});
+
 const purgeSchema = z.object({
   action: z.literal("purge"),
   confirmTitle: z.string(),
@@ -80,6 +86,7 @@ const actionSchema = z.discriminatedUnion("action", [
   softDeleteSchema,
   restoreSchema,
   generateDownloadFormatsSchema,
+  forceRequeueTranscodesSchema,
   purgeSchema,
   hardDeleteSchema,
 ]);
@@ -119,12 +126,14 @@ function resolveReleaseForActionSelect(input: {
     tracks: {
       select: {
         id: true,
+        previewMode: true,
         assets: {
           select: {
             id: true,
             assetRole: true,
             isLossless: true,
             storageKey: true,
+            updatedAt: true,
           },
         },
       },
@@ -274,6 +283,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
   const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+  const transcodeJobKindSupported = prismaModelSupportsField(
+    prisma,
+    "TranscodeJob",
+    "kind",
+  );
   const releaseSelect = resolveReleaseSelect({
     releaseDateSupported,
     deliveryFormatsSupported,
@@ -328,17 +342,6 @@ export async function PATCH(request: Request, context: RouteContext) {
         return NextResponse.json(
           { ok: false, error: "Cannot move a release to a deleted artist." },
           { status: 409 },
-        );
-      }
-
-      if (parsed.markLossyOnly && !release.isLossyOnly && !parsed.confirmLossyOnly) {
-        return NextResponse.json(
-          {
-            ok: false,
-            error:
-              "Confirm lossy-only quality disclosure before saving this release.",
-          },
-          { status: 400 },
         );
       }
 
@@ -559,38 +562,20 @@ export async function PATCH(request: Request, context: RouteContext) {
         let alreadyQueuedJobs = 0;
 
         for (const candidate of losslessMasters) {
-          const pendingJob = await tx.transcodeJob.findFirst({
-            where: {
-              organizationId: auth.context.organizationId,
-              trackId: candidate.trackId,
-              sourceAssetId: candidate.sourceAssetId,
-              status: {
-                in: ["QUEUED", "RUNNING"],
-              },
-            },
-            select: {
-              id: true,
-            },
+          const enqueueResult = await createTranscodeJobWithActiveDedupe(tx, {
+            organizationId: auth.context.organizationId,
+            trackId: candidate.trackId,
+            sourceAssetId: candidate.sourceAssetId,
+            kind: "DELIVERY_FORMATS",
+            kindSupported: transcodeJobKindSupported,
           });
 
-          if (pendingJob) {
+          if (!enqueueResult.created) {
             alreadyQueuedJobs += 1;
             continue;
           }
 
-          const queuedJob = await tx.transcodeJob.create({
-            data: {
-              organizationId: auth.context.organizationId,
-              trackId: candidate.trackId,
-              sourceAssetId: candidate.sourceAssetId,
-              status: "QUEUED",
-            },
-            select: {
-              id: true,
-            },
-          });
-
-          queuedJobIds.push(queuedJob.id);
+          queuedJobIds.push(enqueueResult.jobId);
         }
 
         return {
@@ -638,6 +623,200 @@ export async function PATCH(request: Request, context: RouteContext) {
         release: toAdminReleaseRecord(refreshed),
         queuedTranscodeJobs,
         alreadyQueuedJobs: enqueueSummary.alreadyQueuedJobs,
+      });
+    }
+
+    if (parsed.action === "force-requeue-transcodes") {
+      const previewCandidates = release.tracks
+        .map((track) => {
+          if (track.previewMode !== "CLIP") {
+            return null;
+          }
+
+          const sourceAsset = track.assets
+            .filter((asset) => asset.assetRole === "MASTER")
+            .sort(
+              (a, b) =>
+                b.updatedAt.getTime() - a.updatedAt.getTime(),
+            )[0];
+
+          if (!sourceAsset) {
+            return null;
+          }
+
+          return {
+            trackId: track.id,
+            sourceAssetId: sourceAsset.id,
+          };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            trackId: string;
+            sourceAssetId: string;
+          } => entry !== null,
+        );
+
+      const deliveryCandidates = release.tracks
+        .map((track) => {
+          const sourceAsset = track.assets
+            .filter((asset) => asset.assetRole === "MASTER" && asset.isLossless)
+            .sort(
+              (a, b) =>
+                b.updatedAt.getTime() - a.updatedAt.getTime(),
+            )[0];
+
+          if (!sourceAsset) {
+            return null;
+          }
+
+          return {
+            trackId: track.id,
+            sourceAssetId: sourceAsset.id,
+          };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is {
+            trackId: string;
+            sourceAssetId: string;
+          } => entry !== null,
+        );
+
+      if (previewCandidates.length === 0 && deliveryCandidates.length === 0) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error:
+              "No eligible master assets found to force requeue preview or delivery jobs.",
+          },
+          { status: 409 },
+        );
+      }
+
+      const enqueueSummary = await prisma.$transaction(async (tx) => {
+        const previewJobIds: string[] = [];
+        const deliveryJobIds: string[] = [];
+
+        for (const candidate of previewCandidates) {
+          const previewJobData: Record<string, unknown> = {
+            organizationId: auth.context.organizationId,
+            trackId: candidate.trackId,
+            sourceAssetId: candidate.sourceAssetId,
+            status: "QUEUED",
+          };
+          if (transcodeJobKindSupported) {
+            previewJobData.kind = "PREVIEW_CLIP";
+          }
+
+          const queuedJob = await tx.transcodeJob.create({
+            data: previewJobData as never,
+            select: {
+              id: true,
+            },
+          });
+          previewJobIds.push(queuedJob.id);
+        }
+
+        for (const candidate of deliveryCandidates) {
+          if (!transcodeJobKindSupported) {
+            const queuedJob = await tx.transcodeJob.create({
+              data: {
+                organizationId: auth.context.organizationId,
+                trackId: candidate.trackId,
+                sourceAssetId: candidate.sourceAssetId,
+                status: "QUEUED",
+              } as never,
+              select: {
+                id: true,
+              },
+            });
+            deliveryJobIds.push(queuedJob.id);
+            continue;
+          }
+
+          const enqueueResult = await createTranscodeJobWithActiveDedupe(tx, {
+            organizationId: auth.context.organizationId,
+            trackId: candidate.trackId,
+            sourceAssetId: candidate.sourceAssetId,
+            kind: "DELIVERY_FORMATS",
+            kindSupported: transcodeJobKindSupported,
+          });
+
+          if (!enqueueResult.created) {
+            continue;
+          }
+
+          deliveryJobIds.push(enqueueResult.jobId);
+        }
+
+        return {
+          previewJobIds,
+          deliveryJobIds,
+        };
+      });
+
+      let queuedPreviewJobs = 0;
+      for (const jobId of enqueueSummary.previewJobIds) {
+        try {
+          await enqueuePreviewClipJob(jobId);
+          queuedPreviewJobs += 1;
+        } catch {
+          await prisma.transcodeJob
+            .update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorMessage: "Could not enqueue preview transcode job.",
+                finishedAt: new Date(),
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      let queuedDeliveryJobs = 0;
+      for (const jobId of enqueueSummary.deliveryJobIds) {
+        try {
+          await enqueueDeliveryFormatsJob(jobId);
+          queuedDeliveryJobs += 1;
+        } catch {
+          await prisma.transcodeJob
+            .update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorMessage: "Could not enqueue delivery transcode job.",
+                finishedAt: new Date(),
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      const refreshed = await prisma.release.findFirst({
+        where: {
+          id: release.id,
+          organizationId: auth.context.organizationId,
+        },
+        select: releaseSelect,
+      });
+
+      if (!refreshed) {
+        return NextResponse.json(
+          { ok: false, error: "Release not found after force requeue action." },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        release: toAdminReleaseRecord(refreshed),
+        queuedPreviewJobs,
+        queuedDeliveryJobs,
+        queuedTranscodeJobs: queuedPreviewJobs + queuedDeliveryJobs,
       });
     }
 

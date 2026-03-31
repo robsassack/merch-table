@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { prismaModelSupportsField } from "@/lib/prisma/runtime-support";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
 import { enqueuePreviewClipJob } from "@/lib/transcode/queue";
@@ -79,6 +80,12 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
+    const transcodeJobKindSupported = prismaModelSupportsField(
+      prisma,
+      "TranscodeJob",
+      "kind",
+    );
+
     const payload = await request.json();
     const parsed = actionSchema.parse(payload);
 
@@ -273,13 +280,18 @@ export async function PATCH(request: Request, context: RouteContext) {
         });
 
         if (sourceAsset) {
+          const previewJobData: Record<string, unknown> = {
+            organizationId: auth.context.organizationId,
+            trackId: current.id,
+            sourceAssetId: sourceAsset.id,
+            status: "QUEUED",
+          };
+          if (transcodeJobKindSupported) {
+            previewJobData.kind = "PREVIEW_CLIP";
+          }
+
           const queuedJob = await tx.transcodeJob.create({
-            data: {
-              organizationId: auth.context.organizationId,
-              trackId: current.id,
-              sourceAssetId: sourceAsset.id,
-              status: "QUEUED",
-            },
+            data: previewJobData as never,
             select: {
               id: true,
             },

@@ -3,6 +3,7 @@ import { ReleaseManagementImportConflictDialog } from "./release-management-impo
 import { ReleaseManagementPurgeDialog } from "./release-management-purge-dialog";
 import { ReleaseManagementReleaseStrip } from "./release-management-release-strip";
 import { ReleaseManagementSelectedReleaseList } from "./release-management-selected-release-list";
+import { ReleaseManagementTasksCard } from "./release-management-tasks-card";
 import { ReleaseManagementTrackDeleteDialog } from "./release-management-track-delete-dialog";
 import { ReleaseManagementToastStack } from "./release-management-toast-stack";
 import type { ReleaseManagementController } from "./use-release-management-controller";
@@ -43,6 +44,7 @@ export function ReleaseManagementPanelView(props: {
           restore, and permanent asset purge.
         </p>
 
+        <ReleaseManagementTasksCard controller={props.controller} />
         <ReleaseManagementReleaseStrip controller={props.controller} />
         <ReleaseManagementCreateForm controller={props.controller} />
 

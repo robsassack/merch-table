@@ -1,9 +1,19 @@
 import { prisma } from "@/lib/prisma";
-import { popTranscodeQueueMessage } from "@/lib/transcode/queue";
-import { processTranscodeQueueMessage } from "@/lib/transcode/worker";
+import {
+  popTranscodeQueueMessage,
+  reportTranscodeWorkerHeartbeat,
+} from "@/lib/transcode/queue";
+import {
+  processTranscodeQueueMessage,
+  recoverStaleQueuedTranscodeJobs,
+} from "@/lib/transcode/worker";
 
 const DEFAULT_CONCURRENCY = 1;
 const DEFAULT_QUEUE_POLL_TIMEOUT_SECONDS = 5;
+const DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 10;
+const DEFAULT_STALE_QUEUED_THRESHOLD_SECONDS = 900;
+const DEFAULT_STALE_RECOVERY_INTERVAL_SECONDS = 30;
+const DEFAULT_STALE_RECOVERY_BATCH_SIZE = 25;
 const ERROR_RETRY_DELAY_MS = 1_000;
 
 function parsePositiveInteger(raw: string | undefined, fallback: number) {
@@ -25,9 +35,37 @@ function sleep(ms: number) {
 
 let shuttingDown = false;
 
-async function workerLoop(input: { index: number; pollTimeoutSeconds: number }) {
+async function workerLoop(input: {
+  index: number;
+  pollTimeoutSeconds: number;
+  staleQueuedThresholdSeconds: number;
+  staleRecoveryIntervalSeconds: number;
+  staleRecoveryBatchSize: number;
+}) {
+  let lastStaleRecoveryRunAt = 0;
+
   while (!shuttingDown) {
     try {
+      if (input.index === 1) {
+        const nowMs = Date.now();
+        if (
+          lastStaleRecoveryRunAt === 0 ||
+          nowMs - lastStaleRecoveryRunAt >= input.staleRecoveryIntervalSeconds * 1_000
+        ) {
+          const summary = await recoverStaleQueuedTranscodeJobs({
+            staleAfterSeconds: input.staleQueuedThresholdSeconds,
+            maxJobs: input.staleRecoveryBatchSize,
+          });
+          lastStaleRecoveryRunAt = Date.now();
+
+          if (summary.requeued > 0 || summary.failed > 0) {
+            console.info(
+              `[worker] stale queued recovery scanned=${summary.scanned} requeued=${summary.requeued} failed=${summary.failed} skipped=${summary.skipped}`,
+            );
+          }
+        }
+      }
+
       const message = await popTranscodeQueueMessage({
         timeoutSeconds: input.pollTimeoutSeconds,
       });
@@ -59,9 +97,25 @@ async function main() {
     process.env.TRANSCODE_QUEUE_POLL_TIMEOUT_SECONDS,
     DEFAULT_QUEUE_POLL_TIMEOUT_SECONDS,
   );
+  const staleQueuedThresholdSeconds = parsePositiveInteger(
+    process.env.TRANSCODE_STALE_QUEUED_THRESHOLD_SECONDS,
+    DEFAULT_STALE_QUEUED_THRESHOLD_SECONDS,
+  );
+  const heartbeatIntervalSeconds = parsePositiveInteger(
+    process.env.TRANSCODE_WORKER_HEARTBEAT_INTERVAL_SECONDS,
+    DEFAULT_HEARTBEAT_INTERVAL_SECONDS,
+  );
+  const staleRecoveryIntervalSeconds = parsePositiveInteger(
+    process.env.TRANSCODE_STALE_RECOVERY_INTERVAL_SECONDS,
+    DEFAULT_STALE_RECOVERY_INTERVAL_SECONDS,
+  );
+  const staleRecoveryBatchSize = parsePositiveInteger(
+    process.env.TRANSCODE_STALE_RECOVERY_BATCH_SIZE,
+    DEFAULT_STALE_RECOVERY_BATCH_SIZE,
+  );
 
   console.info(
-    `[worker] starting transcode worker concurrency=${concurrency} pollTimeoutSeconds=${pollTimeoutSeconds}`,
+    `[worker] starting transcode worker concurrency=${concurrency} pollTimeoutSeconds=${pollTimeoutSeconds} heartbeatIntervalSeconds=${heartbeatIntervalSeconds} staleQueuedThresholdSeconds=${staleQueuedThresholdSeconds} staleRecoveryIntervalSeconds=${staleRecoveryIntervalSeconds} staleRecoveryBatchSize=${staleRecoveryBatchSize}`,
   );
 
   const signalHandler = (signal: string) => {
@@ -72,16 +126,30 @@ async function main() {
   process.on("SIGINT", () => signalHandler("SIGINT"));
   process.on("SIGTERM", () => signalHandler("SIGTERM"));
 
+  const heartbeatTtlSeconds = Math.max(30, heartbeatIntervalSeconds * 3);
+  await reportTranscodeWorkerHeartbeat({
+    ttlSeconds: heartbeatTtlSeconds,
+  }).catch(() => undefined);
+  const heartbeatIntervalId = setInterval(() => {
+    void reportTranscodeWorkerHeartbeat({
+      ttlSeconds: heartbeatTtlSeconds,
+    }).catch(() => undefined);
+  }, heartbeatIntervalSeconds * 1_000);
+
   const workers = Array.from({ length: concurrency }, (_, index) =>
     workerLoop({
       index: index + 1,
       pollTimeoutSeconds,
+      staleQueuedThresholdSeconds,
+      staleRecoveryIntervalSeconds,
+      staleRecoveryBatchSize,
     }),
   );
 
   try {
     await Promise.all(workers);
   } finally {
+    clearInterval(heartbeatIntervalId);
     await prisma.$disconnect().catch(() => undefined);
   }
 }

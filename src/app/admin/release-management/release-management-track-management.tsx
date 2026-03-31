@@ -2,7 +2,7 @@ import { buttonClassName, previewModeOptions } from "./constants";
 import { ReleaseManagementTrackList } from "./release-management-track-list";
 import type { PreviewMode, ReleaseDraft, ReleaseRecord } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
-import { formatTrackDuration, toNewTrackDraft, toReleasePreviewDraft } from "./utils";
+import { formatTrackDuration, toReleasePreviewDraft } from "./utils";
 
 export function ReleaseManagementTrackManagement(props: {
   controller: ReleaseManagementController;
@@ -21,11 +21,8 @@ export function ReleaseManagementTrackManagement(props: {
     reorderTrackPending,
   } = props;
   const {
-    newTrackByReleaseId,
-    setNewTrackByReleaseId,
     previewByReleaseId,
     setPreviewByReleaseId,
-    pendingTrackCreateReleaseId,
     pendingTrackUploadId,
     pendingTrackId,
     trackImportJobsByReleaseId,
@@ -34,7 +31,6 @@ export function ReleaseManagementTrackManagement(props: {
     dragOverTrackIdByReleaseId,
     onApplyReleasePreviewToTracks,
     onImportTrackFiles,
-    onCreateTrack,
   } = props.controller;
 
   const importJobs = trackImportJobsByReleaseId[release.id] ?? [];
@@ -53,11 +49,8 @@ export function ReleaseManagementTrackManagement(props: {
 
                     <div className="mt-3 grid gap-2 sm:grid-cols-6">
                       {(() => {
-                        const newTrackDraft =
-                          newTrackByReleaseId[release.id] ?? toNewTrackDraft(release);
                         const previewDraft =
                           previewByReleaseId[release.id] ?? toReleasePreviewDraft(release);
-                        const createTrackPending = pendingTrackCreateReleaseId === release.id;
 
                         return (
                           <>
@@ -86,7 +79,6 @@ export function ReleaseManagementTrackManagement(props: {
                                   className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
                                   disabled={
                                     isPending ||
-                                    createTrackPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending
@@ -130,7 +122,6 @@ export function ReleaseManagementTrackManagement(props: {
                                   placeholder="30"
                                   disabled={
                                     isPending ||
-                                    createTrackPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
@@ -154,7 +145,6 @@ export function ReleaseManagementTrackManagement(props: {
                                   onChange={(event) => void onImportTrackFiles(release, event)}
                                   disabled={
                                     isPending ||
-                                    createTrackPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
@@ -179,125 +169,6 @@ export function ReleaseManagementTrackManagement(props: {
                                 ))}
                               </div>
                             ) : null}
-                            <label className="flex flex-col gap-1 text-[11px] text-zinc-500 sm:col-span-2">
-                              New track title
-                              <input
-                                value={newTrackDraft.title}
-                                onChange={(event) =>
-                                  setNewTrackByReleaseId((previous) => ({
-                                    ...previous,
-                                    [release.id]: {
-                                      ...newTrackDraft,
-                                      title: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
-                                placeholder="Track title"
-                                disabled={
-                                  isPending ||
-                                  createTrackPending ||
-                                  importTrackPending ||
-                                  previewApplyPending ||
-                                  reorderTrackPending
-                                }
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1 text-[11px] text-zinc-500">
-                              Track Number
-                              <input
-                                value={newTrackDraft.trackNumber}
-                                onChange={(event) =>
-                                  setNewTrackByReleaseId((previous) => ({
-                                    ...previous,
-                                    [release.id]: {
-                                      ...newTrackDraft,
-                                      trackNumber: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
-                                inputMode="numeric"
-                                placeholder={String(release.tracks.length + 1)}
-                                disabled={
-                                  isPending ||
-                                  createTrackPending ||
-                                  importTrackPending ||
-                                  previewApplyPending ||
-                                  reorderTrackPending
-                                }
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1 text-[11px] text-zinc-500 sm:col-span-6">
-                              Credits
-                              <textarea
-                                rows={2}
-                                value={newTrackDraft.credits}
-                                onChange={(event) =>
-                                  setNewTrackByReleaseId((previous) => ({
-                                    ...previous,
-                                    [release.id]: {
-                                      ...newTrackDraft,
-                                      credits: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
-                                placeholder="Optional credits"
-                                disabled={
-                                  isPending ||
-                                  createTrackPending ||
-                                  importTrackPending ||
-                                  previewApplyPending ||
-                                  reorderTrackPending
-                                }
-                              />
-                            </label>
-                            <label className="flex flex-col gap-1 text-[11px] text-zinc-500 sm:col-span-6">
-                              Lyrics
-                              <textarea
-                                rows={2}
-                                value={newTrackDraft.lyrics}
-                                onChange={(event) =>
-                                  setNewTrackByReleaseId((previous) => ({
-                                    ...previous,
-                                    [release.id]: {
-                                      ...newTrackDraft,
-                                      lyrics: event.target.value,
-                                    },
-                                  }))
-                                }
-                                className="rounded-md border border-slate-600 bg-slate-950 px-2 py-1.5 text-xs text-zinc-100 outline-none focus:border-slate-400"
-                                placeholder="Optional lyrics"
-                                disabled={
-                                  isPending ||
-                                  createTrackPending ||
-                                  importTrackPending ||
-                                  previewApplyPending ||
-                                  reorderTrackPending
-                                }
-                              />
-                            </label>
-                            <div className="sm:col-span-6">
-                              <button
-                                type="button"
-                                onClick={() => void onCreateTrack(release)}
-                                disabled={
-                                  isPending ||
-                                  createTrackPending ||
-                                  importTrackPending ||
-                                  previewApplyPending ||
-                                  reorderTrackPending
-                                }
-                                className={buttonClassName}
-                              >
-                                {createTrackPending
-                                  ? "Adding track..."
-                                  : reorderTrackPending
-                                    ? "Reordering..."
-                                    : "Add Track"}
-                              </button>
-                            </div>
                           </>
                         );
                       })()}
@@ -305,8 +176,7 @@ export function ReleaseManagementTrackManagement(props: {
 
                     {release.tracks.length === 0 ? (
                       <p className="mt-3 rounded-lg border border-dashed border-slate-700/80 p-3 text-xs text-zinc-500">
-                        No tracks yet. Import files or add a track manually, then upload master and
-                        delivery assets.
+                        No tracks yet. Import files to create tracks and upload master assets.
                       </p>
                     ) : (
                       <ReleaseManagementTrackList

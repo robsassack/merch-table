@@ -12,6 +12,10 @@ import type { DeliveryFormat } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 
+import {
+  enqueueDeliveryFormatsJob,
+  enqueuePreviewClipJob,
+} from "./queue";
 import type { TranscodeQueueMessage } from "./queue";
 
 const execFileAsync = promisify(execFile);
@@ -20,6 +24,7 @@ const DEFAULT_PREVIEW_SECONDS = 30;
 const DEFAULT_SOURCE_ROOT = path.join(os.tmpdir(), "merch-table", "source");
 const DEFAULT_OUTPUT_ROOT = path.join(os.tmpdir(), "merch-table", "output");
 const DEFAULT_RELEASE_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
+const DEFAULT_STALE_QUEUED_RECOVERY_BATCH_SIZE = 25;
 
 type AudioMetadata = {
   bitrateKbps: number | null;
@@ -35,6 +40,23 @@ type OutputDefinition = {
   isLosslessOutput: boolean;
   assetRole: "PREVIEW" | "DELIVERY";
   ffmpegArgs: (inputPath: string, outputPath: string) => string[];
+};
+
+type StaleQueuedRecoveryAction =
+  | {
+      type: "REQUEUE";
+      kind: TranscodeQueueMessage["kind"];
+    }
+  | {
+      type: "FAIL";
+      reason: string;
+    };
+
+export type StaleQueuedTranscodeRecoverySummary = {
+  scanned: number;
+  requeued: number;
+  failed: number;
+  skipped: number;
 };
 
 const DELIVERY_OUTPUTS: OutputDefinition[] = [
@@ -129,6 +151,55 @@ function toErrorMessage(error: unknown) {
   }
 
   return "Unknown transcode worker error.";
+}
+
+function truncateFailureReason(reason: string) {
+  return reason.slice(0, 1_000);
+}
+
+function resolveStaleQueuedRecoveryAction(input: {
+  previewMode: "CLIP" | "FULL";
+  isLossless: boolean;
+  queuedAt: Date;
+  trackUpdatedAt: Date;
+}): StaleQueuedRecoveryAction {
+  const trackChangedAfterQueue = input.trackUpdatedAt.getTime() > input.queuedAt.getTime();
+
+  if (input.previewMode === "CLIP" && !input.isLossless) {
+    return {
+      type: "REQUEUE",
+      kind: "PREVIEW_CLIP",
+    };
+  }
+
+  if (input.previewMode === "FULL" && input.isLossless) {
+    if (trackChangedAfterQueue) {
+      return {
+        type: "FAIL",
+        reason:
+          "Stale queued transcode job could not be auto-requeued because track settings changed after the job was queued. Queue a new job from the latest track or release actions.",
+      };
+    }
+
+    return {
+      type: "REQUEUE",
+      kind: "DELIVERY_FORMATS",
+    };
+  }
+
+  if (input.previewMode === "CLIP" && input.isLossless) {
+    return {
+      type: "FAIL",
+      reason:
+        "Stale queued transcode job could not be auto-requeued because its kind is ambiguous (track preview mode is CLIP and source is lossless). Requeue from track preview settings or the release delivery formats action.",
+    };
+  }
+
+  return {
+    type: "FAIL",
+    reason:
+      "Stale queued transcode job has no valid transcode path (track preview mode is FULL and source is not lossless). Upload a valid source asset, then queue a new transcode job.",
+  };
 }
 
 function resolveSourceExtension(input: { format: string; storageKey: string }) {
@@ -356,6 +427,142 @@ async function markJobFailed(jobId: string, errorMessage: string) {
       finishedAt: new Date(),
     },
   });
+}
+
+async function markQueuedJobFailedIfStillQueued(input: {
+  jobId: string;
+  errorMessage: string;
+}) {
+  const failed = await prisma.transcodeJob.updateMany({
+    where: {
+      id: input.jobId,
+      status: "QUEUED",
+    },
+    data: {
+      status: "FAILED",
+      errorMessage: truncateFailureReason(input.errorMessage),
+      startedAt: null,
+      finishedAt: new Date(),
+    },
+  });
+
+  return failed.count > 0;
+}
+
+export async function recoverStaleQueuedTranscodeJobs(input: {
+  staleAfterSeconds: number;
+  maxJobs?: number;
+  now?: Date;
+}): Promise<StaleQueuedTranscodeRecoverySummary> {
+  const staleAfterSeconds = Math.max(1, Math.floor(input.staleAfterSeconds));
+  const maxJobs = Math.max(
+    1,
+    Math.floor(input.maxJobs ?? DEFAULT_STALE_QUEUED_RECOVERY_BATCH_SIZE),
+  );
+  const now = input.now ?? new Date();
+  const staleBefore = new Date(now.getTime() - staleAfterSeconds * 1_000);
+
+  const staleJobs = await prisma.transcodeJob.findMany({
+    where: {
+      status: "QUEUED",
+      queuedAt: {
+        lt: staleBefore,
+      },
+    },
+    orderBy: [
+      {
+        queuedAt: "asc",
+      },
+    ],
+    take: maxJobs,
+    select: {
+      id: true,
+      queuedAt: true,
+      track: {
+        select: {
+          previewMode: true,
+          updatedAt: true,
+        },
+      },
+      sourceAsset: {
+        select: {
+          isLossless: true,
+        },
+      },
+    },
+  });
+
+  let requeued = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const staleJob of staleJobs) {
+    const requeueTimestamp = new Date();
+    const claim = await prisma.transcodeJob.updateMany({
+      where: {
+        id: staleJob.id,
+        status: "QUEUED",
+        queuedAt: staleJob.queuedAt,
+      },
+      data: {
+        queuedAt: requeueTimestamp,
+        startedAt: null,
+        finishedAt: null,
+        errorMessage: null,
+      },
+    });
+
+    if (claim.count === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const action = resolveStaleQueuedRecoveryAction({
+      previewMode: staleJob.track.previewMode,
+      isLossless: staleJob.sourceAsset.isLossless,
+      queuedAt: staleJob.queuedAt,
+      trackUpdatedAt: staleJob.track.updatedAt,
+    });
+
+    if (action.type === "FAIL") {
+      const didFail = await markQueuedJobFailedIfStillQueued({
+        jobId: staleJob.id,
+        errorMessage: action.reason,
+      });
+      if (didFail) {
+        failed += 1;
+      } else {
+        skipped += 1;
+      }
+      continue;
+    }
+
+    try {
+      if (action.kind === "PREVIEW_CLIP") {
+        await enqueuePreviewClipJob(staleJob.id);
+      } else {
+        await enqueueDeliveryFormatsJob(staleJob.id);
+      }
+      requeued += 1;
+    } catch (error) {
+      const didFail = await markQueuedJobFailedIfStillQueued({
+        jobId: staleJob.id,
+        errorMessage: `Stale queued transcode job could not be re-enqueued: ${toErrorMessage(error)}`,
+      });
+      if (didFail) {
+        failed += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+  }
+
+  return {
+    scanned: staleJobs.length,
+    requeued,
+    failed,
+    skipped,
+  };
 }
 
 async function persistOutputRecord(input: {

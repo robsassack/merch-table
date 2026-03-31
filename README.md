@@ -130,6 +130,8 @@ npm run stripe:trigger:checkout-complete
 - Uploading a master track queues transcode work in Redis (`TranscodeJob` starts as `QUEUED`).
 - A worker process must be running to move jobs to `RUNNING`/`SUCCEEDED` and create preview/delivery assets.
 - Delivery transcodes honor per-release format settings (`MP3`, `M4A`, `FLAC`), with all three enabled by default for new releases.
+- Worker 1 periodically scans for stale `QUEUED` jobs older than `TRANSCODE_STALE_QUEUED_THRESHOLD_SECONDS` (default `900`) and either re-queues them or marks them `FAILED` with an actionable reason when kind inference is unsafe.
+- Tune stale recovery cadence with `TRANSCODE_STALE_RECOVERY_INTERVAL_SECONDS` (default `30`) and `TRANSCODE_STALE_RECOVERY_BATCH_SIZE` (default `25`).
 - If jobs stay queued:
   - Start worker locally: `npm run worker`
   - Or run Docker worker: `docker compose up -d --build worker`

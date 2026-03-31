@@ -196,17 +196,6 @@ export async function POST(request: Request) {
       }
     }
 
-    if (parsed.markLossyOnly && !parsed.confirmLossyOnly) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Confirm lossy-only quality disclosure before saving this release.",
-        },
-        { status: 400 },
-      );
-    }
-
     const activeArtist = await prisma.artist.findFirst({
       where: {
         id: parsed.artistId,

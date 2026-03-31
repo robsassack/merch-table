@@ -7,6 +7,7 @@ import { useReleaseManagementState } from "./use-release-management-state";
 import type {
   NewTrackDraft,
   ReleaseDraft,
+  TranscodeTasksStatusResponse,
   ReleasePreviewDraft,
   ReleaseRecord,
   ReleasesListResponse,
@@ -14,6 +15,7 @@ import type {
   TrackRecordPatch,
 } from "./types";
 import {
+  areAllMasterAssetsLossless,
   formatCurrency,
   sortTracks,
   toNewTrackDraft,
@@ -25,11 +27,18 @@ import {
 
 export function useReleaseManagementController() {
   const TRANSCODE_POLL_INTERVAL_MS = 4_000;
+  const TASKS_STATUS_POLL_INTERVAL_MS = 10_000;
 
   const state = useReleaseManagementState();
   const {
     releases,
     loading,
+    setTasksLoading,
+    setTasksError,
+    tasksStatus,
+    setTasksStatus,
+    tasksLoading,
+    tasksError,
     minimumPriceFloorCents,
     setDraftsById,
     setTrackDraftsById,
@@ -62,7 +71,31 @@ export function useReleaseManagementController() {
     setDraftsById((previous) => {
       const next: Record<string, ReleaseDraft> = {};
       for (const release of list) {
-        next[release.id] = previous[release.id] ?? toReleaseDraft(release);
+        const previousDraft = previous[release.id];
+        if (!previousDraft) {
+          next[release.id] = toReleaseDraft(release);
+          continue;
+        }
+
+        if (!previousDraft.markLossyOnly && release.isLossyOnly) {
+          next[release.id] = {
+            ...previousDraft,
+            markLossyOnly: true,
+            confirmLossyOnly: true,
+          };
+          continue;
+        }
+
+        if (previousDraft.markLossyOnly && areAllMasterAssetsLossless(release)) {
+          next[release.id] = {
+            ...previousDraft,
+            markLossyOnly: false,
+            confirmLossyOnly: false,
+          };
+          continue;
+        }
+
+        next[release.id] = previousDraft;
       }
       return next;
     });
@@ -205,6 +238,40 @@ export function useReleaseManagementController() {
     void loadReleases();
   }, [loadReleases]);
 
+  const loadTasksStatus = useCallback(async (options?: { silent?: boolean }) => {
+    const silent = options?.silent ?? false;
+
+    if (!silent) {
+      setTasksLoading(true);
+      setTasksError(null);
+    }
+
+    try {
+      const response = await fetch("/api/admin/transcode-status", { method: "GET" });
+      const body = (await response.json().catch(() => null)) as TranscodeTasksStatusResponse | null;
+      if (!response.ok || !body?.ok || !body.status) {
+        throw new Error(body?.error ?? "Could not load tasks status.");
+      }
+
+      setTasksStatus(body.status);
+      setTasksError(null);
+    } catch (loadError) {
+      if (!silent) {
+        setTasksError(
+          loadError instanceof Error ? loadError.message : "Could not load tasks status.",
+        );
+      }
+    } finally {
+      if (!silent) {
+        setTasksLoading(false);
+      }
+    }
+  }, [setTasksLoading, setTasksError, setTasksStatus]);
+
+  useEffect(() => {
+    void loadTasksStatus();
+  }, [loadTasksStatus]);
+
   useEffect(() => {
     if (!hasActiveTranscodeJobs) {
       return;
@@ -244,6 +311,32 @@ export function useReleaseManagementController() {
       pollingInFlightRef.current = false;
     };
   }, [hasActiveTranscodeJobs, loadReleases]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    const runPoll = async () => {
+      if (isCancelled || typeof document === "undefined") {
+        return;
+      }
+
+      if (document.visibilityState !== "visible") {
+        return;
+      }
+
+      await loadTasksStatus({ silent: true });
+    };
+
+    const intervalId = window.setInterval(() => {
+      void runPoll();
+    }, TASKS_STATUS_POLL_INTERVAL_MS);
+
+    void runPoll();
+
+    return () => {
+      isCancelled = true;
+      window.clearInterval(intervalId);
+    };
+  }, [loadTasksStatus]);
 
   useEffect(() => {
     setSelectedReleaseId((current) => {
@@ -354,6 +447,7 @@ export function useReleaseManagementController() {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onForceRequeueTranscodes,
     newCoverPreviewSrc,
   } = createReleaseActions({
     ...state,
@@ -424,6 +518,9 @@ export function useReleaseManagementController() {
 
   return {
     ...state,
+    tasksStatus,
+    tasksLoading,
+    tasksError,
     onNewCoverFileChange,
     onExistingCoverFileChange,
     onCreateRelease,
@@ -432,6 +529,7 @@ export function useReleaseManagementController() {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onForceRequeueTranscodes,
     onImportTrackFiles,
     onResolveImportConflict,
     onApplyReleasePreviewToTracks,

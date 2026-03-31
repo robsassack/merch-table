@@ -56,6 +56,11 @@ enum TranscodeStatus {
   FAILED
 }
 
+enum TranscodeJobKind {
+  PREVIEW_CLIP
+  DELIVERY_FORMATS
+}
+
 enum DeliveryFormat {
   MP3
   M4A
@@ -317,6 +322,7 @@ model TranscodeJob {
   organizationId String
   trackId        String
   sourceAssetId  String
+  kind           TranscodeJobKind
   status         TranscodeStatus   @default(QUEUED)
   errorMessage   String?
   queuedAt       DateTime          @default(now())
@@ -331,6 +337,7 @@ model TranscodeJob {
 
   @@index([status, queuedAt])
   @@index([trackId])
+  @@index([organizationId, sourceAssetId, kind, status])
 }
 
 model TranscodeOutput {

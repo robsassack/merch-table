@@ -3,13 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import type { ReleaseRecord, TrackAssetRecord, TrackRecord } from "./types";
-import { formatTrackDuration } from "./utils";
 
 type PlaybackSourceMode =
   | "PREVIEW"
   | "DELIVERY_MP3"
   | "DELIVERY_M4A"
   | "DELIVERY_FLAC";
+const DEFAULT_PLAYBACK_SOURCE: PlaybackSourceMode = "PREVIEW";
 
 function sortAssetsByUpdatedAtDesc(assets: TrackAssetRecord[]) {
   return [...assets].sort(
@@ -35,6 +35,11 @@ function normalizeDeliveryFormat(format: string) {
   return null;
 }
 
+function formatPlaybackFileName(storageKey: string) {
+  const fileName = storageKey.split("/").filter(Boolean).at(-1) ?? storageKey;
+  return fileName.length > 0 ? fileName : storageKey;
+}
+
 function getPlaybackSourceLabel(mode: PlaybackSourceMode) {
   if (mode === "PREVIEW") {
     return "Preview";
@@ -51,17 +56,42 @@ function getPlaybackSourceLabel(mode: PlaybackSourceMode) {
   return "Delivery FLAC";
 }
 
+function findFirstPlayableSelection(
+  tracks: TrackRecord[],
+  mode: PlaybackSourceMode,
+) {
+  for (const track of tracks) {
+    const sourceAsset = pickSourceAsset(track, mode);
+    if (sourceAsset) {
+      return {
+        trackId: track.id,
+        sourceAssetId: sourceAsset.id,
+      };
+    }
+  }
+
+  return null;
+}
+
 function pickSourceAsset(track: TrackRecord, mode: PlaybackSourceMode) {
   const sortedAssets = sortAssetsByUpdatedAtDesc(track.assets);
   const previewAsset = sortedAssets.find((asset) => asset.assetRole === "PREVIEW") ?? null;
   const masterAsset = sortedAssets.find((asset) => asset.assetRole === "MASTER") ?? null;
   const deliveryAssets = sortedAssets.filter((asset) => asset.assetRole === "DELIVERY");
+  const lossyMasterForFormat = (format: "MP3" | "M4A" | "FLAC") =>
+    sortedAssets.find(
+      (asset) =>
+        asset.assetRole === "MASTER" &&
+        !asset.isLossless &&
+        normalizeDeliveryFormat(asset.format) === format,
+    ) ?? null;
 
   if (mode === "DELIVERY_MP3") {
     return (
       deliveryAssets.find(
         (asset) => normalizeDeliveryFormat(asset.format) === "MP3",
-      ) ?? null
+      ) ??
+      lossyMasterForFormat("MP3")
     );
   }
 
@@ -69,7 +99,8 @@ function pickSourceAsset(track: TrackRecord, mode: PlaybackSourceMode) {
     return (
       deliveryAssets.find(
         (asset) => normalizeDeliveryFormat(asset.format) === "M4A",
-      ) ?? null
+      ) ??
+      lossyMasterForFormat("M4A")
     );
   }
 
@@ -77,7 +108,8 @@ function pickSourceAsset(track: TrackRecord, mode: PlaybackSourceMode) {
     return (
       deliveryAssets.find(
         (asset) => normalizeDeliveryFormat(asset.format) === "FLAC",
-      ) ?? null
+      ) ??
+      lossyMasterForFormat("FLAC")
     );
   }
 
@@ -102,14 +134,40 @@ function formatClockTime(seconds: number) {
 
 function isAbortPlaybackError(error: unknown) {
   if (error instanceof DOMException) {
-    return error.name === "AbortError";
+    if (error.name === "AbortError") {
+      return true;
+    }
+
+    return error.message.includes("play() request was interrupted");
   }
 
   if (error instanceof Error) {
-    return error.name === "AbortError";
+    if (error.name === "AbortError") {
+      return true;
+    }
+
+    return error.message.includes("play() request was interrupted");
   }
 
   return false;
+}
+
+async function playAudioWithAbortRetry(audio: HTMLAudioElement) {
+  try {
+    await audio.play();
+    return;
+  } catch (error) {
+    if (!isAbortPlaybackError(error)) {
+      throw error;
+    }
+  }
+
+  // Firefox can abort a play() call immediately after a src swap. Retry once
+  // on the next tick while still in the same user-initiated action path.
+  await new Promise<void>((resolve) => {
+    window.setTimeout(() => resolve(), 0);
+  });
+  await audio.play();
 }
 
 export function ReleaseManagementStorefrontPreview(props: {
@@ -117,9 +175,20 @@ export function ReleaseManagementStorefrontPreview(props: {
 }) {
   const { release } = props;
 
-  const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
-  const [activeSourceAssetId, setActiveSourceAssetId] = useState<string | null>(null);
-  const [playbackSource, setPlaybackSource] = useState<PlaybackSourceMode>("PREVIEW");
+  const initialSelection = findFirstPlayableSelection(
+    release.tracks,
+    DEFAULT_PLAYBACK_SOURCE,
+  );
+
+  const [playbackSource, setPlaybackSource] = useState<PlaybackSourceMode>(
+    DEFAULT_PLAYBACK_SOURCE,
+  );
+  const [activeTrackId, setActiveTrackId] = useState<string | null>(
+    initialSelection?.trackId ?? null,
+  );
+  const [activeSourceAssetId, setActiveSourceAssetId] = useState<string | null>(
+    initialSelection?.sourceAssetId ?? null,
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -130,6 +199,7 @@ export function ReleaseManagementStorefrontPreview(props: {
     () => release.tracks.find((track) => track.id === activeTrackId) ?? null,
     [activeTrackId, release.tracks],
   );
+  const hasSelectedSource = activeSourceAssetId !== null;
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -177,7 +247,7 @@ export function ReleaseManagementStorefrontPreview(props: {
       if (activeTrackId === track.id && activeSourceAssetId === sourceAsset.id) {
         if (audio.paused) {
           try {
-            await audio.play();
+            await playAudioWithAbortRetry(audio);
           } catch (error) {
             if (!isAbortPlaybackError(error)) {
               setIsPlaying(false);
@@ -193,14 +263,22 @@ export function ReleaseManagementStorefrontPreview(props: {
       audio.pause();
       audio.src = nextSrc;
       audio.load();
-      audio.currentTime = 0;
+      try {
+        audio.currentTime = 0;
+      } catch (error) {
+        // Some browsers can reject currentTime seeks during a fresh src swap.
+        // This is non-fatal for preview playback; keep going.
+        if (!isAbortPlaybackError(error)) {
+          setIsPlaying(false);
+        }
+      }
       setCurrentTime(0);
       setDuration(0);
       setActiveTrackId(track.id);
       setActiveSourceAssetId(sourceAsset.id);
 
       try {
-        await audio.play();
+        await playAudioWithAbortRetry(audio);
       } catch (error) {
         if (!isAbortPlaybackError(error)) {
           setIsPlaying(false);
@@ -225,17 +303,25 @@ export function ReleaseManagementStorefrontPreview(props: {
           value={playbackSource}
           onChange={(event) => {
             const nextMode = event.target.value as PlaybackSourceMode;
+            const nextSelection = findFirstPlayableSelection(release.tracks, nextMode);
             const audio = audioRef.current;
             if (audio) {
               audio.pause();
-              audio.removeAttribute("src");
-              audio.load();
+              if (nextSelection) {
+                audio.src = `/api/admin/tracks/assets/${nextSelection.sourceAssetId}/stream`;
+                try {
+                  audio.currentTime = 0;
+                } catch {}
+              } else {
+                audio.removeAttribute("src");
+                audio.load();
+              }
             }
             setIsPlaying(false);
             setCurrentTime(0);
             setDuration(0);
-            setActiveTrackId(null);
-            setActiveSourceAssetId(null);
+            setActiveTrackId(nextSelection?.trackId ?? null);
+            setActiveSourceAssetId(nextSelection?.sourceAssetId ?? null);
             setPlaybackSource(nextMode);
           }}
           className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
@@ -257,7 +343,22 @@ export function ReleaseManagementStorefrontPreview(props: {
         <p className="mt-1 text-xs text-zinc-400">
           {formatClockTime(currentTime)} / {formatClockTime(duration)}
         </p>
-        <audio ref={audioRef} controls preload="metadata" className="mt-3 w-full" />
+        <audio
+          ref={audioRef}
+          src={
+            activeSourceAssetId
+              ? `/api/admin/tracks/assets/${activeSourceAssetId}/stream`
+              : undefined
+          }
+          controls={hasSelectedSource}
+          preload="metadata"
+          className="mt-3 w-full"
+        />
+        {!hasSelectedSource ? (
+          <p className="mt-2 text-xs text-zinc-500">
+            Select a track below to enable player controls.
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-3 space-y-2">
@@ -265,6 +366,7 @@ export function ReleaseManagementStorefrontPreview(props: {
           const sourceAsset = pickSourceAsset(track, playbackSource);
           const isActive = activeTrackId === track.id;
           const actionLabel = isActive ? (isPlaying ? "Pause" : "Resume") : "Play";
+          const actionSymbol = isActive && isPlaying ? "⏸" : "▶";
 
           return (
             <div
@@ -276,12 +378,17 @@ export function ReleaseManagementStorefrontPreview(props: {
                   {track.trackNumber}. {track.title}
                 </p>
                 <p className="text-xs text-zinc-500">
-                  {formatTrackDuration(track.durationMs)} •{" "}
-                  {track.previewMode === "FULL"
-                    ? "full preview"
-                    : `clip ${track.previewSeconds ?? 30}s`}{" "}
-                  • selected source:{" "}
+                  Release: {release.title}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Playback source:{" "}
                   {sourceAsset ? getPlaybackSourceLabel(playbackSource).toLowerCase() : "none"}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Playback file:{" "}
+                  {sourceAsset
+                    ? formatPlaybackFileName(sourceAsset.storageKey)
+                    : "not available"}
                 </p>
               </div>
 
@@ -289,9 +396,18 @@ export function ReleaseManagementStorefrontPreview(props: {
                 <button
                   type="button"
                   className="inline-flex items-center rounded-lg border border-sky-700/70 bg-sky-950/40 px-3 py-1.5 text-xs font-medium text-sky-200 transition hover:bg-sky-900/60"
-                  onClick={() => void onTrackPlayToggle(track)}
+                  aria-label={actionLabel}
+                  title={actionLabel}
+                  onClick={() => {
+                    void onTrackPlayToggle(track).catch((error) => {
+                      if (!isAbortPlaybackError(error)) {
+                        setIsPlaying(false);
+                      }
+                    });
+                  }}
                 >
-                  {actionLabel}
+                  <span aria-hidden="true">{actionSymbol}</span>
+                  <span className="sr-only">{actionLabel}</span>
                 </button>
               ) : (
                 <span className="rounded-lg border border-amber-700/70 bg-amber-950/50 px-3 py-1.5 text-xs font-medium text-amber-200">
