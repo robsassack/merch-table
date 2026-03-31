@@ -28,7 +28,7 @@ import {
 } from "./utils";
 
 type TrackImportUploadActionsInput = ReleaseManagementState & {
-  loadReleases: () => Promise<void>;
+  loadReleases: (options?: { silent?: boolean }) => Promise<void>;
 };
 
 export function createTrackImportUploadActions(input: TrackImportUploadActionsInput) {
@@ -324,7 +324,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
         }
       }
 
-      await loadReleases();
+      await loadReleases({ silent: true });
       setNotice(
         `Imported ${completed}/${plannedImports.length} track${plannedImports.length === 1 ? "" : "s"} for "${release.title}".${
           previewQueuedCount > 0 ? ` Preview jobs queued: ${previewQueuedCount}.` : ""
@@ -464,7 +464,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
         durationMs: metadata.durationMs,
       });
 
-      await loadReleases();
+      await loadReleases({ silent: true });
       setNotice(
         `Uploaded "${file.name}" as ${uploadRole.toLowerCase()} for "${track.title}" (synced metadata to "${metadata.resolvedTitle}", ${formatTrackDuration(metadata.durationMs)}).${
           commitBody.previewJobQueued ? " Preview job queued." : ""

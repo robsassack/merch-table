@@ -214,6 +214,29 @@ async function readAudioMetadata(filePath: string): Promise<AudioMetadata> {
   };
 }
 
+async function readAudioDurationSeconds(filePath: string): Promise<number | null> {
+  const { stdout } = await execFileAsync(
+    "ffprobe",
+    [
+      "-v",
+      "error",
+      "-show_entries",
+      "format=duration",
+      "-of",
+      "default=noprint_wrappers=1:nokey=1",
+      filePath,
+    ],
+    { maxBuffer: 512 * 1024 },
+  );
+
+  const parsed = Number(stdout.trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return parsed;
+}
+
 async function writeBodyToFile(body: unknown, targetPath: string) {
   if (
     typeof body === "object" &&
@@ -415,6 +438,35 @@ async function processPreviewJob(input: {
   outputRoot: string;
 }) {
   const safePreviewSeconds = Math.max(5, Math.round(input.previewSeconds));
+  const sourceDurationSeconds = await readAudioDurationSeconds(input.sourcePath);
+  const clipDurationSeconds = sourceDurationSeconds
+    ? Math.max(1, Math.min(safePreviewSeconds, sourceDurationSeconds))
+    : safePreviewSeconds;
+  const fadeSeconds =
+    clipDurationSeconds > 1
+      ? Math.max(0.15, Math.min(1.5, clipDurationSeconds / 4))
+      : 0;
+  const fadeOutStart = Math.max(0, clipDurationSeconds - fadeSeconds);
+  const randomStartSeconds = (() => {
+    if (!sourceDurationSeconds) {
+      return 0;
+    }
+
+    const maxStart = Math.max(0, sourceDurationSeconds - clipDurationSeconds);
+    if (maxStart <= 0) {
+      return 0;
+    }
+
+    // Prefer a middle section and avoid obvious intros/outros.
+    const middleMin = Math.max(0, sourceDurationSeconds * 0.2);
+    const middleMax = Math.max(middleMin, sourceDurationSeconds * 0.8 - clipDurationSeconds);
+    if (middleMax <= middleMin) {
+      return maxStart / 2;
+    }
+
+    const candidate = middleMin + Math.random() * (middleMax - middleMin);
+    return Math.min(maxStart, Math.max(0, candidate));
+  })();
   const outputFilePath = path.join(input.outputRoot, `${input.jobId}-preview.mp3`);
 
   await runFfmpeg([
@@ -422,13 +474,23 @@ async function processPreviewJob(input: {
     "-hide_banner",
     "-loglevel",
     "error",
+    "-ss",
+    randomStartSeconds.toFixed(3),
     "-i",
     input.sourcePath,
     "-t",
-    String(safePreviewSeconds),
+    clipDurationSeconds.toFixed(3),
+    "-map",
+    "0:a:0",
     "-map_metadata",
     "-1",
     "-vn",
+    ...(fadeSeconds > 0
+      ? [
+          "-af",
+          `afade=t=in:st=0:d=${fadeSeconds.toFixed(3)},afade=t=out:st=${fadeOutStart.toFixed(3)}:d=${fadeSeconds.toFixed(3)}`,
+        ]
+      : []),
     "-codec:a",
     "libmp3lame",
     "-b:a",

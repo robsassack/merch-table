@@ -5,6 +5,7 @@ import {
   statusOptions,
 } from "./constants";
 import { ReleaseManagementReleaseFooter } from "./release-management-release-footer";
+import { ReleaseManagementStorefrontPreview } from "./release-management-storefront-preview";
 import { ReleaseManagementTrackManagement } from "./release-management-track-management";
 import type { DeliveryFormat, PricingMode, ReleaseStatus } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
@@ -493,6 +494,8 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     previewApplyPending={previewApplyPending}
                     reorderTrackPending={reorderTrackPending}
                   />
+
+                  <ReleaseManagementStorefrontPreview release={release} />
                 </div>
 
                   <ReleaseManagementReleaseFooter

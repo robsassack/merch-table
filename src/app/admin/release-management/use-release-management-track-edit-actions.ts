@@ -18,7 +18,7 @@ import {
 } from "./utils";
 
 type TrackEditActionsInput = ReleaseManagementState & {
-  loadReleases: () => Promise<void>;
+  loadReleases: (options?: { silent?: boolean }) => Promise<void>;
   applyTrackPatchToRelease: (releaseId: string, track: TrackRecordPatch) => void;
 };
 
@@ -191,7 +191,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         ...previous,
         [release.id]: body.track!.id,
       }));
-      await loadReleases();
+      await loadReleases({ silent: true });
       setNotice(`Added track "${body.track.title}".`);
     } catch (trackError) {
       setError(trackError instanceof Error ? trackError.message : "Could not create track.");
@@ -368,7 +368,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
       setNotice("Track order updated.");
     } catch (reorderError) {
       setError(reorderError instanceof Error ? reorderError.message : "Could not reorder tracks.");
-      await loadReleases();
+      await loadReleases({ silent: true });
     } finally {
       setPendingTrackReorderReleaseId(null);
       setDragOverTrackIdByReleaseId((previous) => ({
@@ -400,7 +400,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         throw new Error(body?.error ?? "Could not delete track.");
       }
 
-      await loadReleases();
+      await loadReleases({ silent: true });
       setNotice(`Deleted track "${track.title}".`);
     } catch (trackError) {
       setError(trackError instanceof Error ? trackError.message : "Could not delete track.");
