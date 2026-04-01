@@ -32,6 +32,7 @@
   - Public pages: home/catalog, release detail, post-purchase confirmation, buyer library (token-auth).
   - Release page supports tracklist, per-track preview playback (clip/full), and pricing UI for free/fixed/PWYW.
   - Before purchase, show quality disclosure if only lossy files are available.
+  - Public storefront includes a visible "Contact" link to the store owner (using configured `StoreSettings.contactEmail`, rendered as `mailto:`) in shared page chrome (for example, footer).
   - Store in `PRIVATE` state shows a maintenance/coming-soon page to unauthenticated visitors.
   - Free releases bypass Stripe entirely; buyer provides an email address to receive a library magic-link. Email is required to prevent anonymous bulk downloads.
   - Preview clips are generated server-side at upload time and stored as a separate `TrackAsset` with `assetRole: PREVIEW`. No on-the-fly streaming or byte-range slicing of masters.
@@ -63,6 +64,7 @@
   - Stripe Tax basic enabled during Checkout session creation.
   - Free releases (`PricingMode: FREE`) bypass Stripe entirely. Buyer submits an email address; server creates an Order and issues a `BuyerLibraryToken` directly. Email is required — no anonymous free downloads.
   - Entitlements are unlimited; buyer receives email magic-link to library with re-download access.
+  - Add a self-serve "Find my purchases" flow: buyer submits purchase email in a public interface, server issues a fresh library-link email when matches exist, and endpoint always returns a generic success response (no account-existence disclosure).
   - Download endpoint (`GET /api/download/:entitlementToken/:assetId`) validates that the token is not revoked and not expired, then generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused; the buyer always hits this endpoint first. The signed URL includes a `Content-Disposition: attachment` header with a human-readable filename derived from artist, release, and track title (e.g., `Artist - Track Title.flac`), so browsers save the file with a meaningful name rather than a storage key or UUID.
 - File upload:
   - Admin requests a presigned PUT URL via `POST /api/admin/assets/upload-url`; browser uploads directly to Garage/S3, bypassing the Next.js server.
@@ -84,6 +86,7 @@
   - Redis-backed IP-based rate limiting using the existing Redis instance in the Docker Compose stack.
   - Rate-limited endpoints and default thresholds:
     - `POST /api/checkout/free` (free release email capture): strict limit to prevent email-bombing and entitlement spam.
+    - `POST /api/library/resend` (library-link recovery): strict limit to prevent email-bombing and account enumeration abuse.
     - `GET /api/download/:entitlementToken/:assetId` (download): moderate limit to prevent bulk scraping of signed URLs.
     - `POST /api/admin/assets/upload-url` (presigned upload URL generation): moderate limit per admin session.
     - `POST /api/checkout/session` (Stripe session creation): moderate limit to prevent session flooding.
@@ -138,6 +141,7 @@
 - HTTP endpoints:
   - `POST /api/checkout/session` (create Stripe Checkout session).
   - `POST /api/checkout/free` (email capture and entitlement issuance for free releases, no Stripe).
+  - `POST /api/library/resend` (request fresh library-link email by purchase email address).
   - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
   - `GET /api/library/:token` (resolve buyer library).
   - `GET /api/download/:entitlementToken/:assetId` (validate token, generate fresh signed URL, redirect).
@@ -157,6 +161,8 @@
 
 ## Test Plan
 
+- Test data generation:
+  - Provide a deterministic seed script (`npm run seed:test`) that can reset and populate representative fixtures (free/fixed/PWYW releases, lossy/lossless assets, successful/failed orders, revoked/expired library tokens) so integration and E2E suites run against known data.
 - Unit tests:
   - Pricing validation for free/fixed/PWYW paths.
   - Server-side PWYW validation rejects checkout session creation when amount is below artist-set `minimumPriceCents`.
@@ -174,6 +180,7 @@
   - Webhook idempotency: delivering the same `checkout.session.completed` event twice results in exactly one `Order`, one set of entitlements, and one confirmation email. Second delivery returns 200 with no side effects.
   - Entitlement generation and library token issuance.
   - Free checkout issues entitlement and sends library email without creating a Stripe session.
+  - Library-link resend endpoint always returns generic success and sends a fresh library email when matching purchases exist.
   - `lastUsedAt` and `accessCount` update correctly on library access.
   - Presigned upload URL generation and expiry enforcement.
   - Preview clip asset is created automatically on track upload when previewMode is CLIP.
@@ -181,6 +188,7 @@
   - Email failure on purchase sets `emailStatus` flag on Order record.
   - Each email template (purchase confirmation, free-release library link, admin magic-link, setup test) renders valid HTML with the correct dynamic values (release name, library URL, amount).
   - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on free checkout endpoint.
+  - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on library resend endpoint.
   - Rate limiter returns 429 on download endpoint when threshold is exceeded; valid requests succeed again after the window resets.
   - Stripe webhook endpoint is not rate-limited; rapid consecutive webhook deliveries are all processed.
 - End-to-end scenarios:
@@ -192,7 +200,9 @@
   - Admin creates release with lossy-only files and storefront warning appears pre-purchase.
   - Buyer claims a free release with email only; receives library magic-link without going through Stripe.
   - Buyer purchases fixed-price release, receives magic link, and downloads multiple times.
+  - Buyer who lost the original email uses "Find my purchases", requests a resend, receives a fresh library link, and accesses existing purchases.
   - Buyer revisits a release they already own; "You own this" indicator appears and library link works. Re-purchase via "Buy again" succeeds and issues a new library token.
+  - Buyer can find and use the storefront "Contact" link to email the store owner from catalog and release pages.
   - Buyer uses PWYW amount above minimum and receives correct entitlements.
   - Preview playback works for both clip and full modes; clip asset is confirmed as a separate stored file.
   - Clicking a second track while one is playing stops the first and starts the second; player UI updates to reflect the new track.

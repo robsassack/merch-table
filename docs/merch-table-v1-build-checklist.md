@@ -178,6 +178,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 > Goal: Buyers can access their library and download files.
 
 - [ ] `GET /api/library/:token` — resolve buyer library; validate token not revoked/expired
+- [ ] `POST /api/library/resend` — buyer submits purchase email to request a fresh library link; always return generic success response to avoid account enumeration
+- [ ] Public "Find my purchases" interface with email form + confirmation state for library-link resend requests
 - [ ] `BuyerLibraryToken` access tracking: update `lastUsedAt` and `accessCount` on each access
 - [ ] `GET /api/download/:entitlementToken/:assetId` — validate token, generate fresh signed URL per request
 - [ ] Signed URL expires after 15 minutes (configurable via env var); never cached or reused
@@ -185,6 +187,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Revoked token returns 403; expired token returns 403
 - [ ] Rate limiting on download endpoint (moderate, prevents bulk scraping)
 - [ ] Rate limiting on checkout session creation (moderate)
+- [ ] Strict rate limiting on library resend endpoint (prevents email-bombing and abuse)
 
 ---
 
@@ -196,6 +199,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [ ] List published releases (exclude soft-deleted)
 - [ ] Respect `storeStatus` middleware (private = maintenance page)
+
+### Global storefront footer
+
+- [ ] Show "Contact" link for the store owner using configured contact email (e.g., `mailto:` from `StoreSettings.contactEmail`) on public storefront pages
 
 ### Release detail page
 
@@ -334,6 +341,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Confidence that the system works as specified.
 
+### Test data
+
+- [ ] Add deterministic test seed generation (`npm run seed:test`) that creates representative fixtures (free/fixed/PWYW releases, tracks/assets, orders, and library tokens) for local, integration, and E2E testing
+
 ### Unit tests
 
 - [ ] Pricing validation for free/fixed/PWYW paths
@@ -376,8 +387,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Admin creates lossy-only release → quality warning on storefront
 - [ ] Buyer claims free release with email → receives library link (no Stripe)
 - [ ] Buyer purchases fixed-price → receives magic link → downloads multiple times
+- [ ] Buyer can request library-link resend from "Find my purchases" and receives a fresh link for prior purchases
 - [ ] Buyer revisits owned release → "You own this" shown; re-purchase works
 - [ ] Buyer PWYW above minimum → correct entitlements
+- [ ] Buyer can use storefront contact link to reach the store owner from public pages
 - [ ] Preview playback works for clip and full modes (clip is separate stored file)
 - [ ] Switching tracks stops current, starts new; player UI updates
 - [ ] Admin revokes token → buyer gets 403
