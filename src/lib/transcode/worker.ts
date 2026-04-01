@@ -8,9 +8,10 @@ import { promisify } from "node:util";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
-import type { DeliveryFormat } from "@/generated/prisma/enums";
+import type { DeliveryFormat, TranscodeJobKind } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
+import { createTranscodeJobWithActiveDedupe } from "@/lib/transcode/job-dedupe";
 
 import {
   enqueueDeliveryFormatsJob,
@@ -25,6 +26,40 @@ const DEFAULT_SOURCE_ROOT = path.join(os.tmpdir(), "merch-table", "source");
 const DEFAULT_OUTPUT_ROOT = path.join(os.tmpdir(), "merch-table", "output");
 const DEFAULT_RELEASE_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
 const DEFAULT_STALE_QUEUED_RECOVERY_BATCH_SIZE = 25;
+const DEFAULT_RETRY_ENQUEUE_BATCH_SIZE = 25;
+const DEFAULT_RETRY_ENQUEUE_FAILURE_DELAY_MS = 10_000;
+const DEFAULT_TRANSIENT_RETRY_MAX_ATTEMPTS = 4;
+const DEFAULT_TRANSIENT_RETRY_BASE_DELAY_SECONDS = 5;
+const DEFAULT_TRANSIENT_RETRY_MAX_DELAY_SECONDS = 120;
+
+const TRANSIENT_NODE_ERROR_CODES = new Set([
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "ECONNABORTED",
+  "EPIPE",
+  "ETIMEDOUT",
+  "ESOCKETTIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EAI_AGAIN",
+]);
+
+const TRANSIENT_MESSAGE_PATTERNS = [
+  "temporarily unavailable",
+  "resource temporarily unavailable",
+  "connection reset",
+  "connection refused",
+  "timed out",
+  "timeout",
+  "network is unreachable",
+  "no route to host",
+  "broken pipe",
+  "service unavailable",
+  "bad gateway",
+  "gateway timeout",
+  "too many requests",
+  "try again",
+];
 
 type AudioMetadata = {
   bitrateKbps: number | null;
@@ -45,7 +80,7 @@ type OutputDefinition = {
 type StaleQueuedRecoveryAction =
   | {
       type: "REQUEUE";
-      kind: TranscodeQueueMessage["kind"];
+      kind: TranscodeJobKind;
     }
   | {
       type: "FAIL";
@@ -55,6 +90,13 @@ type StaleQueuedRecoveryAction =
 export type StaleQueuedTranscodeRecoverySummary = {
   scanned: number;
   requeued: number;
+  failed: number;
+  skipped: number;
+};
+
+export type RetryEnqueueSummary = {
+  scanned: number;
+  enqueued: number;
   failed: number;
   skipped: number;
 };
@@ -145,6 +187,52 @@ function readDirectoryFromEnv(name: string, fallback: string) {
   return path.resolve(value);
 }
 
+function readPositiveIntegerFromEnv(name: string, fallback: number) {
+  const raw = process.env[name]?.trim();
+  if (!raw) {
+    return fallback;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function readTransientRetryPolicyFromEnv() {
+  const maxAttempts = Math.max(
+    1,
+    readPositiveIntegerFromEnv(
+      "TRANSCODE_TRANSIENT_RETRY_MAX_ATTEMPTS",
+      DEFAULT_TRANSIENT_RETRY_MAX_ATTEMPTS,
+    ),
+  );
+  const baseDelayMs =
+    Math.max(
+      1,
+      readPositiveIntegerFromEnv(
+        "TRANSCODE_TRANSIENT_RETRY_BASE_DELAY_SECONDS",
+        DEFAULT_TRANSIENT_RETRY_BASE_DELAY_SECONDS,
+      ),
+    ) * 1_000;
+  const maxDelayMs =
+    Math.max(
+      1,
+      readPositiveIntegerFromEnv(
+        "TRANSCODE_TRANSIENT_RETRY_MAX_DELAY_SECONDS",
+        DEFAULT_TRANSIENT_RETRY_MAX_DELAY_SECONDS,
+      ),
+    ) * 1_000;
+
+  return {
+    maxAttempts,
+    baseDelayMs,
+    maxDelayMs: Math.max(baseDelayMs, maxDelayMs),
+  } as const;
+}
+
 function toErrorMessage(error: unknown) {
   if (error instanceof Error) {
     return error.message.slice(0, 1_000);
@@ -157,48 +245,262 @@ function truncateFailureReason(reason: string) {
   return reason.slice(0, 1_000);
 }
 
+function extractErrorCode(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+
+  return null;
+}
+
+function extractErrorName(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    typeof error.name === "string"
+  ) {
+    return error.name;
+  }
+
+  return null;
+}
+
+function extractHttpStatusCode(error: unknown) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "$metadata" in error &&
+    typeof error.$metadata === "object" &&
+    error.$metadata !== null &&
+    "httpStatusCode" in error.$metadata &&
+    typeof error.$metadata.httpStatusCode === "number"
+  ) {
+    return error.$metadata.httpStatusCode;
+  }
+
+  return null;
+}
+
+function extractErrorDetailText(error: unknown) {
+  let detail = "";
+
+  if (error instanceof Error) {
+    detail = error.message;
+  }
+
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "stderr" in error &&
+    typeof error.stderr === "string" &&
+    error.stderr.trim().length > 0
+  ) {
+    detail = `${detail} ${error.stderr}`.trim();
+  }
+
+  return detail.toLowerCase();
+}
+
+function isTransientTranscodeError(error: unknown) {
+  const errorCode = extractErrorCode(error);
+  if (errorCode && TRANSIENT_NODE_ERROR_CODES.has(errorCode.toUpperCase())) {
+    return true;
+  }
+
+  const httpStatusCode = extractHttpStatusCode(error);
+  if (
+    httpStatusCode !== null &&
+    [408, 425, 429, 500, 502, 503, 504].includes(httpStatusCode)
+  ) {
+    return true;
+  }
+
+  const errorName = extractErrorName(error)?.toLowerCase() ?? "";
+  if (
+    errorName.includes("timeout") ||
+    errorName.includes("throttle") ||
+    errorName.includes("network")
+  ) {
+    return true;
+  }
+
+  const detail = extractErrorDetailText(error);
+  if (
+    TRANSIENT_MESSAGE_PATTERNS.some((pattern) =>
+      detail.includes(pattern),
+    )
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function resolveRetryBackoffDelayMs(input: {
+  attemptCount: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}) {
+  const exponent = Math.max(0, input.attemptCount - 1);
+  const rawDelayMs = Math.min(
+    input.maxDelayMs,
+    input.baseDelayMs * Math.pow(2, exponent),
+  );
+  const jitterFactor = 0.85 + Math.random() * 0.3;
+  return Math.max(1_000, Math.round(rawDelayMs * jitterFactor));
+}
+
+async function scheduleTransientRetry(input: {
+  jobId: string;
+  attemptCount: number;
+  maxAttempts: number;
+  delayMs: number;
+  errorMessage: string;
+}) {
+  const retryAt = new Date(Date.now() + input.delayMs);
+  const retryInSeconds = Math.max(1, Math.ceil(input.delayMs / 1_000));
+
+  const updated = await prisma.transcodeJob.updateMany({
+    where: {
+      id: input.jobId,
+      status: "RUNNING",
+    },
+    data: {
+      status: "QUEUED",
+      queuedAt: new Date(),
+      nextRetryAt: retryAt,
+      startedAt: null,
+      finishedAt: null,
+      errorMessage: truncateFailureReason(
+        `Transient transcode failure (attempt ${input.attemptCount}/${input.maxAttempts}). Retrying in ${retryInSeconds}s. Last error: ${input.errorMessage}`,
+      ),
+    },
+  });
+
+  return updated.count > 0;
+}
+
+function resolveEffectiveDeliveryFormats(formats: DeliveryFormat[]) {
+  return formats.length > 0 ? formats : DEFAULT_RELEASE_DELIVERY_FORMATS;
+}
+
+function canonicalizeDeliveryFormats(formats: DeliveryFormat[]) {
+  return [...new Set(formats)].sort().join("|");
+}
+
+function didDeliveryFormatsChange(input: {
+  before: DeliveryFormat[];
+  after: DeliveryFormat[];
+}) {
+  return (
+    canonicalizeDeliveryFormats(input.before) !==
+    canonicalizeDeliveryFormats(input.after)
+  );
+}
+
+async function maybeQueueDeliveryReconcileJob(input: {
+  organizationId: string;
+  trackId: string;
+  sourceAssetId: string;
+  releaseId: string;
+  processedFormats: DeliveryFormat[];
+}) {
+  const release = await prisma.release.findUnique({
+    where: {
+      id: input.releaseId,
+    },
+    select: {
+      deliveryFormats: true,
+    },
+  });
+
+  if (!release) {
+    return false;
+  }
+
+  const latestFormats = resolveEffectiveDeliveryFormats(release.deliveryFormats);
+  if (
+    !didDeliveryFormatsChange({
+      before: input.processedFormats,
+      after: latestFormats,
+    })
+  ) {
+    return false;
+  }
+
+  const followUp = await prisma.$transaction(async (tx) =>
+    createTranscodeJobWithActiveDedupe(tx, {
+      organizationId: input.organizationId,
+      trackId: input.trackId,
+      sourceAssetId: input.sourceAssetId,
+      jobKind: "DELIVERY_FORMATS",
+    }),
+  );
+
+  if (!followUp.created) {
+    return false;
+  }
+
+  try {
+    await enqueueDeliveryFormatsJob(followUp.jobId);
+  } catch (error) {
+    const retryAt = new Date(Date.now() + DEFAULT_RETRY_ENQUEUE_FAILURE_DELAY_MS);
+    await prisma.transcodeJob
+      .updateMany({
+        where: {
+          id: followUp.jobId,
+          status: "QUEUED",
+        },
+        data: {
+          nextRetryAt: retryAt,
+          errorMessage: truncateFailureReason(
+            `Could not enqueue delivery reconcile job yet; will retry queueing shortly. Last error: ${toErrorMessage(error)}`,
+          ),
+        },
+      })
+      .catch(() => undefined);
+  }
+
+  return true;
+}
+
 function resolveStaleQueuedRecoveryAction(input: {
+  jobKind: TranscodeJobKind;
   previewMode: "CLIP" | "FULL";
   isLossless: boolean;
-  queuedAt: Date;
-  trackUpdatedAt: Date;
 }): StaleQueuedRecoveryAction {
-  const trackChangedAfterQueue = input.trackUpdatedAt.getTime() > input.queuedAt.getTime();
+  if (input.jobKind === "PREVIEW_CLIP") {
+    if (input.previewMode !== "CLIP") {
+      return {
+        type: "FAIL",
+        reason:
+          "Stale queued preview job is no longer valid because the track preview mode changed to FULL. Queue a new preview clip job if needed.",
+      };
+    }
 
-  if (input.previewMode === "CLIP" && !input.isLossless) {
     return {
       type: "REQUEUE",
       kind: "PREVIEW_CLIP",
     };
   }
 
-  if (input.previewMode === "FULL" && input.isLossless) {
-    if (trackChangedAfterQueue) {
-      return {
-        type: "FAIL",
-        reason:
-          "Stale queued transcode job could not be auto-requeued because track settings changed after the job was queued. Queue a new job from the latest track or release actions.",
-      };
-    }
-
-    return {
-      type: "REQUEUE",
-      kind: "DELIVERY_FORMATS",
-    };
-  }
-
-  if (input.previewMode === "CLIP" && input.isLossless) {
+  if (!input.isLossless) {
     return {
       type: "FAIL",
       reason:
-        "Stale queued transcode job could not be auto-requeued because its kind is ambiguous (track preview mode is CLIP and source is lossless). Requeue from track preview settings or the release delivery formats action.",
+        "Stale queued delivery transcode job could not be auto-requeued because delivery jobs require a lossless source asset. Upload a lossless master, then queue a new delivery job.",
     };
   }
 
   return {
-    type: "FAIL",
-    reason:
-      "Stale queued transcode job has no valid transcode path (track preview mode is FULL and source is not lossless). Upload a valid source asset, then queue a new transcode job.",
+    type: "REQUEUE",
+    kind: "DELIVERY_FORMATS",
   };
 }
 
@@ -465,6 +767,7 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
   const staleJobs = await prisma.transcodeJob.findMany({
     where: {
       status: "QUEUED",
+      nextRetryAt: null,
       queuedAt: {
         lt: staleBefore,
       },
@@ -478,10 +781,10 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
     select: {
       id: true,
       queuedAt: true,
+      jobKind: true,
       track: {
         select: {
           previewMode: true,
-          updatedAt: true,
         },
       },
       sourceAsset: {
@@ -502,6 +805,7 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
       where: {
         id: staleJob.id,
         status: "QUEUED",
+        nextRetryAt: null,
         queuedAt: staleJob.queuedAt,
       },
       data: {
@@ -518,10 +822,9 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
     }
 
     const action = resolveStaleQueuedRecoveryAction({
+      jobKind: staleJob.jobKind,
       previewMode: staleJob.track.previewMode,
       isLossless: staleJob.sourceAsset.isLossless,
-      queuedAt: staleJob.queuedAt,
-      trackUpdatedAt: staleJob.track.updatedAt,
     });
 
     if (action.type === "FAIL") {
@@ -560,6 +863,93 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
   return {
     scanned: staleJobs.length,
     requeued,
+    failed,
+    skipped,
+  };
+}
+
+export async function enqueueDueQueuedRetryJobs(input?: {
+  maxJobs?: number;
+  now?: Date;
+}): Promise<RetryEnqueueSummary> {
+  const maxJobs = Math.max(
+    1,
+    Math.floor(input?.maxJobs ?? DEFAULT_RETRY_ENQUEUE_BATCH_SIZE),
+  );
+  const now = input?.now ?? new Date();
+
+  const dueJobs = await prisma.transcodeJob.findMany({
+    where: {
+      status: "QUEUED",
+      nextRetryAt: {
+        lte: now,
+      },
+    },
+    orderBy: [{ nextRetryAt: "asc" }, { queuedAt: "asc" }],
+    take: maxJobs,
+    select: {
+      id: true,
+      jobKind: true,
+      nextRetryAt: true,
+    },
+  });
+
+  let enqueued = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const dueJob of dueJobs) {
+    if (!dueJob.nextRetryAt) {
+      skipped += 1;
+      continue;
+    }
+
+    const claim = await prisma.transcodeJob.updateMany({
+      where: {
+        id: dueJob.id,
+        status: "QUEUED",
+        nextRetryAt: dueJob.nextRetryAt,
+      },
+      data: {
+        nextRetryAt: null,
+        queuedAt: new Date(),
+      },
+    });
+
+    if (claim.count === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    try {
+      if (dueJob.jobKind === "PREVIEW_CLIP") {
+        await enqueuePreviewClipJob(dueJob.id);
+      } else {
+        await enqueueDeliveryFormatsJob(dueJob.id);
+      }
+      enqueued += 1;
+    } catch (error) {
+      const rescheduleAt = new Date(Date.now() + DEFAULT_RETRY_ENQUEUE_FAILURE_DELAY_MS);
+      await prisma.transcodeJob.updateMany({
+        where: {
+          id: dueJob.id,
+          status: "QUEUED",
+          nextRetryAt: null,
+        },
+        data: {
+          nextRetryAt: rescheduleAt,
+          errorMessage: truncateFailureReason(
+            `Retry enqueue failed; will retry queueing shortly. Last error: ${toErrorMessage(error)}`,
+          ),
+        },
+      });
+      failed += 1;
+    }
+  }
+
+  return {
+    scanned: dueJobs.length,
+    enqueued,
     failed,
     skipped,
   };
@@ -782,16 +1172,29 @@ async function processDeliveryFormatsJob(input: {
 }
 
 export async function processTranscodeQueueMessage(message: TranscodeQueueMessage) {
+  const claimTimestamp = new Date();
   const claim = await prisma.transcodeJob.updateMany({
     where: {
       id: message.jobId,
       status: "QUEUED",
+      OR: [
+        { nextRetryAt: null },
+        {
+          nextRetryAt: {
+            lte: claimTimestamp,
+          },
+        },
+      ],
     },
     data: {
       status: "RUNNING",
-      startedAt: new Date(),
+      startedAt: claimTimestamp,
       finishedAt: null,
       errorMessage: null,
+      nextRetryAt: null,
+      attemptCount: {
+        increment: 1,
+      },
     },
   });
 
@@ -805,14 +1208,18 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
     },
     select: {
       id: true,
+      organizationId: true,
       trackId: true,
       sourceAssetId: true,
+      jobKind: true,
+      attemptCount: true,
       track: {
         select: {
           id: true,
           previewSeconds: true,
           release: {
             select: {
+              id: true,
               deliveryFormats: true,
             },
           },
@@ -840,15 +1247,16 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
     return;
   }
 
-  if (message.kind === "DELIVERY_FORMATS" && !job.sourceAsset.isLossless) {
+  const effectiveKind = job.jobKind;
+
+  if (effectiveKind === "DELIVERY_FORMATS" && !job.sourceAsset.isLossless) {
     await markJobFailed(message.jobId, "Delivery transcode requires a lossless source asset.");
     return;
   }
 
-  const releaseDeliveryFormats =
-    job.track.release.deliveryFormats.length > 0
-      ? job.track.release.deliveryFormats
-      : DEFAULT_RELEASE_DELIVERY_FORMATS;
+  const releaseDeliveryFormats = resolveEffectiveDeliveryFormats(
+    job.track.release.deliveryFormats,
+  );
 
   const sourceRoot = readDirectoryFromEnv("TRANSCODE_SOURCE_ROOT", DEFAULT_SOURCE_ROOT);
   const outputRoot = readDirectoryFromEnv("TRANSCODE_OUTPUT_ROOT", DEFAULT_OUTPUT_ROOT);
@@ -880,7 +1288,7 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
 
     await writeBodyToFile(object.Body, sourcePath);
 
-    if (message.kind === "PREVIEW_CLIP") {
+    if (effectiveKind === "PREVIEW_CLIP") {
       await processPreviewJob({
         jobId: job.id,
         trackId: job.trackId,
@@ -906,10 +1314,42 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
         status: "SUCCEEDED",
         errorMessage: null,
         finishedAt: new Date(),
+        nextRetryAt: null,
       },
     });
+
+    if (effectiveKind === "DELIVERY_FORMATS") {
+      await maybeQueueDeliveryReconcileJob({
+        organizationId: job.organizationId,
+        trackId: job.trackId,
+        sourceAssetId: job.sourceAssetId,
+        releaseId: job.track.release.id,
+        processedFormats: releaseDeliveryFormats,
+      });
+    }
   } catch (error) {
-    await markJobFailed(job.id, toErrorMessage(error));
+    const errorMessage = toErrorMessage(error);
+    const retryPolicy = readTransientRetryPolicyFromEnv();
+    if (isTransientTranscodeError(error) && job.attemptCount < retryPolicy.maxAttempts) {
+      const retryDelayMs = resolveRetryBackoffDelayMs({
+        attemptCount: job.attemptCount,
+        baseDelayMs: retryPolicy.baseDelayMs,
+        maxDelayMs: retryPolicy.maxDelayMs,
+      });
+      const didScheduleRetry = await scheduleTransientRetry({
+        jobId: job.id,
+        attemptCount: job.attemptCount,
+        maxAttempts: retryPolicy.maxAttempts,
+        delayMs: retryDelayMs,
+        errorMessage,
+      });
+
+      if (didScheduleRetry) {
+        return;
+      }
+    }
+
+    await markJobFailed(job.id, errorMessage);
     throw error;
   } finally {
     await fs.rm(sourcePath, { force: true }).catch(() => undefined);

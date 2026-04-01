@@ -322,7 +322,9 @@ model TranscodeJob {
   organizationId String
   trackId        String
   sourceAssetId  String
-  kind           TranscodeJobKind
+  jobKind        TranscodeJobKind
+  attemptCount   Int               @default(0)
+  nextRetryAt    DateTime?
   status         TranscodeStatus   @default(QUEUED)
   errorMessage   String?
   queuedAt       DateTime          @default(now())
@@ -337,7 +339,8 @@ model TranscodeJob {
 
   @@index([status, queuedAt])
   @@index([trackId])
-  @@index([organizationId, sourceAssetId, kind, status])
+  @@index([organizationId, sourceAssetId, jobKind, status])
+  @@index([status, nextRetryAt, queuedAt])
 }
 
 model TranscodeOutput {

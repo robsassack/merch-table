@@ -353,6 +353,10 @@ export function areAllMasterAssetsLossless(release: ReleaseRecord) {
 }
 
 export function getTrackPreviewStatus(track: TrackRecord) {
+  const previewJobs = track.transcodeJobs.filter(
+    (job) => job.jobKind === "PREVIEW_CLIP",
+  );
+
   if (track.previewMode === "FULL") {
     return {
       label: "full preview",
@@ -386,7 +390,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     encodedPreviewSeconds === null ||
     encodedPreviewSeconds === configuredPreviewSeconds;
 
-  const runningJob = track.transcodeJobs.find((job) => job.status === "RUNNING");
+  const runningJob = previewJobs.find((job) => job.status === "RUNNING");
   if (runningJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
       label: previewAsset ? "preview updating" : "preview running",
@@ -395,7 +399,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     };
   }
 
-  const queuedJob = track.transcodeJobs.find((job) => job.status === "QUEUED");
+  const queuedJob = previewJobs.find((job) => job.status === "QUEUED");
   if (queuedJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
       label: previewAsset ? "preview updating" : "preview queued",
@@ -420,7 +424,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     };
   }
 
-  const failedJob = track.transcodeJobs.find((job) => job.status === "FAILED");
+  const failedJob = previewJobs.find((job) => job.status === "FAILED");
   if (failedJob) {
     return {
       label: "preview failed",

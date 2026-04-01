@@ -4,6 +4,7 @@ import {
   reportTranscodeWorkerHeartbeat,
 } from "@/lib/transcode/queue";
 import {
+  enqueueDueQueuedRetryJobs,
   processTranscodeQueueMessage,
   recoverStaleQueuedTranscodeJobs,
 } from "@/lib/transcode/worker";
@@ -14,6 +15,8 @@ const DEFAULT_HEARTBEAT_INTERVAL_SECONDS = 10;
 const DEFAULT_STALE_QUEUED_THRESHOLD_SECONDS = 900;
 const DEFAULT_STALE_RECOVERY_INTERVAL_SECONDS = 30;
 const DEFAULT_STALE_RECOVERY_BATCH_SIZE = 25;
+const DEFAULT_RETRY_ENQUEUE_INTERVAL_SECONDS = 5;
+const DEFAULT_RETRY_ENQUEUE_BATCH_SIZE = 25;
 const ERROR_RETRY_DELAY_MS = 1_000;
 
 function parsePositiveInteger(raw: string | undefined, fallback: number) {
@@ -41,13 +44,33 @@ async function workerLoop(input: {
   staleQueuedThresholdSeconds: number;
   staleRecoveryIntervalSeconds: number;
   staleRecoveryBatchSize: number;
+  retryEnqueueIntervalSeconds: number;
+  retryEnqueueBatchSize: number;
 }) {
   let lastStaleRecoveryRunAt = 0;
+  let lastRetryEnqueueRunAt = 0;
 
   while (!shuttingDown) {
     try {
       if (input.index === 1) {
         const nowMs = Date.now();
+
+        if (
+          lastRetryEnqueueRunAt === 0 ||
+          nowMs - lastRetryEnqueueRunAt >= input.retryEnqueueIntervalSeconds * 1_000
+        ) {
+          const retrySummary = await enqueueDueQueuedRetryJobs({
+            maxJobs: input.retryEnqueueBatchSize,
+          });
+          lastRetryEnqueueRunAt = Date.now();
+
+          if (retrySummary.enqueued > 0 || retrySummary.failed > 0) {
+            console.info(
+              `[worker] retry enqueue scanned=${retrySummary.scanned} enqueued=${retrySummary.enqueued} failed=${retrySummary.failed} skipped=${retrySummary.skipped}`,
+            );
+          }
+        }
+
         if (
           lastStaleRecoveryRunAt === 0 ||
           nowMs - lastStaleRecoveryRunAt >= input.staleRecoveryIntervalSeconds * 1_000
@@ -113,9 +136,17 @@ async function main() {
     process.env.TRANSCODE_STALE_RECOVERY_BATCH_SIZE,
     DEFAULT_STALE_RECOVERY_BATCH_SIZE,
   );
+  const retryEnqueueIntervalSeconds = parsePositiveInteger(
+    process.env.TRANSCODE_RETRY_ENQUEUE_INTERVAL_SECONDS,
+    DEFAULT_RETRY_ENQUEUE_INTERVAL_SECONDS,
+  );
+  const retryEnqueueBatchSize = parsePositiveInteger(
+    process.env.TRANSCODE_RETRY_ENQUEUE_BATCH_SIZE,
+    DEFAULT_RETRY_ENQUEUE_BATCH_SIZE,
+  );
 
   console.info(
-    `[worker] starting transcode worker concurrency=${concurrency} pollTimeoutSeconds=${pollTimeoutSeconds} heartbeatIntervalSeconds=${heartbeatIntervalSeconds} staleQueuedThresholdSeconds=${staleQueuedThresholdSeconds} staleRecoveryIntervalSeconds=${staleRecoveryIntervalSeconds} staleRecoveryBatchSize=${staleRecoveryBatchSize}`,
+    `[worker] starting transcode worker concurrency=${concurrency} pollTimeoutSeconds=${pollTimeoutSeconds} heartbeatIntervalSeconds=${heartbeatIntervalSeconds} staleQueuedThresholdSeconds=${staleQueuedThresholdSeconds} staleRecoveryIntervalSeconds=${staleRecoveryIntervalSeconds} staleRecoveryBatchSize=${staleRecoveryBatchSize} retryEnqueueIntervalSeconds=${retryEnqueueIntervalSeconds} retryEnqueueBatchSize=${retryEnqueueBatchSize}`,
   );
 
   const signalHandler = (signal: string) => {
@@ -143,6 +174,8 @@ async function main() {
       staleQueuedThresholdSeconds,
       staleRecoveryIntervalSeconds,
       staleRecoveryBatchSize,
+      retryEnqueueIntervalSeconds,
+      retryEnqueueBatchSize,
     }),
   );
 

@@ -173,7 +173,10 @@ export function ReleaseManagementTrackList(props: {
                             ? resolveUploadedFileNameFromStorageKey(latestMasterAsset.storageKey)
                             : "";
                           const lastFailedJob = track.transcodeJobs
-                            .filter((job) => job.status === "FAILED")
+                            .filter(
+                              (job) =>
+                                job.jobKind === "PREVIEW_CLIP" && job.status === "FAILED",
+                            )
                             .sort(
                               (a, b) =>
                                 new Date(b.updatedAt).getTime() -

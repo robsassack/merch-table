@@ -38,6 +38,7 @@ export const adminTrackSelect = {
     select: {
       id: true,
       sourceAssetId: true,
+      jobKind: true,
       status: true,
       errorMessage: true,
       queuedAt: true,
@@ -82,6 +83,7 @@ export function toAdminTrackRecord(track: AdminTrackRow): AdminReleaseTrackRecor
     transcodeJobs: track.transcodeJobs.map((job) => ({
       id: job.id,
       sourceAssetId: job.sourceAssetId,
+      jobKind: job.jobKind,
       status: job.status,
       errorMessage: job.errorMessage,
       queuedAt: job.queuedAt.toISOString(),

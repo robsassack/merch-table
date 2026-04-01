@@ -4,6 +4,7 @@ import type {
   AssetRole,
   DeliveryFormat,
   PreviewMode,
+  TranscodeJobKind,
   TranscodeStatus,
 } from "@/generated/prisma/enums";
 import { adminTrackSelect, toAdminTrackRecord } from "@/lib/admin/track-management";
@@ -143,6 +144,7 @@ export type AdminTrackAssetRecord = {
 export type AdminTrackTranscodeJobRecord = {
   id: string;
   sourceAssetId: string;
+  jobKind: TranscodeJobKind;
   status: TranscodeStatus;
   errorMessage: string | null;
   queuedAt: string;

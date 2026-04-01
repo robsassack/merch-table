@@ -18,7 +18,6 @@ import {
   readMinimumPriceFloorCentsFromEnv,
 } from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
-import { prismaModelSupportsField } from "@/lib/prisma/runtime-support";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
@@ -283,11 +282,6 @@ export async function PATCH(request: Request, context: RouteContext) {
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
   const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
-  const transcodeJobKindSupported = prismaModelSupportsField(
-    prisma,
-    "TranscodeJob",
-    "kind",
-  );
   const releaseSelect = resolveReleaseSelect({
     releaseDateSupported,
     deliveryFormatsSupported,
@@ -566,8 +560,7 @@ export async function PATCH(request: Request, context: RouteContext) {
             organizationId: auth.context.organizationId,
             trackId: candidate.trackId,
             sourceAssetId: candidate.sourceAssetId,
-            kind: "DELIVERY_FORMATS",
-            kindSupported: transcodeJobKindSupported,
+            jobKind: "DELIVERY_FORMATS",
           });
 
           if (!enqueueResult.created) {
@@ -701,18 +694,14 @@ export async function PATCH(request: Request, context: RouteContext) {
         const deliveryJobIds: string[] = [];
 
         for (const candidate of previewCandidates) {
-          const previewJobData: Record<string, unknown> = {
-            organizationId: auth.context.organizationId,
-            trackId: candidate.trackId,
-            sourceAssetId: candidate.sourceAssetId,
-            status: "QUEUED",
-          };
-          if (transcodeJobKindSupported) {
-            previewJobData.kind = "PREVIEW_CLIP";
-          }
-
           const queuedJob = await tx.transcodeJob.create({
-            data: previewJobData as never,
+            data: {
+              organizationId: auth.context.organizationId,
+              trackId: candidate.trackId,
+              sourceAssetId: candidate.sourceAssetId,
+              jobKind: "PREVIEW_CLIP",
+              status: "QUEUED",
+            },
             select: {
               id: true,
             },
@@ -721,28 +710,11 @@ export async function PATCH(request: Request, context: RouteContext) {
         }
 
         for (const candidate of deliveryCandidates) {
-          if (!transcodeJobKindSupported) {
-            const queuedJob = await tx.transcodeJob.create({
-              data: {
-                organizationId: auth.context.organizationId,
-                trackId: candidate.trackId,
-                sourceAssetId: candidate.sourceAssetId,
-                status: "QUEUED",
-              } as never,
-              select: {
-                id: true,
-              },
-            });
-            deliveryJobIds.push(queuedJob.id);
-            continue;
-          }
-
           const enqueueResult = await createTranscodeJobWithActiveDedupe(tx, {
             organizationId: auth.context.organizationId,
             trackId: candidate.trackId,
             sourceAssetId: candidate.sourceAssetId,
-            kind: "DELIVERY_FORMATS",
-            kindSupported: transcodeJobKindSupported,
+            jobKind: "DELIVERY_FORMATS",
           });
 
           if (!enqueueResult.created) {

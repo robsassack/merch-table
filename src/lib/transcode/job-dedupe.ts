@@ -5,9 +5,9 @@ type TranscodeTx = Prisma.TransactionClient;
 
 function getAdvisoryLockScopeKey(input: {
   sourceAssetId: string;
-  kind: TranscodeJobKind;
+  jobKind: TranscodeJobKind;
 }) {
-  return `${input.sourceAssetId}:${input.kind}`;
+  return `${input.sourceAssetId}:${input.jobKind}`;
 }
 
 async function acquireTranscodeJobEnqueueLock(
@@ -15,15 +15,15 @@ async function acquireTranscodeJobEnqueueLock(
   input: {
     organizationId: string;
     sourceAssetId: string;
-    kind: TranscodeJobKind;
+    jobKind: TranscodeJobKind;
   },
 ) {
   const scopeKey = getAdvisoryLockScopeKey({
     sourceAssetId: input.sourceAssetId,
-    kind: input.kind,
+    jobKind: input.jobKind,
   });
 
-  // Serialize enqueue attempts for the same org/source/kind within a transaction.
+  // Serialize enqueue attempts for the same org/source/jobKind within a transaction.
   await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${input.organizationId}), hashtext(${scopeKey}))`;
 }
 
@@ -33,25 +33,20 @@ export async function createTranscodeJobWithActiveDedupe(
     organizationId: string;
     trackId: string;
     sourceAssetId: string;
-    kind: TranscodeJobKind;
-    kindSupported?: boolean;
+    jobKind: TranscodeJobKind;
   },
 ) {
-  const kindSupported = input.kindSupported ?? true;
-
   await acquireTranscodeJobEnqueueLock(tx, {
     organizationId: input.organizationId,
     sourceAssetId: input.sourceAssetId,
-    kind: kindSupported ? input.kind : "DELIVERY_FORMATS",
+    jobKind: input.jobKind,
   });
 
   const existing = await tx.transcodeJob.findFirst({
     where: {
       organizationId: input.organizationId,
       sourceAssetId: input.sourceAssetId,
-      ...(kindSupported
-        ? { kind: input.kind }
-        : { trackId: input.trackId }),
+      jobKind: input.jobKind,
       status: {
         in: ["QUEUED", "RUNNING"],
       },
@@ -72,11 +67,9 @@ export async function createTranscodeJobWithActiveDedupe(
     organizationId: input.organizationId,
     trackId: input.trackId,
     sourceAssetId: input.sourceAssetId,
+    jobKind: input.jobKind,
     status: "QUEUED",
   };
-  if (kindSupported) {
-    createdData.kind = input.kind;
-  }
 
   const created = await tx.transcodeJob.create({
     data: createdData as never,

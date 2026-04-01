@@ -130,9 +130,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Edge cases (Priority 2)
 
-- [ ] Add `jobKind` on `TranscodeJob` (`PREVIEW_CLIP`, `DELIVERY_FORMATS`) to avoid ambiguous retries and status badges
-- [ ] Add retry policy for transient failures (storage/network/temporary ffmpeg errors), with capped attempts and backoff
-- [ ] Handle format changes during active delivery transcode (`release.deliveryFormats` changed while job is `RUNNING`)
+- [x] Add `jobKind` on `TranscodeJob` (`PREVIEW_CLIP`, `DELIVERY_FORMATS`) to avoid ambiguous retries and status badges
+- [x] Add retry policy for transient failures (storage/network/temporary ffmpeg errors), with capped attempts and backoff
+- [x] Handle format changes during active delivery transcode (`release.deliveryFormats` changed while job is `RUNNING`)
 - [ ] Ensure partial output cleanup behavior is consistent when one delivery format fails after others succeed
 - [ ] Add explicit requeue action for failed jobs from admin UI (single track + bulk release)
 - [ ] Add automated test coverage for preview requeue flow when `previewSeconds` is changed repeatedly
@@ -261,6 +261,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Storage migration path (optional later): explicit, guided migration job with confirmation + validation
 - [ ] "Factory reset" option in settings (re-triggers wizard; does not wipe data without explicit confirmation)
 - [ ] Add markdown editing tools to release description field
+- [ ] Add default options for pricing, download formats, and preview settings when creating a new release
 
 ### Status panel
 

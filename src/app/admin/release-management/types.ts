@@ -5,6 +5,7 @@ export type ReleaseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
 export type PreviewMode = "CLIP" | "FULL";
 export type AssetRole = "MASTER" | "PREVIEW" | "DELIVERY";
 export type TranscodeStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
+export type TranscodeJobKind = "PREVIEW_CLIP" | "DELIVERY_FORMATS";
 export type DeliveryFormat = "MP3" | "M4A" | "FLAC";
 
 export type ArtistOption = {
@@ -67,6 +68,7 @@ export type TrackAssetRecord = {
 export type TrackTranscodeJobRecord = {
   id: string;
   sourceAssetId: string;
+  jobKind: TranscodeJobKind;
   status: TranscodeStatus;
   errorMessage: string | null;
   queuedAt: string;
