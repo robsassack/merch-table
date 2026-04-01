@@ -131,9 +131,17 @@ export async function PATCH(request: Request, context: RouteContext) {
 
     if (parsed.action === "delete") {
       await prisma.$transaction(async (tx) => {
+        const trackCount = await tx.releaseTrack.count({
+          where: { releaseId: release.id },
+        });
+
         await tx.releaseTrack.delete({
           where: { id: existing.id },
         });
+
+        // Shift neighbors in two phases to avoid transient unique collisions on
+        // [releaseId, trackNumber].
+        const shiftOffset = trackCount + 1;
 
         await tx.releaseTrack.updateMany({
           where: {
@@ -141,7 +149,17 @@ export async function PATCH(request: Request, context: RouteContext) {
             trackNumber: { gt: existing.trackNumber },
           },
           data: {
-            trackNumber: { decrement: 1 },
+            trackNumber: { increment: shiftOffset },
+          },
+        });
+
+        await tx.releaseTrack.updateMany({
+          where: {
+            releaseId: release.id,
+            trackNumber: { gt: existing.trackNumber + shiftOffset },
+          },
+          data: {
+            trackNumber: { decrement: shiftOffset + 1 },
           },
         });
       });
@@ -227,7 +245,10 @@ export async function PATCH(request: Request, context: RouteContext) {
           },
         });
 
+        const shiftOffset = totalTracks + 1;
+
         if (nextTrackNumber < current.trackNumber) {
+          // Move neighbors out of range, then normalize to +1.
           await tx.releaseTrack.updateMany({
             where: {
               releaseId: release.id,
@@ -237,10 +258,24 @@ export async function PATCH(request: Request, context: RouteContext) {
               },
             },
             data: {
-              trackNumber: { increment: 1 },
+              trackNumber: { increment: shiftOffset },
+            },
+          });
+
+          await tx.releaseTrack.updateMany({
+            where: {
+              releaseId: release.id,
+              trackNumber: {
+                gte: nextTrackNumber + shiftOffset,
+                lt: current.trackNumber + shiftOffset,
+              },
+            },
+            data: {
+              trackNumber: { decrement: shiftOffset - 1 },
             },
           });
         } else {
+          // Move neighbors out of range, then normalize to -1.
           await tx.releaseTrack.updateMany({
             where: {
               releaseId: release.id,
@@ -250,7 +285,20 @@ export async function PATCH(request: Request, context: RouteContext) {
               },
             },
             data: {
-              trackNumber: { decrement: 1 },
+              trackNumber: { increment: shiftOffset },
+            },
+          });
+
+          await tx.releaseTrack.updateMany({
+            where: {
+              releaseId: release.id,
+              trackNumber: {
+                gt: current.trackNumber + shiftOffset,
+                lte: nextTrackNumber + shiftOffset,
+              },
+            },
+            data: {
+              trackNumber: { decrement: shiftOffset + 1 },
             },
           });
         }
