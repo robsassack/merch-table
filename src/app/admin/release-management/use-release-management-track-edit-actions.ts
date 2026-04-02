@@ -43,10 +43,12 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
     pendingTrackReorderReleaseId,
     pendingTrackImportReleaseId,
     pendingTrackUploadId,
+    pendingTrackRequeueId,
     pendingTrackId,
     pendingReleaseId,
     createPending,
     setPendingTrackReorderReleaseId,
+    setPendingTrackRequeueId,
   } = input;
 
   const onApplyReleasePreviewToTracks = async (
@@ -264,6 +266,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
       input.pendingPreviewApplyReleaseId ||
       pendingTrackImportReleaseId ||
       pendingTrackUploadId ||
+      pendingTrackRequeueId ||
       pendingTrackId ||
       pendingReleaseId ||
       createPending
@@ -385,7 +388,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
   const onDeleteTrack = async (releaseId: string, track: TrackRecord) => {
     setError(null);
     setNotice(null);
-    setPendingTrackId(track.id);
+    setPendingTrackRequeueId(track.id);
 
     try {
       const response = await fetch(`/api/admin/releases/${releaseId}/tracks/${track.id}`, {
@@ -405,6 +408,68 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
     } catch (trackError) {
       setError(trackError instanceof Error ? trackError.message : "Could not delete track.");
     } finally {
+      setPendingTrackRequeueId(null);
+    }
+  };
+
+  const onRequeueTrackFailedTranscodes = async (
+    releaseId: string,
+    track: TrackRecord,
+  ) => {
+    setError(null);
+    setNotice(null);
+    setPendingTrackId(track.id);
+
+    try {
+      const response = await fetch(`/api/admin/releases/${releaseId}/tracks/${track.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "requeue-failed-transcodes",
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as TrackMutationResponse | null;
+      if (!response.ok || !body?.ok || !body.track) {
+        throw new Error(body?.error ?? "Could not requeue failed transcode jobs for this track.");
+      }
+
+      applyTrackPatchToRelease(releaseId, body.track);
+
+      const queuedPreviewJobs = body.queuedPreviewJobs ?? 0;
+      const queuedDeliveryJobs = body.queuedDeliveryJobs ?? 0;
+      const queuedTotal = body.queuedTranscodeJobs ?? queuedPreviewJobs + queuedDeliveryJobs;
+      const skippedFailedJobs = body.skippedFailedJobs ?? 0;
+      const failedJobsFound = body.failedJobsFound ?? queuedTotal + skippedFailedJobs;
+
+      if (queuedTotal === 0) {
+        if (failedJobsFound === 0) {
+          setNotice(`No failed transcode jobs were found for "${body.track.title}".`);
+          return;
+        }
+
+        setNotice(
+          `No failed transcode jobs were queued for "${body.track.title}". Skipped ${skippedFailedJobs}.`,
+        );
+        return;
+      }
+
+      if (skippedFailedJobs > 0) {
+        setNotice(
+          `Queued ${queuedTotal} failed transcode job${queuedTotal === 1 ? "" : "s"} for "${body.track.title}", skipped ${skippedFailedJobs}.`,
+        );
+        return;
+      }
+
+      setNotice(
+        `Queued ${queuedTotal} failed transcode job${queuedTotal === 1 ? "" : "s"} for "${body.track.title}".`,
+      );
+    } catch (trackError) {
+      setError(
+        trackError instanceof Error
+          ? trackError.message
+          : "Could not requeue failed transcode jobs for this track.",
+      );
+    } finally {
       setPendingTrackId(null);
     }
   };
@@ -415,5 +480,6 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
     onUpdateTrack,
     onReorderTrackDrop,
     onDeleteTrack,
+    onRequeueTrackFailedTranscodes,
   };
 }

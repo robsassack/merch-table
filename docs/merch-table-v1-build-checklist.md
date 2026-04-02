@@ -133,10 +133,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Add `jobKind` on `TranscodeJob` (`PREVIEW_CLIP`, `DELIVERY_FORMATS`) to avoid ambiguous retries and status badges
 - [x] Add retry policy for transient failures (storage/network/temporary ffmpeg errors), with capped attempts and backoff
 - [x] Handle format changes during active delivery transcode (`release.deliveryFormats` changed while job is `RUNNING`)
-- [ ] Ensure partial output cleanup behavior is consistent when one delivery format fails after others succeed
-- [ ] Add explicit requeue action for failed jobs from admin UI (single track + bulk release)
-- [ ] Add automated test coverage for preview requeue flow when `previewSeconds` is changed repeatedly
-- [ ] Add automated test coverage for duplicate queue messages and worker concurrency >1
+- [x] Ensure partial output cleanup behavior is consistent when one delivery format fails after others succeed
+- [x] Add explicit requeue action for failed jobs from admin UI (single track + bulk release)
+- [x] Add automated test coverage for preview requeue flow when `previewSeconds` is changed repeatedly
+- [x] Add automated test coverage for duplicate queue messages and worker concurrency >1
 
 ---
 

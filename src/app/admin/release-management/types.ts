@@ -130,6 +130,8 @@ export type ReleaseMutationResponse = {
   release?: ReleaseRecord;
   hardDeletedReleaseId?: string;
   purgedAssetCount?: number;
+  failedJobsFound?: number;
+  skippedFailedJobs?: number;
   queuedTranscodeJobs?: number;
   queuedPreviewJobs?: number;
   queuedDeliveryJobs?: number;
@@ -141,6 +143,11 @@ export type TrackMutationResponse = {
   error?: string;
   track?: TrackRecord;
   deletedTrackId?: string;
+  failedJobsFound?: number;
+  skippedFailedJobs?: number;
+  queuedTranscodeJobs?: number;
+  queuedPreviewJobs?: number;
+  queuedDeliveryJobs?: number;
   previewJobQueued?: boolean;
   previewJobId?: string | null;
 };

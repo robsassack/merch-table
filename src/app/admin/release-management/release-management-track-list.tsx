@@ -36,6 +36,7 @@ export function ReleaseManagementTrackList(props: {
   importTrackPending: boolean;
   previewApplyPending: boolean;
   reorderTrackPending: boolean;
+  showFailedOnly: boolean;
   expandedTrackIdForRelease: string | null;
   draggingTrackIdForRelease: string | null;
   dragOverTrackIdForRelease: string | null;
@@ -49,6 +50,7 @@ export function ReleaseManagementTrackList(props: {
     importTrackPending,
     previewApplyPending,
     reorderTrackPending,
+    showFailedOnly,
     expandedTrackIdForRelease,
     draggingTrackIdForRelease,
     dragOverTrackIdForRelease,
@@ -58,6 +60,7 @@ export function ReleaseManagementTrackList(props: {
     trackDraftsById,
     setTrackDraftsById,
     pendingTrackId,
+    pendingTrackRequeueId,
     pendingTrackUploadId,
     trackUploadProgressById,
     trackUploadRoleById,
@@ -69,17 +72,31 @@ export function ReleaseManagementTrackList(props: {
     onReorderTrackDrop,
     onInlineTrackFileChange,
     onUpdateTrack,
+    onRequeueTrackFailedTranscodes,
   } = props.controller;
+
+  const visibleTracks = sortTracks(release.tracks).filter(
+    (track) =>
+      !showFailedOnly ||
+      track.transcodeJobs.some((job) => job.status === "FAILED"),
+  );
 
   return (
                       <div className="mt-3 space-y-3">
-                        {sortTracks(release.tracks).map((track) => {
+                        {visibleTracks.length === 0 ? (
+                          <p className="rounded-md border border-dashed border-slate-700/80 px-3 py-2 text-[11px] text-zinc-500">
+                            No failed tracks match this filter.
+                          </p>
+                        ) : null}
+                        {visibleTracks.map((track) => {
                           const trackDraft = trackDraftsById[track.id] ?? toTrackDraft(track);
                           const isTrackExpanded = expandedTrackIdForRelease === track.id;
                           const trackPending = pendingTrackId === track.id;
+                          const trackRequeuePending = pendingTrackRequeueId === track.id;
                           const trackUploadPending = pendingTrackUploadId === track.id;
                           const isTrackDragging = draggingTrackIdForRelease === track.id;
                           const isTrackDragOver = dragOverTrackIdForRelease === track.id;
+                          const trackActionPending = trackPending || trackRequeuePending;
                           const trackUploadProgress = trackUploadProgressById[track.id] ?? 0;
                           const trackUploadRole = trackUploadRoleById[track.id] ?? "MASTER";
                           const previewStatus = getTrackPreviewStatus(track);
@@ -172,11 +189,11 @@ export function ReleaseManagementTrackList(props: {
                           const uploadedMasterFileName = latestMasterAsset
                             ? resolveUploadedFileNameFromStorageKey(latestMasterAsset.storageKey)
                             : "";
-                          const lastFailedJob = track.transcodeJobs
-                            .filter(
-                              (job) =>
-                                job.jobKind === "PREVIEW_CLIP" && job.status === "FAILED",
-                            )
+                          const failedJobs = track.transcodeJobs.filter(
+                            (job) => job.status === "FAILED",
+                          );
+                          const failedJobsCount = failedJobs.length;
+                          const lastFailedJob = failedJobs
                             .sort(
                               (a, b) =>
                                 new Date(b.updatedAt).getTime() -
@@ -255,7 +272,7 @@ export function ReleaseManagementTrackList(props: {
                                     title={trackPending ? "Deleting..." : "Delete track"}
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending ||
@@ -299,7 +316,7 @@ export function ReleaseManagementTrackList(props: {
                                     }
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending ||
@@ -338,6 +355,11 @@ export function ReleaseManagementTrackList(props: {
                                 <span className={deliveryStatus.className}>
                                   {deliveryStatus.label}
                                 </span>
+                                {failedJobsCount > 0 ? (
+                                  <span className="rounded-full border border-rose-700/70 bg-rose-950/40 px-2 py-0.5 text-[11px] font-medium text-rose-300">
+                                    {failedJobsCount} failed
+                                  </span>
+                                ) : null}
                                 <span className="text-[11px] text-zinc-500">
                                   assets: {masterCount} master, {deliveryCountLabel} delivery,{" "}
                                   {previewCount} preview
@@ -371,7 +393,7 @@ export function ReleaseManagementTrackList(props: {
                                     className="rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending
@@ -395,7 +417,7 @@ export function ReleaseManagementTrackList(props: {
                                     inputMode="numeric"
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending
@@ -419,7 +441,7 @@ export function ReleaseManagementTrackList(props: {
                                     className="min-h-[88px] rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending
@@ -443,7 +465,7 @@ export function ReleaseManagementTrackList(props: {
                                     className="min-h-[88px] rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending
@@ -463,7 +485,7 @@ export function ReleaseManagementTrackList(props: {
                                   }
                                   disabled={
                                     isPending ||
-                                    trackPending ||
+                                    trackActionPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
@@ -485,7 +507,7 @@ export function ReleaseManagementTrackList(props: {
                                     }
                                     disabled={
                                       isPending ||
-                                      trackPending ||
+                                      trackActionPending ||
                                       importTrackPending ||
                                       previewApplyPending ||
                                       reorderTrackPending ||
@@ -548,12 +570,33 @@ export function ReleaseManagementTrackList(props: {
                                     No Delivery
                                   </span>
                                 ) : null}
+                                {failedJobsCount > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void onRequeueTrackFailedTranscodes(release.id, track)
+                                    }
+                                    disabled={
+                                      isPending ||
+                                      trackActionPending ||
+                                      importTrackPending ||
+                                      previewApplyPending ||
+                                      reorderTrackPending ||
+                                      trackUploadPending
+                                    }
+                                    className={buttonClassName}
+                                  >
+                                    {trackRequeuePending
+                                      ? "Queueing..."
+                                      : `Requeue Failed (${failedJobsCount})`}
+                                  </button>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => void onUpdateTrack(release.id, track.id)}
                                   disabled={
                                     isPending ||
-                                    trackPending ||
+                                    trackActionPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
@@ -574,7 +617,7 @@ export function ReleaseManagementTrackList(props: {
                                   }}
                                   disabled={
                                     isPending ||
-                                    trackPending ||
+                                    trackActionPending ||
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
@@ -588,7 +631,7 @@ export function ReleaseManagementTrackList(props: {
 
                                   {lastFailedJob?.errorMessage ? (
                                     <p className="mt-2 rounded-md border border-rose-700/60 bg-rose-950/40 px-2 py-1 text-[11px] text-rose-200">
-                                      Last preview error: {lastFailedJob.errorMessage}
+                                      Last {lastFailedJob.jobKind === "PREVIEW_CLIP" ? "preview" : "delivery"} error: {lastFailedJob.errorMessage}
                                     </p>
                                   ) : null}
                                 </>

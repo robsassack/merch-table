@@ -968,62 +968,146 @@ async function persistOutputRecord(input: {
   const stat = await fs.stat(input.filePath);
   const metadata = await readAudioMetadata(input.filePath);
 
-  const asset = await prisma.trackAsset.upsert({
-    where: {
-      trackId_storageKey: {
+  return prisma.$transaction(async (tx) => {
+    const existingAsset = await tx.trackAsset.findUnique({
+      where: {
+        trackId_storageKey: {
+          trackId: input.trackId,
+          storageKey: input.storageKey,
+        },
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    const asset = await tx.trackAsset.upsert({
+      where: {
+        trackId_storageKey: {
+          trackId: input.trackId,
+          storageKey: input.storageKey,
+        },
+      },
+      create: {
         trackId: input.trackId,
         storageKey: input.storageKey,
-      },
-    },
-    create: {
-      trackId: input.trackId,
-      storageKey: input.storageKey,
-      format: input.outputFormat,
-      mimeType: input.mimeType,
-      fileSizeBytes: stat.size,
-      bitrateKbps: metadata.bitrateKbps,
-      sampleRateHz: metadata.sampleRateHz,
-      channels: metadata.channels,
-      isLossless: input.isLossless,
-      assetRole: input.assetRole,
-    },
-    update: {
-      format: input.outputFormat,
-      mimeType: input.mimeType,
-      fileSizeBytes: stat.size,
-      bitrateKbps: metadata.bitrateKbps,
-      sampleRateHz: metadata.sampleRateHz,
-      channels: metadata.channels,
-      isLossless: input.isLossless,
-      assetRole: input.assetRole,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  await prisma.transcodeOutput.upsert({
-    where: {
-      jobId_format: {
-        jobId: input.jobId,
         format: input.outputFormat,
+        mimeType: input.mimeType,
+        fileSizeBytes: stat.size,
+        bitrateKbps: metadata.bitrateKbps,
+        sampleRateHz: metadata.sampleRateHz,
+        channels: metadata.channels,
+        isLossless: input.isLossless,
+        assetRole: input.assetRole,
       },
-    },
-    create: {
-      jobId: input.jobId,
+      update: {
+        format: input.outputFormat,
+        mimeType: input.mimeType,
+        fileSizeBytes: stat.size,
+        bitrateKbps: metadata.bitrateKbps,
+        sampleRateHz: metadata.sampleRateHz,
+        channels: metadata.channels,
+        isLossless: input.isLossless,
+        assetRole: input.assetRole,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    await tx.transcodeOutput.upsert({
+      where: {
+        jobId_format: {
+          jobId: input.jobId,
+          format: input.outputFormat,
+        },
+      },
+      create: {
+        jobId: input.jobId,
+        outputAssetId: asset.id,
+        format: input.outputFormat,
+        storageKey: input.storageKey,
+        mimeType: input.mimeType,
+        fileSizeBytes: stat.size,
+      },
+      update: {
+        outputAssetId: asset.id,
+        storageKey: input.storageKey,
+        mimeType: input.mimeType,
+        fileSizeBytes: stat.size,
+      },
+    });
+
+    return {
       outputAssetId: asset.id,
-      format: input.outputFormat,
-      storageKey: input.storageKey,
-      mimeType: input.mimeType,
-      fileSizeBytes: stat.size,
-    },
-    update: {
-      outputAssetId: asset.id,
-      storageKey: input.storageKey,
-      mimeType: input.mimeType,
-      fileSizeBytes: stat.size,
-    },
+      createdTrackAsset: !existingAsset,
+    };
   });
+}
+
+type DeliveryOutputRollbackCandidate = {
+  outputFormat: string;
+  storageKey: string;
+  outputAssetId: string;
+  createdTrackAsset: boolean;
+};
+
+async function cleanupPartialDeliveryOutputs(input: {
+  jobId: string;
+  processedOutputs: DeliveryOutputRollbackCandidate[];
+}) {
+  if (input.processedOutputs.length === 0) {
+    return;
+  }
+
+  const processedFormats = [...new Set(input.processedOutputs.map((output) => output.outputFormat))];
+
+  await prisma.transcodeOutput
+    .deleteMany({
+      where: {
+        jobId: input.jobId,
+        format: {
+          in: processedFormats,
+        },
+      },
+    })
+    .catch(() => undefined);
+
+  const createdAssets = input.processedOutputs.filter((output) => output.createdTrackAsset);
+  if (createdAssets.length === 0) {
+    return;
+  }
+
+  const storage = getStorageAdapterFromEnv();
+  const client = storage.getClient();
+  const uniqueCreatedAssets = new Map(
+    createdAssets.map((asset) => [asset.outputAssetId, asset.storageKey]),
+  );
+
+  for (const [assetId, storageKey] of uniqueCreatedAssets) {
+    await client
+      .send(
+        new DeleteObjectCommand({
+          Bucket: storage.bucket,
+          Key: storageKey,
+        }),
+      )
+      .catch(() => undefined);
+
+    await prisma.trackAsset
+      .deleteMany({
+        where: {
+          id: assetId,
+          outputRecords: {
+            none: {},
+          },
+          sourceJobs: {
+            none: {},
+          },
+        },
+      })
+      .catch(() => undefined);
+  }
 }
 
 async function processPreviewJob(input: {
@@ -1141,33 +1225,50 @@ async function processDeliveryFormatsJob(input: {
     throw new Error("Release has no enabled delivery formats.");
   }
 
-  for (const output of selectedOutputs) {
-    const outputPath = path.join(input.outputRoot, `${input.jobId}.${output.extension}`);
+  const processedOutputs: DeliveryOutputRollbackCandidate[] = [];
 
-    await runFfmpeg(output.ffmpegArgs(input.sourcePath, outputPath));
+  try {
+    for (const output of selectedOutputs) {
+      const outputPath = path.join(input.outputRoot, `${input.jobId}.${output.extension}`);
 
-    const storageKey = resolveDeliveryStorageKey({
-      trackId: input.trackId,
-      sourceAssetId: input.sourceAssetId,
-      extension: output.extension,
-    });
+      await runFfmpeg(output.ffmpegArgs(input.sourcePath, outputPath));
 
-    await uploadFileToStorage({
-      storageKey,
-      contentType: output.mimeType,
-      filePath: outputPath,
-    });
+      const storageKey = resolveDeliveryStorageKey({
+        trackId: input.trackId,
+        sourceAssetId: input.sourceAssetId,
+        extension: output.extension,
+      });
 
-    await persistOutputRecord({
+      await uploadFileToStorage({
+        storageKey,
+        contentType: output.mimeType,
+        filePath: outputPath,
+      });
+
+      const persisted = await persistOutputRecord({
+        jobId: input.jobId,
+        trackId: input.trackId,
+        storageKey,
+        outputFormat: output.outputFormat,
+        mimeType: output.mimeType,
+        filePath: outputPath,
+        isLossless: output.isLosslessOutput,
+        assetRole: output.assetRole,
+      });
+
+      processedOutputs.push({
+        outputFormat: output.outputFormat,
+        storageKey,
+        outputAssetId: persisted.outputAssetId,
+        createdTrackAsset: persisted.createdTrackAsset,
+      });
+    }
+  } catch (error) {
+    await cleanupPartialDeliveryOutputs({
       jobId: input.jobId,
-      trackId: input.trackId,
-      storageKey,
-      outputFormat: output.outputFormat,
-      mimeType: output.mimeType,
-      filePath: outputPath,
-      isLossless: output.isLosslessOutput,
-      assetRole: output.assetRole,
+      processedOutputs,
     });
+    throw error;
   }
 }
 

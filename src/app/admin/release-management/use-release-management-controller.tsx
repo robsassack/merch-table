@@ -447,6 +447,7 @@ export function useReleaseManagementController() {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
     newCoverPreviewSrc,
   } = createReleaseActions({
@@ -466,6 +467,7 @@ export function useReleaseManagementController() {
     onUpdateTrack,
     onReorderTrackDrop,
     onDeleteTrack,
+    onRequeueTrackFailedTranscodes,
   } = createTrackEditActions({
     ...state,
     loadReleases,
@@ -529,6 +531,7 @@ export function useReleaseManagementController() {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
     onImportTrackFiles,
     onResolveImportConflict,
@@ -537,6 +540,7 @@ export function useReleaseManagementController() {
     onUpdateTrack,
     onReorderTrackDrop,
     onDeleteTrack,
+    onRequeueTrackFailedTranscodes,
     onInlineTrackFileChange,
     getPricingEstimate,
     renderPricingDetails,

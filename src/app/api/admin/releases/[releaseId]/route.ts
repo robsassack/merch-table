@@ -70,6 +70,10 @@ const forceRequeueTranscodesSchema = z.object({
   action: z.literal("force-requeue-transcodes"),
 });
 
+const requeueFailedTranscodesSchema = z.object({
+  action: z.literal("requeue-failed-transcodes"),
+});
+
 const purgeSchema = z.object({
   action: z.literal("purge"),
   confirmTitle: z.string(),
@@ -85,6 +89,7 @@ const actionSchema = z.discriminatedUnion("action", [
   softDeleteSchema,
   restoreSchema,
   generateDownloadFormatsSchema,
+  requeueFailedTranscodesSchema,
   forceRequeueTranscodesSchema,
   purgeSchema,
   hardDeleteSchema,
@@ -133,6 +138,13 @@ function resolveReleaseForActionSelect(input: {
             isLossless: true,
             storageKey: true,
             updatedAt: true,
+          },
+        },
+        transcodeJobs: {
+          select: {
+            sourceAssetId: true,
+            jobKind: true,
+            status: true,
           },
         },
       },
@@ -786,6 +798,159 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json({
         ok: true,
         release: toAdminReleaseRecord(refreshed),
+        queuedPreviewJobs,
+        queuedDeliveryJobs,
+        queuedTranscodeJobs: queuedPreviewJobs + queuedDeliveryJobs,
+      });
+    }
+
+    if (parsed.action === "requeue-failed-transcodes") {
+      let failedJobsFound = 0;
+      let skippedFailedJobs = 0;
+
+      const candidateByScopeKey = new Map<
+        string,
+        {
+          trackId: string;
+          sourceAssetId: string;
+          jobKind: "PREVIEW_CLIP" | "DELIVERY_FORMATS";
+        }
+      >();
+
+      for (const track of release.tracks) {
+        const sourceAssetById = new Map(track.assets.map((asset) => [asset.id, asset]));
+
+        for (const job of track.transcodeJobs) {
+          if (job.status !== "FAILED") {
+            continue;
+          }
+
+          failedJobsFound += 1;
+
+          const sourceAsset = sourceAssetById.get(job.sourceAssetId);
+          if (!sourceAsset) {
+            skippedFailedJobs += 1;
+            continue;
+          }
+
+          if (job.jobKind === "PREVIEW_CLIP" && track.previewMode !== "CLIP") {
+            skippedFailedJobs += 1;
+            continue;
+          }
+
+          if (job.jobKind === "DELIVERY_FORMATS" && !sourceAsset.isLossless) {
+            skippedFailedJobs += 1;
+            continue;
+          }
+
+          const scopeKey = `${job.jobKind}:${job.sourceAssetId}`;
+          if (candidateByScopeKey.has(scopeKey)) {
+            skippedFailedJobs += 1;
+            continue;
+          }
+
+          candidateByScopeKey.set(scopeKey, {
+            trackId: track.id,
+            sourceAssetId: job.sourceAssetId,
+            jobKind: job.jobKind,
+          });
+        }
+      }
+
+      const enqueueSummary = await prisma.$transaction(async (tx) => {
+        const previewJobIds: string[] = [];
+        const deliveryJobIds: string[] = [];
+        let alreadyQueuedFailedJobs = 0;
+
+        for (const candidate of candidateByScopeKey.values()) {
+          const enqueueResult = await createTranscodeJobWithActiveDedupe(tx, {
+            organizationId: auth.context.organizationId,
+            trackId: candidate.trackId,
+            sourceAssetId: candidate.sourceAssetId,
+            jobKind: candidate.jobKind,
+          });
+
+          if (!enqueueResult.created) {
+            alreadyQueuedFailedJobs += 1;
+            continue;
+          }
+
+          if (candidate.jobKind === "PREVIEW_CLIP") {
+            previewJobIds.push(enqueueResult.jobId);
+          } else {
+            deliveryJobIds.push(enqueueResult.jobId);
+          }
+        }
+
+        return {
+          previewJobIds,
+          deliveryJobIds,
+          alreadyQueuedFailedJobs,
+        };
+      });
+
+      skippedFailedJobs += enqueueSummary.alreadyQueuedFailedJobs;
+
+      let queuedPreviewJobs = 0;
+      for (const jobId of enqueueSummary.previewJobIds) {
+        try {
+          await enqueuePreviewClipJob(jobId);
+          queuedPreviewJobs += 1;
+        } catch {
+          skippedFailedJobs += 1;
+          await prisma.transcodeJob
+            .update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorMessage: "Could not enqueue preview transcode job.",
+                finishedAt: new Date(),
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      let queuedDeliveryJobs = 0;
+      for (const jobId of enqueueSummary.deliveryJobIds) {
+        try {
+          await enqueueDeliveryFormatsJob(jobId);
+          queuedDeliveryJobs += 1;
+        } catch {
+          skippedFailedJobs += 1;
+          await prisma.transcodeJob
+            .update({
+              where: { id: jobId },
+              data: {
+                status: "FAILED",
+                errorMessage: "Could not enqueue delivery transcode job.",
+                finishedAt: new Date(),
+              },
+            })
+            .catch(() => undefined);
+        }
+      }
+
+      const refreshed = await prisma.release.findFirst({
+        where: {
+          id: release.id,
+          organizationId: auth.context.organizationId,
+        },
+        select: releaseSelect,
+      });
+
+      if (!refreshed) {
+        return NextResponse.json(
+          { ok: false, error: "Release not found after failed-job requeue action." },
+          { status: 404 },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        release: toAdminReleaseRecord(refreshed),
+        failedJobsFound,
+        skippedFailedJobs,
         queuedPreviewJobs,
         queuedDeliveryJobs,
         queuedTranscodeJobs: queuedPreviewJobs + queuedDeliveryJobs,

@@ -572,6 +572,62 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     }
   };
 
+  const onRequeueFailedTranscodes = async (release: ReleaseRecord) => {
+    setError(null);
+    setNotice(null);
+    setPendingReleaseId(release.id);
+
+    try {
+      const response = await fetch(`/api/admin/releases/${release.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "requeue-failed-transcodes",
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
+      if (!response.ok || !body?.ok || !body.release) {
+        throw new Error(getMutationError(body, "Could not requeue failed transcode jobs."));
+      }
+
+      replaceRelease(body.release);
+      const queuedPreviewJobs = body.queuedPreviewJobs ?? 0;
+      const queuedDeliveryJobs = body.queuedDeliveryJobs ?? 0;
+      const queuedTotal = body.queuedTranscodeJobs ?? queuedPreviewJobs + queuedDeliveryJobs;
+      const skippedFailedJobs = body.skippedFailedJobs ?? 0;
+      const failedJobsFound = body.failedJobsFound ?? queuedTotal + skippedFailedJobs;
+
+      if (queuedTotal === 0) {
+        if (failedJobsFound === 0) {
+          setNotice("No failed transcode jobs were found for this release.");
+          return;
+        }
+
+        setNotice(
+          `No failed transcode jobs were queued. Skipped ${skippedFailedJobs} job${skippedFailedJobs === 1 ? "" : "s"}.`,
+        );
+        return;
+      }
+
+      if (skippedFailedJobs > 0) {
+        setNotice(
+          `Queued ${queuedTotal} failed transcode job${queuedTotal === 1 ? "" : "s"}, skipped ${skippedFailedJobs}.`,
+        );
+        return;
+      }
+
+      setNotice(`Queued ${queuedTotal} failed transcode job${queuedTotal === 1 ? "" : "s"}.`);
+    } catch (queueError) {
+      setError(
+        queueError instanceof Error
+          ? queueError.message
+          : "Could not requeue failed transcode jobs.",
+      );
+    } finally {
+      setPendingReleaseId(null);
+    }
+  };
+
   const newCoverPreviewSrc = newCoverPreviewUrl ?? newCoverImageUrl;
 
   return {
@@ -584,6 +640,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     onPurgeRelease,
     onHardDeleteRelease,
     onGenerateDownloadFormats,
+    onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
     newCoverPreviewSrc,
   };

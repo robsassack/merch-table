@@ -27,10 +27,16 @@ export function ReleaseManagementReleaseFooter(props: {
     onUpdateRelease,
     onSoftDeleteOrRestoreRelease,
     onGenerateDownloadFormats,
+    onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
     setPurgeDialogRelease,
     setPurgeConfirmInput,
   } = props.controller;
+  const failedJobsCount = release.tracks.reduce(
+    (count, track) =>
+      count + track.transcodeJobs.filter((job) => job.status === "FAILED").length,
+    0,
+  );
 
   return (
     <>
@@ -95,8 +101,30 @@ export function ReleaseManagementReleaseFooter(props: {
         {!release.deletedAt ? (
           <button
             type="button"
+            disabled={isPending || createPending || failedJobsCount === 0}
+            onClick={() => void onRequeueFailedTranscodes(release)}
+            className={buttonClassName}
+          >
+            {isPending
+              ? "Queueing..."
+              : `Requeue Failed Jobs (${failedJobsCount})`}
+          </button>
+        ) : null}
+
+        {!release.deletedAt && advancedById[release.id] ? (
+          <button
+            type="button"
             disabled={isPending || createPending || release.tracks.length === 0}
-            onClick={() => void onForceRequeueTranscodes(release)}
+            onClick={() => {
+              const confirmed = globalThis.confirm(
+                "Force requeue will queue preview and delivery jobs for all eligible tracks in this release, not only failed jobs. Continue?",
+              );
+              if (!confirmed) {
+                return;
+              }
+
+              void onForceRequeueTranscodes(release);
+            }}
             className={buttonClassName}
           >
             {isPending ? "Queueing..." : "Force Requeue Jobs"}

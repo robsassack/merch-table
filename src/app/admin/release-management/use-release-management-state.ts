@@ -89,6 +89,7 @@ export function useReleaseManagementState() {
     null,
   );
   const [pendingTrackUploadId, setPendingTrackUploadId] = useState<string | null>(null);
+  const [pendingTrackRequeueId, setPendingTrackRequeueId] = useState<string | null>(null);
   const [trackUploadProgressById, setTrackUploadProgressById] = useState<
     Record<string, number>
   >({});
@@ -282,6 +283,8 @@ export function useReleaseManagementState() {
     setPendingTrackImportReleaseId,
     pendingTrackUploadId,
     setPendingTrackUploadId,
+    pendingTrackRequeueId,
+    setPendingTrackRequeueId,
     trackUploadProgressById,
     setTrackUploadProgressById,
     trackImportJobsByReleaseId,

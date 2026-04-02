@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 import { buttonClassName, previewModeOptions } from "./constants";
 import { ReleaseManagementTrackList } from "./release-management-track-list";
 import type { PreviewMode, ReleaseDraft, ReleaseRecord } from "./types";
@@ -25,6 +27,7 @@ export function ReleaseManagementTrackManagement(props: {
     setPreviewByReleaseId,
     pendingTrackUploadId,
     pendingTrackId,
+    pendingTrackRequeueId,
     trackImportJobsByReleaseId,
     expandedTrackIdByReleaseId,
     draggingTrackIdByReleaseId,
@@ -37,14 +40,39 @@ export function ReleaseManagementTrackManagement(props: {
   const expandedTrackIdForRelease = expandedTrackIdByReleaseId[release.id] ?? null;
   const draggingTrackIdForRelease = draggingTrackIdByReleaseId[release.id] ?? null;
   const dragOverTrackIdForRelease = dragOverTrackIdByReleaseId[release.id] ?? null;
+  const [showFailedOnlyByReleaseId, setShowFailedOnlyByReleaseId] = useState<
+    Record<string, boolean>
+  >({});
+  const failedTrackCount = release.tracks.filter((track) =>
+    track.transcodeJobs.some((job) => job.status === "FAILED"),
+  ).length;
+  const showFailedOnly = failedTrackCount > 0 && (showFailedOnlyByReleaseId[release.id] ?? false);
 
   return (
                   <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-zinc-300">Track Management</p>
-                      <p className="text-[11px] text-zinc-500">
-                        {release.tracks.length} track{release.tracks.length === 1 ? "" : "s"}
-                      </p>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-[11px] text-zinc-500">
+                          {release.tracks.length} track{release.tracks.length === 1 ? "" : "s"} •{" "}
+                          {failedTrackCount} failed
+                        </p>
+                        <button
+                          type="button"
+                          className={buttonClassName}
+                          disabled={failedTrackCount === 0}
+                          onClick={() =>
+                            setShowFailedOnlyByReleaseId((previous) => ({
+                              ...previous,
+                              [release.id]: !showFailedOnly,
+                            }))
+                          }
+                        >
+                          {showFailedOnly
+                            ? "Show All Tracks"
+                            : `Show Failed Only (${failedTrackCount})`}
+                        </button>
+                      </div>
                     </div>
 
                     <div className="mt-3 grid gap-2 sm:grid-cols-6">
@@ -149,7 +177,8 @@ export function ReleaseManagementTrackManagement(props: {
                                     previewApplyPending ||
                                     reorderTrackPending ||
                                     pendingTrackUploadId !== null ||
-                                    pendingTrackId !== null
+                                    pendingTrackId !== null ||
+                                    pendingTrackRequeueId !== null
                                   }
                                 />
                                 {importTrackPending ? "Importing tracks..." : "Import Tracks"}
@@ -186,6 +215,7 @@ export function ReleaseManagementTrackManagement(props: {
                         importTrackPending={importTrackPending}
                         previewApplyPending={previewApplyPending}
                         reorderTrackPending={reorderTrackPending}
+                        showFailedOnly={showFailedOnly}
                         expandedTrackIdForRelease={expandedTrackIdForRelease}
                         draggingTrackIdForRelease={draggingTrackIdForRelease}
                         dragOverTrackIdForRelease={dragOverTrackIdForRelease}
