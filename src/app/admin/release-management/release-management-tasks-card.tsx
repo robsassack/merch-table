@@ -1,5 +1,6 @@
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 
+import { buttonClassName } from "./constants";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 
 function formatStatusTimestamp(value: string | null) {
@@ -31,13 +32,31 @@ function getWorkerStatusClassName(workerUp: boolean | null) {
 export function ReleaseManagementTasksCard(props: {
   controller: ReleaseManagementController;
 }) {
-  const { tasksLoading, tasksStatus, tasksError } = props.controller;
+  const {
+    tasksLoading,
+    tasksStatus,
+    tasksError,
+    recoverStuckPending,
+    onRecoverStuckJobs,
+  } = props.controller;
 
   return (
     <div className="mt-4 rounded-xl border border-slate-700/80 bg-slate-900/50 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-semibold text-zinc-100">Tasks</p>
-        {tasksLoading ? <p className="text-xs text-zinc-500">Checking…</p> : null}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className={buttonClassName}
+            onClick={() => {
+              void onRecoverStuckJobs();
+            }}
+            disabled={tasksLoading || recoverStuckPending}
+          >
+            {recoverStuckPending ? "Recovering…" : "Recover Stuck Jobs"}
+          </button>
+          {tasksLoading ? <p className="text-xs text-zinc-500">Checking…</p> : null}
+        </div>
       </div>
 
       {tasksError ? (

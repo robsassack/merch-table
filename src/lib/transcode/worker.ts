@@ -26,11 +26,13 @@ const DEFAULT_SOURCE_ROOT = path.join(os.tmpdir(), "merch-table", "source");
 const DEFAULT_OUTPUT_ROOT = path.join(os.tmpdir(), "merch-table", "output");
 const DEFAULT_RELEASE_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
 const DEFAULT_STALE_QUEUED_RECOVERY_BATCH_SIZE = 25;
+const DEFAULT_STALE_RUNNING_RECOVERY_BATCH_SIZE = 25;
 const DEFAULT_RETRY_ENQUEUE_BATCH_SIZE = 25;
 const DEFAULT_RETRY_ENQUEUE_FAILURE_DELAY_MS = 10_000;
 const DEFAULT_TRANSIENT_RETRY_MAX_ATTEMPTS = 4;
 const DEFAULT_TRANSIENT_RETRY_BASE_DELAY_SECONDS = 5;
 const DEFAULT_TRANSIENT_RETRY_MAX_DELAY_SECONDS = 120;
+const DEFAULT_FFMPEG_TIMEOUT_SECONDS = 15 * 60;
 
 const TRANSIENT_NODE_ERROR_CODES = new Set([
   "ECONNRESET",
@@ -88,6 +90,13 @@ type StaleQueuedRecoveryAction =
     };
 
 export type StaleQueuedTranscodeRecoverySummary = {
+  scanned: number;
+  requeued: number;
+  failed: number;
+  skipped: number;
+};
+
+export type StaleRunningTranscodeRecoverySummary = {
   scanned: number;
   requeued: number;
   failed: number;
@@ -518,9 +527,24 @@ function resolveSourceExtension(input: { format: string; storageKey: string }) {
   return "bin";
 }
 
+function readPositiveIntegerSecondsFromEnv(name: string, fallback: number) {
+  return readPositiveIntegerFromEnv(name, fallback);
+}
+
 async function runFfmpeg(args: string[]) {
+  const timeoutMs =
+    Math.max(
+      1,
+      readPositiveIntegerSecondsFromEnv(
+        "TRANSCODE_FFMPEG_TIMEOUT_SECONDS",
+        DEFAULT_FFMPEG_TIMEOUT_SECONDS,
+      ),
+    ) * 1_000;
+
   await execFileAsync("ffmpeg", args, {
     maxBuffer: 10 * 1024 * 1024,
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
   });
 }
 
@@ -721,14 +745,19 @@ function resolveDeliveryStorageKey(input: {
 }
 
 async function markJobFailed(jobId: string, errorMessage: string) {
-  await prisma.transcodeJob.update({
-    where: { id: jobId },
+  const failed = await prisma.transcodeJob.updateMany({
+    where: {
+      id: jobId,
+      status: "RUNNING",
+    },
     data: {
       status: "FAILED",
       errorMessage,
       finishedAt: new Date(),
     },
   });
+
+  return failed.count > 0;
 }
 
 async function markQueuedJobFailedIfStillQueued(input: {
@@ -755,6 +784,7 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
   staleAfterSeconds: number;
   maxJobs?: number;
   now?: Date;
+  organizationId?: string;
 }): Promise<StaleQueuedTranscodeRecoverySummary> {
   const staleAfterSeconds = Math.max(1, Math.floor(input.staleAfterSeconds));
   const maxJobs = Math.max(
@@ -766,6 +796,7 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
 
   const staleJobs = await prisma.transcodeJob.findMany({
     where: {
+      organizationId: input.organizationId,
       status: "QUEUED",
       nextRetryAt: null,
       queuedAt: {
@@ -868,9 +899,136 @@ export async function recoverStaleQueuedTranscodeJobs(input: {
   };
 }
 
+export async function recoverStaleRunningTranscodeJobs(input: {
+  staleAfterSeconds: number;
+  maxJobs?: number;
+  now?: Date;
+  organizationId?: string;
+}): Promise<StaleRunningTranscodeRecoverySummary> {
+  const staleAfterSeconds = Math.max(1, Math.floor(input.staleAfterSeconds));
+  const maxJobs = Math.max(
+    1,
+    Math.floor(input.maxJobs ?? DEFAULT_STALE_RUNNING_RECOVERY_BATCH_SIZE),
+  );
+  const now = input.now ?? new Date();
+  const staleBefore = new Date(now.getTime() - staleAfterSeconds * 1_000);
+
+  const staleJobs = await prisma.transcodeJob.findMany({
+    where: {
+      organizationId: input.organizationId,
+      status: "RUNNING",
+      startedAt: {
+        lt: staleBefore,
+      },
+    },
+    orderBy: [
+      {
+        startedAt: "asc",
+      },
+    ],
+    take: maxJobs,
+    select: {
+      id: true,
+      startedAt: true,
+      jobKind: true,
+      track: {
+        select: {
+          previewMode: true,
+        },
+      },
+      sourceAsset: {
+        select: {
+          isLossless: true,
+        },
+      },
+    },
+  });
+
+  let requeued = 0;
+  let failed = 0;
+  let skipped = 0;
+
+  for (const staleJob of staleJobs) {
+    if (!staleJob.startedAt) {
+      skipped += 1;
+      continue;
+    }
+
+    const queuedAt = new Date();
+    const claim = await prisma.transcodeJob.updateMany({
+      where: {
+        id: staleJob.id,
+        status: "RUNNING",
+        startedAt: staleJob.startedAt,
+      },
+      data: {
+        status: "QUEUED",
+        queuedAt,
+        startedAt: null,
+        finishedAt: null,
+        nextRetryAt: null,
+        errorMessage: truncateFailureReason(
+          `Recovered stale running transcode attempt after exceeding ${staleAfterSeconds}s runtime. Requeueing.`,
+        ),
+      },
+    });
+
+    if (claim.count === 0) {
+      skipped += 1;
+      continue;
+    }
+
+    const action = resolveStaleQueuedRecoveryAction({
+      jobKind: staleJob.jobKind,
+      previewMode: staleJob.track.previewMode,
+      isLossless: staleJob.sourceAsset.isLossless,
+    });
+
+    if (action.type === "FAIL") {
+      const didFail = await markQueuedJobFailedIfStillQueued({
+        jobId: staleJob.id,
+        errorMessage: action.reason,
+      });
+      if (didFail) {
+        failed += 1;
+      } else {
+        skipped += 1;
+      }
+      continue;
+    }
+
+    try {
+      if (action.kind === "PREVIEW_CLIP") {
+        await enqueuePreviewClipJob(staleJob.id);
+      } else {
+        await enqueueDeliveryFormatsJob(staleJob.id);
+      }
+      requeued += 1;
+    } catch (error) {
+      const didFail = await markQueuedJobFailedIfStillQueued({
+        jobId: staleJob.id,
+        errorMessage: `Recovered stale running transcode job could not be re-enqueued: ${toErrorMessage(error)}`,
+      });
+      if (didFail) {
+        failed += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+  }
+
+  return {
+    scanned: staleJobs.length,
+    requeued,
+    failed,
+    skipped,
+  };
+}
+
 export async function enqueueDueQueuedRetryJobs(input?: {
   maxJobs?: number;
   now?: Date;
+  organizationId?: string;
 }): Promise<RetryEnqueueSummary> {
   const maxJobs = Math.max(
     1,
@@ -880,6 +1038,7 @@ export async function enqueueDueQueuedRetryJobs(input?: {
 
   const dueJobs = await prisma.transcodeJob.findMany({
     where: {
+      organizationId: input?.organizationId,
       status: "QUEUED",
       nextRetryAt: {
         lte: now,
@@ -1409,8 +1568,11 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
       });
     }
 
-    await prisma.transcodeJob.update({
-      where: { id: job.id },
+    const markedSucceeded = await prisma.transcodeJob.updateMany({
+      where: {
+        id: job.id,
+        status: "RUNNING",
+      },
       data: {
         status: "SUCCEEDED",
         errorMessage: null,
@@ -1418,6 +1580,10 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
         nextRetryAt: null,
       },
     });
+
+    if (markedSucceeded.count === 0) {
+      return;
+    }
 
     if (effectiveKind === "DELIVERY_FORMATS") {
       await maybeQueueDeliveryReconcileJob({

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { createReleaseActions } from "./use-release-management-release-actions";
 import { createTrackEditActions } from "./use-release-management-track-edit-actions";
@@ -6,6 +6,7 @@ import { createTrackImportUploadActions } from "./use-release-management-track-i
 import { useReleaseManagementState } from "./use-release-management-state";
 import type {
   NewTrackDraft,
+  RecoverStuckTranscodesResponse,
   ReleaseDraft,
   TranscodeTasksStatusResponse,
   ReleasePreviewDraft,
@@ -50,6 +51,7 @@ export function useReleaseManagementController() {
     setPreviewByReleaseId,
     setLoading,
     setError,
+    setNotice,
     setReleases,
     setArtists,
     setMinimumPriceFloorCents,
@@ -61,6 +63,7 @@ export function useReleaseManagementController() {
     setCreateComposerOpen,
   } = state;
   const pollingInFlightRef = useRef(false);
+  const [recoverStuckPending, setRecoverStuckPending] = useState(false);
 
   const hasActiveTranscodeJobs = releases.some((release) =>
     release.tracks.some((track) =>
@@ -338,6 +341,46 @@ export function useReleaseManagementController() {
     };
   }, [loadTasksStatus]);
 
+  const onRecoverStuckJobs = useCallback(async () => {
+    setError(null);
+    setTasksError(null);
+    setRecoverStuckPending(true);
+
+    try {
+      const response = await fetch("/api/admin/transcode-status/recover-stuck", {
+        method: "POST",
+      });
+      const body = (await response.json().catch(() => null)) as RecoverStuckTranscodesResponse | null;
+      if (!response.ok || !body?.ok || !body.summary) {
+        throw new Error(body?.error ?? "Could not recover stuck transcode jobs.");
+      }
+
+      const staleQueuedRecovered = body.summary.staleQueued.requeued;
+      const staleRunningRecovered = body.summary.staleRunning.requeued;
+      const retryEnqueued = body.summary.retryDue.enqueued;
+      const totalRecoveries = staleQueuedRecovered + staleRunningRecovered + retryEnqueued;
+
+      if (totalRecoveries === 0) {
+        setNotice("No stuck transcode jobs were recovered.");
+      } else {
+        setNotice(
+          `Recovered ${staleQueuedRecovered} stale queued, ${staleRunningRecovered} stale running, and re-enqueued ${retryEnqueued} retry job${retryEnqueued === 1 ? "" : "s"}.`,
+        );
+      }
+
+      await Promise.all([
+        loadTasksStatus({ silent: true }),
+        loadReleases({ silent: true }),
+      ]);
+    } catch (error) {
+      setTasksError(
+        error instanceof Error ? error.message : "Could not recover stuck transcode jobs.",
+      );
+    } finally {
+      setRecoverStuckPending(false);
+    }
+  }, [loadReleases, loadTasksStatus, setError, setNotice, setTasksError]);
+
   useEffect(() => {
     setSelectedReleaseId((current) => {
       if (releases.length === 0) {
@@ -523,6 +566,7 @@ export function useReleaseManagementController() {
     tasksStatus,
     tasksLoading,
     tasksError,
+    recoverStuckPending,
     onNewCoverFileChange,
     onExistingCoverFileChange,
     onCreateRelease,
@@ -533,6 +577,7 @@ export function useReleaseManagementController() {
     onGenerateDownloadFormats,
     onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
+    onRecoverStuckJobs,
     onImportTrackFiles,
     onResolveImportConflict,
     onApplyReleasePreviewToTracks,

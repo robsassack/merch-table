@@ -124,6 +124,39 @@ export type TranscodeTasksStatusResponse = {
   status?: TranscodeTasksStatus;
 };
 
+export type RecoverStuckTranscodesResponse = {
+  ok?: boolean;
+  error?: string;
+  summary?: {
+    staleQueued: {
+      scanned: number;
+      requeued: number;
+      failed: number;
+      skipped: number;
+    };
+    staleRunning: {
+      scanned: number;
+      requeued: number;
+      failed: number;
+      skipped: number;
+    };
+    retryDue: {
+      scanned: number;
+      enqueued: number;
+      failed: number;
+      skipped: number;
+    };
+    thresholds: {
+      staleQueuedThresholdSeconds: number;
+      staleRunningThresholdSeconds: number;
+    };
+    batchSizes: {
+      staleRecoveryBatchSize: number;
+      retryEnqueueBatchSize: number;
+    };
+  };
+};
+
 export type ReleaseMutationResponse = {
   ok?: boolean;
   error?: string;
