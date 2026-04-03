@@ -2,83 +2,16 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
-import { AdminDialogPortal } from "./dialog-portal";
-
-type ArtistRecord = {
-  id: string;
-  name: string;
-  slug: string;
-  location: string | null;
-  bio: string | null;
-  deletedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-  _count: {
-    releases: number;
-  };
-};
-
-type ArtistsListResponse = {
-  ok?: boolean;
-  error?: string;
-  artists?: ArtistRecord[];
-};
-
-type ArtistMutationResponse = {
-  ok?: boolean;
-  error?: string;
-  artist?: ArtistRecord;
-  purgedArtistId?: string;
-};
-
-type ArtistDraft = {
-  name: string;
-  slug: string;
-  location: string;
-  bio: string;
-};
-
-const buttonClassName =
-  "inline-flex items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-zinc-200 transition hover:bg-slate-700 hover:text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50";
-
-const primaryButtonClassName =
-  "inline-flex items-center justify-center rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
-
-const dangerButtonClassName =
-  "inline-flex items-center justify-center rounded-lg border border-red-800/80 bg-red-950/70 px-3 py-1.5 text-xs font-medium text-red-200 transition hover:bg-red-900/70 hover:text-red-100 disabled:cursor-not-allowed disabled:opacity-50";
-
-function slugify(value: string) {
-  const slug = value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-  return slug.length > 0 ? slug : "artist";
-}
-
-function sanitizeUrlInput(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
-function getArtistUrlPreview(name: string, slug: string) {
-  const custom = sanitizeUrlInput(slug);
-  const resolved = custom.length > 0 ? custom : slugify(name);
-  return `/artist/${resolved}`;
-}
-
-function getMutationError(responseBody: ArtistMutationResponse | null, fallback: string) {
-  if (responseBody?.error && responseBody.error.length > 0) {
-    return responseBody.error;
-  }
-
-  return fallback;
-}
+import { ArtistManagementArtistCard } from "./artist-management-artist-card";
+import { ArtistManagementCreateForm } from "./artist-management-create-form";
+import { ArtistManagementPurgeDialog } from "./artist-management-purge-dialog";
+import {
+  getMutationError,
+  type ArtistDraft,
+  type ArtistMutationResponse,
+  type ArtistRecord,
+  type ArtistsListResponse,
+} from "./artist-management-panel-shared";
 
 export function ArtistManagementPanel() {
   const [artists, setArtists] = useState<ArtistRecord[]>([]);
@@ -323,85 +256,22 @@ export function ArtistManagementPanel() {
         purge deleted artists.
       </p>
 
-      <form onSubmit={onCreateArtist} className="mt-5 rounded-xl border border-slate-700 p-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-sm font-medium text-zinc-200">Create artist</p>
-          <button
-            type="button"
-            onClick={() => setCreateAdvancedOpen((previous) => !previous)}
-            className={buttonClassName}
-          >
-            {createAdvancedOpen ? "Hide Advanced" : "Advanced"}
-          </button>
-        </div>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-            Name (required)
-            <input
-              required
-              maxLength={120}
-              value={newName}
-              onChange={(event) => {
-                const value = event.target.value;
-                setNewName(value);
-                if (!newUrlTouched) {
-                  setNewSlug(slugify(value));
-                }
-              }}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-              placeholder="Artist name"
-            />
-          </label>
-
-          {createAdvancedOpen ? (
-            <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-              URL
-              <input
-                maxLength={120}
-                value={newSlug}
-                onChange={(event) => {
-                  setNewSlug(sanitizeUrlInput(event.target.value));
-                  setNewUrlTouched(true);
-                }}
-                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                placeholder="artist-name"
-              />
-              <span className="text-[11px] text-zinc-500">
-                Preview: {getArtistUrlPreview(newName, newSlug)}
-              </span>
-            </label>
-          ) : null}
-
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-            Location
-            <input
-              maxLength={160}
-              value={newLocation}
-              onChange={(event) => setNewLocation(event.target.value)}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-              placeholder="Detroit, MI"
-            />
-          </label>
-
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-            Bio
-            <textarea
-              rows={3}
-              maxLength={4_000}
-              value={newBio}
-              onChange={(event) => setNewBio(event.target.value)}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-              placeholder="Optional artist bio"
-            />
-          </label>
-        </div>
-
-        <div className="mt-3 flex justify-end">
-          <button type="submit" disabled={createPending} className={primaryButtonClassName}>
-            {createPending ? "Creating..." : "Create Artist"}
-          </button>
-        </div>
-      </form>
+      <ArtistManagementCreateForm
+        onSubmit={onCreateArtist}
+        newName={newName}
+        setNewName={setNewName}
+        newSlug={newSlug}
+        setNewSlug={setNewSlug}
+        newLocation={newLocation}
+        setNewLocation={setNewLocation}
+        newBio={newBio}
+        setNewBio={setNewBio}
+        createAdvancedOpen={createAdvancedOpen}
+        setCreateAdvancedOpen={setCreateAdvancedOpen}
+        newUrlTouched={newUrlTouched}
+        setNewUrlTouched={setNewUrlTouched}
+        createPending={createPending}
+      />
 
       {notice ? <p className="mt-4 text-sm text-emerald-400">{notice}</p> : null}
       {error ? <p className="mt-4 text-sm text-red-400">{error}</p> : null}
@@ -421,219 +291,54 @@ export function ArtistManagementPanel() {
               location: artist.location ?? "",
               bio: artist.bio ?? "",
             };
-            const isPending = pendingArtistId === artist.id;
 
             return (
-              <article key={artist.id} className="rounded-xl border border-slate-700 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-100">{artist.name}</h3>
-                    {artist.deletedAt ? (
-                      <span className="rounded-full border border-amber-700/70 bg-amber-950/50 px-2 py-0.5 text-[11px] font-medium text-amber-300">
-                        deleted
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="text-xs text-zinc-500">{artist._count.releases} releases</p>
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-                    Name (required)
-                    <input
-                      required
-                      maxLength={120}
-                      value={draft.name}
-                      onChange={(event) =>
-                        setDraftsById((previous) => ({
-                          ...previous,
-                          [artist.id]: { ...draft, name: event.target.value },
-                        }))
-                      }
-                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-                    Location
-                    <input
-                      maxLength={160}
-                      value={draft.location}
-                      onChange={(event) =>
-                        setDraftsById((previous) => ({
-                          ...previous,
-                          [artist.id]: { ...draft, location: event.target.value },
-                        }))
-                      }
-                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                    />
-                  </label>
-
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-                    Bio
-                    <textarea
-                      rows={3}
-                      maxLength={4_000}
-                      value={draft.bio}
-                      onChange={(event) =>
-                        setDraftsById((previous) => ({
-                          ...previous,
-                          [artist.id]: { ...draft, bio: event.target.value },
-                        }))
-                      }
-                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                    />
-                  </label>
-
-                  {advancedById[artist.id] ? (
-                    <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-                      URL
-                      <input
-                        maxLength={120}
-                        value={draft.slug}
-                        onChange={(event) =>
-                          setDraftsById((previous) => ({
-                            ...previous,
-                            [artist.id]: {
-                              ...draft,
-                              slug: sanitizeUrlInput(event.target.value),
-                            },
-                          }))
-                        }
-                        className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                      />
-                      <span className="text-[11px] text-zinc-500">
-                        Preview: {getArtistUrlPreview(draft.name, draft.slug)}
-                      </span>
-                    </label>
-                  ) : null}
-                </div>
-
-                <p className="mt-3 text-xs text-zinc-500">
-                  Updated {formatIsoTimestampForDisplay(artist.updatedAt)}
-                  {artist.deletedAt
-                    ? ` • Deleted ${formatIsoTimestampForDisplay(artist.deletedAt)}`
-                    : ""}
-                </p>
-
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={isPending || createPending}
-                    onClick={() =>
-                      setAdvancedById((previous) => ({
-                        ...previous,
-                        [artist.id]: !previous[artist.id],
-                      }))
-                    }
-                    className={buttonClassName}
-                  >
-                    {advancedById[artist.id] ? "Hide Advanced" : "Advanced"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending || createPending}
-                    onClick={() => void onUpdateArtist(artist.id)}
-                    className={buttonClassName}
-                  >
-                    {isPending ? "Saving..." : "Save"}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={isPending || createPending}
-                    onClick={() => void onSoftDeleteOrRestoreArtist(artist)}
-                    className={buttonClassName}
-                  >
-                    {isPending
-                      ? artist.deletedAt
-                        ? "Restoring..."
-                        : "Deleting..."
-                      : artist.deletedAt
-                        ? "Restore"
-                        : "Soft Delete"}
-                  </button>
-
-                  {artist.deletedAt ? (
-                    <button
-                      type="button"
-                      disabled={isPending || createPending}
-                      onClick={() => {
-                        setPurgeDialogArtist(artist);
-                        setPurgeConfirmInput("");
-                      }}
-                      className={dangerButtonClassName}
-                    >
-                      {isPending ? "Purging..." : "Permanently Purge"}
-                    </button>
-                  ) : null}
-                </div>
-              </article>
+              <ArtistManagementArtistCard
+                key={artist.id}
+                artist={artist}
+                draft={draft}
+                isPending={pendingArtistId === artist.id}
+                createPending={createPending}
+                advancedOpen={Boolean(advancedById[artist.id])}
+                onDraftChange={(next) =>
+                  setDraftsById((previous) => ({
+                    ...previous,
+                    [artist.id]: next,
+                  }))
+                }
+                onToggleAdvanced={() =>
+                  setAdvancedById((previous) => ({
+                    ...previous,
+                    [artist.id]: !previous[artist.id],
+                  }))
+                }
+                onSave={() => void onUpdateArtist(artist.id)}
+                onSoftDeleteOrRestore={() => void onSoftDeleteOrRestoreArtist(artist)}
+                onOpenPurgeDialog={() => {
+                  setPurgeDialogArtist(artist);
+                  setPurgeConfirmInput("");
+                }}
+              />
             );
           })}
         </div>
       )}
 
       {purgeDialogArtist ? (
-        <AdminDialogPortal>
-          <div
-            className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Confirm permanent artist purge"
-          >
-            <div className="flex min-h-full items-center justify-center p-4">
-              <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-                <h3 className="text-lg font-semibold text-zinc-100">Confirm permanent purge</h3>
-                <p className="mt-2 text-sm text-zinc-400">
-                  This will permanently remove <span className="font-semibold">{purgeDialogArtist.name}</span>.
-                  Type the artist name to confirm.
-                </p>
-
-                <label className="mt-4 flex flex-col gap-1 text-xs text-zinc-500">
-                  Artist name confirmation
-                  <input
-                    value={purgeConfirmInput}
-                    onChange={(event) => setPurgeConfirmInput(event.target.value)}
-                    className="rounded-lg border border-slate-600 bg-slate-950 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                    placeholder={purgeDialogArtist.name}
-                  />
-                </label>
-
-                <div className="mt-4 flex justify-end gap-2">
-                  <button
-                    type="button"
-                    className={buttonClassName}
-                    onClick={() => {
-                      if (pendingArtistId) {
-                        return;
-                      }
-                      setPurgeDialogArtist(null);
-                      setPurgeConfirmInput("");
-                    }}
-                    disabled={Boolean(pendingArtistId)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    className={dangerButtonClassName}
-                    disabled={
-                      Boolean(pendingArtistId) ||
-                      purgeConfirmInput.trim() !== purgeDialogArtist.name
-                    }
-                    onClick={() =>
-                      void onPurgeArtist(purgeDialogArtist, purgeConfirmInput)
-                    }
-                  >
-                    {pendingArtistId ? "Purging..." : "Confirm Purge"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </AdminDialogPortal>
+        <ArtistManagementPurgeDialog
+          artist={purgeDialogArtist}
+          pendingArtistId={pendingArtistId}
+          purgeConfirmInput={purgeConfirmInput}
+          setPurgeConfirmInput={setPurgeConfirmInput}
+          onCancel={() => {
+            if (pendingArtistId) {
+              return;
+            }
+            setPurgeDialogArtist(null);
+            setPurgeConfirmInput("");
+          }}
+          onConfirm={() => void onPurgeArtist(purgeDialogArtist, purgeConfirmInput)}
+        />
       ) : null}
     </section>
   );

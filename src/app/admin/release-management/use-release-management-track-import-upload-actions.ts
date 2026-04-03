@@ -8,24 +8,24 @@ import {
 import { parseTrackImportFileMetadata } from "@/lib/audio/track-import-browser";
 
 import { ALLOWED_AUDIO_MIME_TYPES } from "./constants";
+import {
+  createTrackForRelease,
+  updateTrackMetadataFromAudio,
+  uploadTrackAsset,
+} from "./track-upload-api";
 import type { ReleaseManagementState } from "./use-release-management-state";
 import type {
   PlannedTrackImport,
-  PreviewMode,
   ReleaseRecord,
-  TrackAssetCommitResponse,
   TrackImportMode,
   TrackImportStatus,
-  TrackMutationResponse,
   TrackRecord,
-  UploadUrlResponse,
 } from "./types";
 import {
   formatTrackDuration,
   resolveAudioMimeType,
   resolvePreviewPayload,
   toReleasePreviewDraft,
-  uploadViaSignedPut,
 } from "./utils";
 
 type TrackImportUploadActionsInput = ReleaseManagementState & {
@@ -110,125 +110,6 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
         ),
       };
     });
-  };
-
-  const createTrackForRelease = async (inputValue: {
-    releaseId: string;
-    title: string;
-    trackNumber?: number;
-    durationMs?: number | null;
-    previewMode: PreviewMode;
-    previewSeconds: number | null;
-  }) => {
-    const response = await fetch(`/api/admin/releases/${inputValue.releaseId}/tracks`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        title: inputValue.title,
-        trackNumber: inputValue.trackNumber,
-        durationMs: inputValue.durationMs,
-        previewMode: inputValue.previewMode,
-        previewSeconds: inputValue.previewSeconds,
-      }),
-    });
-    const body = (await response.json().catch(() => null)) as TrackMutationResponse | null;
-    if (!response.ok || !body?.ok || !body.track) {
-      throw new Error(body?.error ?? "Could not create track.");
-    }
-
-    return body.track;
-  };
-
-  const updateTrackMetadataFromAudio = async (inputValue: {
-    releaseId: string;
-    trackId: string;
-    title: string;
-    durationMs: number | null;
-  }) => {
-    const response = await fetch(
-      `/api/admin/releases/${inputValue.releaseId}/tracks/${inputValue.trackId}`,
-      {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          title: inputValue.title,
-          durationMs: inputValue.durationMs,
-        }),
-      },
-    );
-
-    const body = (await response.json().catch(() => null)) as TrackMutationResponse | null;
-    if (!response.ok || !body?.ok || !body.track) {
-      throw new Error(body?.error ?? "Could not sync track metadata.");
-    }
-
-    return body.track;
-  };
-
-  const uploadTrackAsset = async (inputValue: {
-    releaseId: string;
-    trackId: string;
-    file: File;
-    contentType: string;
-    assetRole: "MASTER" | "DELIVERY";
-    onProgress?: (percent: number) => void;
-  }) => {
-    const uploadUrlResponse = await fetch("/api/admin/upload/upload-url", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        fileName: inputValue.file.name,
-        contentType: inputValue.contentType,
-        sizeBytes: inputValue.file.size,
-      }),
-    });
-    const uploadUrlBody = (await uploadUrlResponse
-      .json()
-      .catch(() => null)) as UploadUrlResponse | null;
-
-    if (
-      !uploadUrlResponse.ok ||
-      !uploadUrlBody?.ok ||
-      !uploadUrlBody.uploadUrl ||
-      !uploadUrlBody.storageKey ||
-      !uploadUrlBody.bucket ||
-      !uploadUrlBody.storageProvider
-    ) {
-      throw new Error(uploadUrlBody?.error ?? "Could not create upload URL.");
-    }
-
-    await uploadViaSignedPut({
-      uploadUrl: uploadUrlBody.uploadUrl,
-      file: inputValue.file,
-      contentType: inputValue.contentType,
-      requiredHeaders: uploadUrlBody.requiredHeaders ?? {},
-      onProgress: (percent) => {
-        inputValue.onProgress?.(percent);
-      },
-    });
-
-    const commitResponse = await fetch("/api/admin/upload/track-assets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        releaseId: inputValue.releaseId,
-        trackId: inputValue.trackId,
-        fileName: inputValue.file.name,
-        storageKey: uploadUrlBody.storageKey,
-        contentType: inputValue.contentType,
-        sizeBytes: inputValue.file.size,
-        assetRole: inputValue.assetRole,
-      }),
-    });
-    const commitBody = (await commitResponse
-      .json()
-      .catch(() => null)) as TrackAssetCommitResponse | null;
-    if (!commitResponse.ok || !commitBody?.ok) {
-      throw new Error(commitBody?.error ?? "Could not attach uploaded asset to this track.");
-    }
-
-    return commitBody;
   };
 
   const runTrackImport = async (inputValue: {

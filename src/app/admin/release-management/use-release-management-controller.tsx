@@ -3,21 +3,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createReleaseActions } from "./use-release-management-release-actions";
 import { createTrackEditActions } from "./use-release-management-track-edit-actions";
 import { createTrackImportUploadActions } from "./use-release-management-track-import-upload-actions";
+import { renderReleasePricingDetails } from "./release-management-pricing-details";
+import { syncReleaseDraftState, syncReleaseTrackState } from "./release-management-sync";
 import { useReleaseManagementState } from "./use-release-management-state";
 import type {
-  NewTrackDraft,
   RecoverStuckTranscodesResponse,
   ReleaseDraft,
-  TranscodeTasksStatusResponse,
-  ReleasePreviewDraft,
   ReleaseRecord,
   ReleasesListResponse,
-  TrackDraft,
+  TranscodeTasksStatusResponse,
   TrackRecordPatch,
 } from "./types";
 import {
-  areAllMasterAssetsLossless,
-  formatCurrency,
   sortTracks,
   toNewTrackDraft,
   toReleaseDraft,
@@ -71,102 +68,18 @@ export function useReleaseManagementController() {
     ),
   );
   const syncDrafts = useCallback((list: ReleaseRecord[]) => {
-    setDraftsById((previous) => {
-      const next: Record<string, ReleaseDraft> = {};
-      for (const release of list) {
-        const previousDraft = previous[release.id];
-        if (!previousDraft) {
-          next[release.id] = toReleaseDraft(release);
-          continue;
-        }
-
-        if (!previousDraft.markLossyOnly && release.isLossyOnly) {
-          next[release.id] = {
-            ...previousDraft,
-            markLossyOnly: true,
-            confirmLossyOnly: true,
-          };
-          continue;
-        }
-
-        if (previousDraft.markLossyOnly && areAllMasterAssetsLossless(release)) {
-          next[release.id] = {
-            ...previousDraft,
-            markLossyOnly: false,
-            confirmLossyOnly: false,
-          };
-          continue;
-        }
-
-        next[release.id] = previousDraft;
-      }
-      return next;
-    });
+    syncReleaseDraftState(list, setDraftsById);
   }, [setDraftsById]);
 
   const syncTrackDrafts = useCallback((list: ReleaseRecord[]) => {
-    setTrackDraftsById((previous) => {
-      const next: Record<string, TrackDraft> = {};
-      for (const release of list) {
-        for (const track of release.tracks) {
-          next[track.id] = previous[track.id] ?? toTrackDraft(track);
-        }
-      }
-      return next;
-    });
-
-    setNewTrackByReleaseId((previous) => {
-      const next: Record<string, NewTrackDraft> = {};
-      for (const release of list) {
-        next[release.id] = previous[release.id] ?? toNewTrackDraft(release);
-      }
-      return next;
-    });
-
-    setTrackUploadRoleById((previous) => {
-      const next: Record<string, "MASTER" | "DELIVERY"> = {};
-      for (const release of list) {
-        for (const track of release.tracks) {
-          next[track.id] = previous[track.id] ?? "MASTER";
-        }
-      }
-      return next;
-    });
-
-    setExpandedTrackIdByReleaseId((previous) => {
-      const next: Record<string, string | null> = {};
-      for (const release of list) {
-        const previousExpanded = previous[release.id] ?? null;
-        const stillExists =
-          previousExpanded !== null &&
-          release.tracks.some((track) => track.id === previousExpanded);
-        next[release.id] = stillExists ? previousExpanded : null;
-      }
-      return next;
-    });
-
-    setDraggingTrackIdByReleaseId((previous) => {
-      const next: Record<string, string | null> = {};
-      for (const release of list) {
-        next[release.id] = previous[release.id] ?? null;
-      }
-      return next;
-    });
-
-    setDragOverTrackIdByReleaseId((previous) => {
-      const next: Record<string, string | null> = {};
-      for (const release of list) {
-        next[release.id] = previous[release.id] ?? null;
-      }
-      return next;
-    });
-
-    setPreviewByReleaseId((previous) => {
-      const next: Record<string, ReleasePreviewDraft> = {};
-      for (const release of list) {
-        next[release.id] = previous[release.id] ?? toReleasePreviewDraft(release);
-      }
-      return next;
+    syncReleaseTrackState(list, {
+      setTrackDraftsById,
+      setNewTrackByReleaseId,
+      setTrackUploadRoleById,
+      setExpandedTrackIdByReleaseId,
+      setDraggingTrackIdByReleaseId,
+      setDragOverTrackIdByReleaseId,
+      setPreviewByReleaseId,
     });
   }, [
     setTrackDraftsById,
@@ -517,49 +430,13 @@ export function useReleaseManagementController() {
     applyTrackPatchToRelease,
   });
 
-  const renderPricingDetails = (draft: ReleaseDraft, currency: string) => {
-    if (draft.pricingMode === "FREE") {
-      return (
-        <p className="mt-2 text-xs text-zinc-500">
-          Free release. Stripe is bypassed and no minimum floor applies.
-        </p>
-      );
-    }
-
-    const estimate = getPricingEstimate(draft, currency);
-
-    return (
-      <>
-        <p className="mt-2 text-xs text-zinc-500">
-          Minimum system floor:{" "}
-          {draft.pricingMode === "PWYW" && draft.allowFreeCheckout
-            ? `${formatCurrency(0, currency)} (free checkout enabled) or ${formatCurrency(minimumPriceFloorCents, currency)}+`
-            : formatCurrency(minimumPriceFloorCents, currency)}
-          .
-        </p>
-        {estimate ? (
-          <p className="mt-1 text-xs text-zinc-400">
-            At {estimate.grossLabel}, Stripe fees are ~{estimate.feeLabel} and payout is ~
-            {estimate.netLabel}.
-          </p>
-        ) : draft.pricingMode === "PWYW" && draft.allowFreeCheckout ? (
-          <p className="mt-1 text-xs text-zinc-400">
-            Free checkout is enabled. Buyers can check out at{" "}
-            {formatCurrency(0, currency)}.
-          </p>
-        ) : (
-          <p className="mt-1 text-xs text-zinc-500">
-            Enter a price to preview Stripe fee and net payout.
-          </p>
-        )}
-        {estimate?.belowFloor ? (
-          <p className="mt-2 rounded-lg border border-amber-700/60 bg-amber-950/40 px-3 py-2 text-xs text-amber-300">
-            Price is below the minimum floor of {formatCurrency(minimumPriceFloorCents, currency)}.
-          </p>
-        ) : null}
-      </>
-    );
-  };
+  const renderPricingDetails = (draft: ReleaseDraft, currency: string) =>
+    renderReleasePricingDetails({
+      draft,
+      currency,
+      minimumPriceFloorCents,
+      getPricingEstimate,
+    });
 
   return {
     ...state,
