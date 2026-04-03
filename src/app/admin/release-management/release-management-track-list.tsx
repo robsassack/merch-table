@@ -292,7 +292,7 @@ export function ReleaseManagementTrackList(props: {
                                       <circle cx="9" cy="12" r="1" />
                                     </svg>
                                   </span>
-                                  <p className="min-w-0 break-words text-left text-xs font-medium text-zinc-200">
+                                  <p className="min-w-0 wrap-break-word text-left text-xs font-medium text-zinc-200">
                                     Track {track.trackNumber} • {track.title} •{" "}
                                     {formatTrackDuration(track.durationMs)}
                                   </p>
@@ -521,7 +521,7 @@ export function ReleaseManagementTrackList(props: {
                                         },
                                       }))
                                     }
-                                    className="min-h-[88px] rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
+                                    className="min-h-22 rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
                                     disabled={
                                       isPending ||
                                       trackActionPending ||
@@ -545,7 +545,7 @@ export function ReleaseManagementTrackList(props: {
                                         },
                                       }))
                                     }
-                                    className="min-h-[88px] rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
+                                    className="min-h-22 rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
                                     disabled={
                                       isPending ||
                                       trackActionPending ||
