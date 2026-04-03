@@ -182,7 +182,11 @@ async function setupPreviewWorkerHarness(input: { jobs: JobSpec[] }) {
       where: { id?: string; status?: string };
       data?: { status?: string; attemptCount?: { increment?: number } };
     }) => {
-      claimCallCount += 1;
+      const isClaimAttempt =
+        args.where.status === "QUEUED" && args.data?.status === "RUNNING";
+      if (isClaimAttempt) {
+        claimCallCount += 1;
+      }
       const jobId = args.where.id;
       if (!jobId) {
         return { count: 0 };
