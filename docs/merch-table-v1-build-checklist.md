@@ -147,11 +147,11 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Stripe integration
 
-- [ ] `POST /api/checkout/session` — create Stripe Checkout session for `FIXED` and `PWYW` releases
-- [ ] Server-side PWYW validation: reject amounts below `minimumPriceCents`
-- [ ] System minimum price floor enforced on session creation
-- [ ] Stripe Tax basic enabled during Checkout session creation
-- [ ] Currency from `StoreSettings` passed to all Checkout sessions
+- [x] `POST /api/checkout/session` — create Stripe Checkout session for `FIXED` and `PWYW` releases
+- [x] Server-side PWYW validation: reject amounts below `minimumPriceCents`
+- [x] System minimum price floor enforced on session creation
+- [x] Stripe Tax basic enabled during Checkout session creation
+- [x] Currency from `StoreSettings` passed to all Checkout sessions
 
 ### Free checkout
 
@@ -277,7 +277,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Settings UI: allow updating contact email
 - [ ] Settings UI: allow updating store currency
 - [ ] Settings UI: allow updating SMTP/email configuration
-- [ ] Settings UI: allow updating Stripe API key + webhook secret
+- [x] Settings UI: allow updating Stripe API key + webhook secret
 - [ ] Settings UI: allow updating admin email
 - [ ] Storage safety guardrail: disallow switching `GARAGE` ↔ `S3` after assets exist
 - [ ] Storage migration path (optional later): explicit, guided migration job with confirmation + validation
