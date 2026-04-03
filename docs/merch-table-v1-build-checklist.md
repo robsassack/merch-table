@@ -171,6 +171,20 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Free-release library link email (library magic-link, release name)
 - [ ] `emailStatus` tracking on Order (`PENDING`, `SENT`, `FAILED`)
 
+### Mock email provider
+
+- [ ] Abstract email sending behind an `EMAIL_PROVIDER` env var (`resend` | `mock`)
+- [ ] Mock provider: logs payload to stdout, returns fake message ID, increments in-process counter keyed by template type
+- [ ] Counter resets between test cases; exported for use in integration test assertions
+- [ ] `.env.test` created with `EMAIL_PROVIDER=mock`, local DB URL, and test Stripe keys; used by all integration, load, and E2E test runs
+
+### Email provider abstraction
+
+- [ ] Implement `EmailProvider` interface with `resend` and `mock` implementations
+- [ ] `EMAIL_PROVIDER` env var selects implementation at runtime (`resend` | `mock`)
+- [ ] Mock provider logs payload to stdout, returns fake message ID, exposes sent-email counter and `getLastEmail()` helper for test assertions
+- [ ] `.env.test` configured with `EMAIL_PROVIDER=mock`, local test DB, and test Stripe keys
+
 ---
 
 ## Phase 6: Buyer Library & Downloads
@@ -375,6 +389,17 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Rate limiter returns 429 with `Retry-After` on free checkout
 - [ ] Rate limiter returns 429 on download; resets after window
 - [ ] Stripe webhook endpoint not rate-limited under rapid consecutive delivery
+- [ ] Concurrent free checkouts with same email + release → exactly one `Order` and one `BuyerLibraryToken`; second request returns graceful response with no duplicate side effects
+- [ ] Mock email counter asserts exactly one `free_library_link` queued per free checkout, even under concurrent submission
+- [ ] `accessCount` increments correctly under concurrent download requests to the same entitlement token (no lost updates)
+- [ ] Concurrent free checkout: two simultaneous requests with same email + release → exactly one Order, one BuyerLibraryToken, one queued email (mock counter assertion)
+- [ ] Concurrent download: multiple simultaneous requests with valid token → all receive signed URLs; `accessCount` reflects correct final value (no lost updates)
+
+### Load tests (k6, `/tests/load/`, runs against local Compose stack with `.env.test`)
+
+- [ ] Burst free checkout: 20 concurrent VUs, same email + release; assert zero duplicate orders and p95 < 500ms
+- [ ] Download burst: 50 concurrent VUs with valid token; assert all receive signed URLs and no 5xx responses
+- [ ] Transcode queue backlog: 20 simultaneous track uploads queuing preview clip jobs; assert all jobs reach `SUCCEEDED` within timeout and none are lost or duplicated
 
 ### End-to-end scenarios
 
@@ -401,6 +426,14 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Admin purges soft-deleted assets → storage files removed, download returns 404
 - [ ] Storefront passes axe-core with no critical/serious WCAG 2.1 AA violations
 - [ ] Audio player fully operable via keyboard
+
+### Load tests (k6)
+
+- [ ] k6 installed and `/tests/load/` directory scaffolded with a shared `.env.test` config helper
+- [ ] Scenario: concurrent free checkouts with the same email + release (2 simultaneous VUs); assert one order created, one email queued
+- [ ] Scenario: burst downloads via the same entitlement token; assert all requests succeed under threshold and signed URLs are distinct
+- [ ] Scenario: simultaneous track uploads triggering transcode queue jobs; assert all jobs enqueued and no duplicates
+- [ ] k6 thresholds defined for p95 response time and error rate on each scenario
 
 ### Deployment verification
 

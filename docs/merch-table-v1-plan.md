@@ -159,6 +159,23 @@
   - Required: DB URL, auth secret, SMTP settings, Stripe keys/webhook secret, storage credentials, Garage toggle.
   - Optional: Redis URL override, CDN base URL, transcoding concurrency, max upload size, default token TTL, signed URL expiry (default: 15 minutes), rate limit thresholds per endpoint, minimum price floor in cents (default: 50).
 
+## Test Environment Contract
+
+- Email provider abstraction:
+  - The email sending module checks an `EMAIL_PROVIDER` env var: `resend` (production) or `mock` (test/load environments).
+  - The mock provider is a no-op that logs the full payload to stdout, returns a fake message ID, and increments an in-process counter keyed by template type (e.g., `purchase_confirmation`, `free_library_link`, `admin_magic_link`, `setup_test`).
+  - Integration and load tests import the counter directly to assert "exactly N emails of type X were queued" without any real delivery occurring.
+  - `.env.test` is the designated config for all integration, load, and E2E test runs. It sets `EMAIL_PROVIDER=mock`, points to a local test database, and uses test Stripe keys.
+  - The mock counter resets between test cases; tests must not rely on counter state from prior cases.
+- Load testing:
+  - k6 is the designated load testing tool. Scripts live in `/tests/load/`.
+  - All load test runs use `.env.test` (mock email, local DB, no real Stripe or Resend calls).
+  - Three priority scenarios:
+    - Concurrent free checkouts with the same email + release (surfaces race condition on duplicate order creation).
+    - Burst downloads via the same entitlement token (validates signed URL generation under load).
+    - Simultaneous track uploads triggering transcode queue jobs (validates worker queue behavior under backlog).
+  - k6 thresholds codify pass/fail criteria (e.g., p95 response time, error rate) so load tests can gate CI if desired.
+
 ## Test Plan
 
 - Test data generation:
@@ -191,6 +208,15 @@
   - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on library resend endpoint.
   - Rate limiter returns 429 on download endpoint when threshold is exceeded; valid requests succeed again after the window resets.
   - Stripe webhook endpoint is not rate-limited; rapid consecutive webhook deliveries are all processed.
+  - Concurrent free checkouts with the same email + release result in exactly one `Order` and one `BuyerLibraryToken`; the second request receives a graceful response with no duplicate side effects.
+  - Mock email counter asserts exactly one `free_library_link` email queued per free checkout, even under concurrent submission.
+  - `accessCount` increments correctly under concurrent download requests to the same entitlement token (no lost updates).
+  - Concurrent free checkout: two simultaneous `POST /api/checkout/free` requests with the same email and release ID result in exactly one `Order`, one `BuyerLibraryToken`, and one queued email. Mock email counter confirms no duplicate sends.
+  - Concurrent download: multiple simultaneous requests to `GET /api/download/:entitlementToken/:assetId` each receive a valid signed URL; `accessCount` on `BuyerLibraryToken` reflects the correct final count (no lost updates).
+- Load tests (k6, scripts in `/tests/load/`, run against local Compose stack with `.env.test`):
+  - Burst free checkout: ramp to 20 concurrent VUs submitting `POST /api/checkout/free` with the same email+release; assert zero duplicate orders and p95 response time under 500ms.
+  - Download burst: 50 concurrent VUs hitting `GET /api/download/:entitlementToken/:assetId` with a valid token; assert all receive signed URLs and no 5xx responses.
+  - Transcode queue backlog: simulate 20 simultaneous track uploads all queuing preview clip jobs; assert all jobs reach `SUCCEEDED` within a timeout and no jobs are lost or duplicated.
 - End-to-end scenarios:
   - Fresh container start → bootstrap token in logs → setup wizard completes → store moves to `PRIVATE`.
   - Setup wizard SMTP step fails and blocks progression with a clear error.
