@@ -1,14 +1,12 @@
+import { APIError } from "better-auth";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { userHasAdminAccessToOrganization } from "@/lib/auth/admin-access";
-import { consumeAdminMagicLinkToken } from "@/lib/auth/admin-magic-link";
-import {
-  createAdminSessionCookieValue,
-  getAdminSessionCookieName,
-  getAdminSessionTtlSeconds,
-} from "@/lib/auth/admin-session";
+import { enforceAdminMagicLinkAccess } from "@/lib/auth/admin-magic-link-access";
+import { serializeSignedSessionTokenCookie } from "@/lib/auth/better-auth-session-cookie";
 import { getSetupSessionCookieName } from "@/lib/auth/setup-session";
+import { auth } from "@/lib/better-auth";
 import { prisma } from "@/lib/prisma";
 import { authRateLimitPolicies } from "@/lib/security/auth-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
@@ -21,6 +19,56 @@ export const runtime = "nodejs";
 const consumeSchema = z.object({
   token: z.string().trim().min(1),
 });
+
+async function revokeIssuedSessionToken(token: string) {
+  const context = await auth.$context;
+  await context.internalAdapter.deleteSession(token);
+}
+
+async function appendSignedBetterAuthSessionCookie(
+  response: NextResponse,
+  input: { token: string },
+) {
+  const context = await auth.$context;
+  const serialized = await serializeSignedSessionTokenCookie({
+    token: input.token,
+    secret: context.secret,
+    cookie: context.authCookies.sessionToken,
+  });
+
+  response.headers.append("set-cookie", serialized);
+}
+
+async function clearBetterAuthSessionCookies(response: NextResponse) {
+  const context = await auth.$context;
+
+  response.cookies.set({
+    name: context.authCookies.sessionToken.name,
+    value: "",
+    path: context.authCookies.sessionToken.attributes.path ?? "/",
+    maxAge: 0,
+  });
+
+  response.cookies.set({
+    name: context.authCookies.sessionData.name,
+    value: "",
+    path: context.authCookies.sessionData.attributes.path ?? "/",
+    maxAge: 0,
+  });
+}
+
+function isBetterAuthApiError(error: unknown) {
+  if (error instanceof APIError) {
+    return true;
+  }
+
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const candidate = error as { name?: unknown };
+  return candidate.name === "APIError";
+}
 
 export async function POST(request: Request) {
   const csrfError = enforceCsrfProtection(request);
@@ -39,15 +87,13 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const parsed = consumeSchema.parse(payload);
-    const consumed = await consumeAdminMagicLinkToken(parsed.token);
-    if (!consumed) {
-      return NextResponse.json(
-        { ok: false, error: "This sign-in link is invalid, expired, or already used." },
-        { status: 401 },
-      );
-    }
 
-    const normalizedEmail = consumed.email.trim().toLowerCase();
+    const verification = await auth.api.magicLinkVerify({
+      query: { token: parsed.token },
+      headers: request.headers,
+    });
+
+    const normalizedEmail = verification.user.email.trim().toLowerCase();
 
     const setup = await prisma.storeSettings.findFirst({
       select: { setupComplete: true, organizationId: true },
@@ -58,6 +104,7 @@ export async function POST(request: Request) {
     if (!setup?.setupComplete) {
       const stepOneState = await getStepOneState();
       if (!isStepOneComplete(stepOneState)) {
+        await revokeIssuedSessionToken(verification.token);
         return NextResponse.json(
           { ok: false, error: "Setup basics are incomplete." },
           { status: 409 },
@@ -74,19 +121,8 @@ export async function POST(request: Request) {
       organizationId = setupResult.organizationId;
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-      select: { id: true, email: true },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { ok: false, error: "This magic link is not associated with an admin user." },
-        { status: 403 },
-      );
-    }
-
     if (!organizationId) {
+      await revokeIssuedSessionToken(verification.token);
       return NextResponse.json(
         { ok: false, error: "Could not resolve admin organization." },
         { status: 500 },
@@ -94,36 +130,34 @@ export async function POST(request: Request) {
     }
 
     const hasAdminAccess = await userHasAdminAccessToOrganization({
-      userId: user.id,
+      userId: verification.user.id,
       organizationId,
     });
 
-    if (!hasAdminAccess) {
+    const access = await enforceAdminMagicLinkAccess({
+      hasAdminAccess,
+      issuedSessionToken: verification.token,
+      revokeIssuedSessionToken,
+    });
+    if (!access.ok) {
       return NextResponse.json(
-        { ok: false, error: "This magic link is not associated with an admin user." },
-        { status: 403 },
+        { ok: false, error: access.error },
+        { status: access.status },
       );
     }
 
     const response = NextResponse.json({ ok: true, redirectTo: "/admin" });
-    response.cookies.set({
-      name: getAdminSessionCookieName(),
-      value: createAdminSessionCookieValue({
-        userId: user.id,
-        email: user.email,
-        organizationId,
-      }),
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: getAdminSessionTtlSeconds(),
-    });
+
     response.cookies.set({
       name: getSetupSessionCookieName(),
       value: "",
       path: "/",
       maxAge: 0,
+    });
+
+    await clearBetterAuthSessionCookies(response);
+    await appendSignedBetterAuthSessionCookie(response, {
+      token: verification.token,
     });
 
     return response;
@@ -134,6 +168,15 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+
+    if (isBetterAuthApiError(error)) {
+      return NextResponse.json(
+        { ok: false, error: "This sign-in link is invalid, expired, or already used." },
+        { status: 401 },
+      );
+    }
+
+    console.error("[auth] Failed to complete admin magic-link sign-in", error);
 
     return NextResponse.json(
       { ok: false, error: "Could not complete admin sign-in." },

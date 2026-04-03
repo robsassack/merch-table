@@ -55,6 +55,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Admin auth
 
 - [x] Magic-link email login flow (request link → email → validate token → session)
+- [x] Admin logout flow (visible sign-out action in admin UI; clears session cookie and returns to `/admin/auth`)
 - [x] Admin magic-link login email template (one-time link + expiry notice)
 - [x] Bootstrap token fallback path (for when SMTP is misconfigured on first deploy)
 

@@ -82,12 +82,60 @@ enum EmailStatus {
 model User {
   id            String         @id @default(cuid())
   email         String         @unique
-  name          String?
+  name          String         @default("")
+  emailVerified Boolean        @default(false)
+  image         String?
+  sessions      Session[]
+  accounts      Account[]
   memberships   Membership[]
   organizations Organization[] @relation("OrganizationOwner")
   artists       Artist[]       @relation("ArtistOwner")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String   @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
 }
 
 model Organization {
@@ -433,18 +481,6 @@ model SetupWizardState {
   adminMagicLinkLastError String?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-}
-
-model AdminMagicLinkToken {
-  id        String   @id @default(cuid())
-  email     String
-  tokenHash String   @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([email, usedAt, expiresAt])
 }
 
 model SetupToken {

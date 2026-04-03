@@ -1,13 +1,18 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { hasValidAdminSession } from "@/lib/auth/admin-session";
+import { getSessionWithStrictLookup } from "@/lib/auth/admin-session-lookup";
+import { auth } from "@/lib/better-auth";
 
 import { AdminAuthRequestForm } from "./request-form";
 
 export default async function AdminAuthPage() {
-  const cookieStore = await cookies();
-  if (hasValidAdminSession(cookieStore)) {
+  const session = await getSessionWithStrictLookup({
+    headers: new Headers(await headers()),
+    getSession: auth.api.getSession,
+  });
+
+  if (session) {
     redirect("/admin");
   }
 

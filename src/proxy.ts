@@ -42,13 +42,13 @@ async function isSetupComplete(request: NextRequest) {
 
 async function isAdminAuthenticated(request: NextRequest) {
   try {
+    const forwardedHeaders = new Headers(request.headers);
+    forwardedHeaders.set("x-merch-table-proxy", "admin-auth-gate");
+
     const response = await fetch(`${request.nextUrl.origin}/api/admin/auth/status`, {
       method: "GET",
       cache: "no-store",
-      headers: {
-        "x-merch-table-proxy": "admin-auth-gate",
-        cookie: request.headers.get("cookie") ?? "",
-      },
+      headers: forwardedHeaders,
     });
 
     if (!response.ok) {
@@ -105,6 +105,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!api/setup|api/admin/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)",
+    "/((?!api/setup|api/admin/auth|api/auth|_next/static|_next/image|favicon.ico|.*\\..*).*)",
   ],
 };

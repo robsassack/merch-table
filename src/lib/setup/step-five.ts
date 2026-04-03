@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import { sendAdminMagicLink } from "@/lib/auth/admin-magic-link";
+import { getAdminMagicLinkExpiryMinutes } from "@/lib/auth/admin-magic-link";
+import { auth } from "@/lib/better-auth";
 import { prisma } from "@/lib/prisma";
 
 export const stepFiveSchema = z.object({
@@ -79,7 +80,7 @@ export async function saveStepFiveState(input: StepFiveInput) {
   return getStepFiveState();
 }
 
-export async function sendFirstAdminMagicLink() {
+export async function sendFirstAdminMagicLink(requestHeaders: Headers) {
   const state = await prisma.setupWizardState.findUnique({
     where: { singletonKey: 1 },
     select: {
@@ -93,9 +94,19 @@ export async function sendFirstAdminMagicLink() {
     throw new Error("Complete SMTP setup and admin email before sending magic link.");
   }
 
-  const result = await sendAdminMagicLink(state.adminEmail);
+  const normalizedEmail = state.adminEmail.trim().toLowerCase();
+  await auth.api.signInMagicLink({
+    body: {
+      email: normalizedEmail,
+    },
+    headers: requestHeaders,
+  });
 
   const now = new Date();
+  const expiresAt = new Date(
+    now.getTime() + getAdminMagicLinkExpiryMinutes() * 60_000,
+  );
+
   await prisma.setupWizardState.update({
     where: { id: state.id },
     data: {
@@ -106,8 +117,8 @@ export async function sendFirstAdminMagicLink() {
 
   return {
     sentAt: now.toISOString(),
-    adminEmail: result.adminEmail,
-    expiresAt: result.expiresAt,
+    adminEmail: normalizedEmail,
+    expiresAt: expiresAt.toISOString(),
   };
 }
 

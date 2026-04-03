@@ -2,7 +2,11 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { adminEmailHasAccessToOrganization } from "@/lib/auth/admin-access";
-import { sendAdminMagicLink } from "@/lib/auth/admin-magic-link";
+import {
+  GENERIC_ADMIN_MAGIC_LINK_MESSAGE,
+  resolveAdminRequestLinkPlan,
+} from "@/lib/auth/admin-request-link";
+import { auth } from "@/lib/better-auth";
 import { prisma } from "@/lib/prisma";
 import { authRateLimitPolicies } from "@/lib/security/auth-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
@@ -17,9 +21,6 @@ export const runtime = "nodejs";
 const requestSchema = z.object({
   email: z.email().max(320),
 });
-
-const GENERIC_SUCCESS_MESSAGE =
-  "If that email is authorized, a magic link has been sent.";
 
 async function isAuthorizedAdminEmail(email: string, organizationId: string) {
   return adminEmailHasAccessToOrganization({ email, organizationId });
@@ -62,17 +63,24 @@ export async function POST(request: Request) {
         key: `admin-email:${createHashedRateLimitKey(normalizedEmail)}`,
       },
     );
-    if (emailScopedRateLimit.limited) {
-      return NextResponse.json({ ok: true, message: GENERIC_SUCCESS_MESSAGE });
-    }
 
     const authorized = await isAuthorizedAdminEmail(
       normalizedEmail,
       setup.organizationId,
     );
-    if (authorized) {
+    const plan = resolveAdminRequestLinkPlan({
+      emailRateLimited: emailScopedRateLimit.limited,
+      authorized,
+    });
+
+    if (plan.shouldSendMagicLink) {
       try {
-        await sendAdminMagicLink(normalizedEmail);
+        await auth.api.signInMagicLink({
+          body: {
+            email: normalizedEmail,
+          },
+          headers: request.headers,
+        });
       } catch (error) {
         console.warn(
           `[auth] Failed to send admin magic link: ${
@@ -82,7 +90,10 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, message: GENERIC_SUCCESS_MESSAGE });
+    return NextResponse.json({
+      ok: true,
+      message: plan.message ?? GENERIC_ADMIN_MAGIC_LINK_MESSAGE,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

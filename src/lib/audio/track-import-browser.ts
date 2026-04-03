@@ -45,7 +45,7 @@ export async function parseTrackImportFileMetadata(
   let durationMs: number | null = null;
 
   try {
-    const { parseBlob } = await import("music-metadata-browser");
+    const { parseBlob } = await import("music-metadata");
     const parsed = await parseBlob(file, { duration: true });
 
     const trackNo = parsed.common.track.no;

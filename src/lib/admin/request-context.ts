@@ -1,8 +1,9 @@
-import { cookies } from "next/headers";
+import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { userHasAdminAccessToOrganization } from "@/lib/auth/admin-access";
-import { readAdminSession } from "@/lib/auth/admin-session";
+import { getSessionWithStrictLookup } from "@/lib/auth/admin-session-lookup";
+import { auth } from "@/lib/better-auth";
 import { prisma } from "@/lib/prisma";
 
 export type AdminRequestContext = {
@@ -16,9 +17,13 @@ export type AdminRequestContext = {
 };
 
 export async function requireAdminRequestContext() {
-  const cookieStore = await cookies();
-  const session = readAdminSession(cookieStore);
-  if (!session) {
+  const requestHeaders = new Headers(await headers());
+  const authSession = await getSessionWithStrictLookup({
+    headers: requestHeaders,
+    getSession: auth.api.getSession,
+  });
+
+  if (!authSession) {
     return {
       ok: false as const,
       response: NextResponse.json(
@@ -43,21 +48,8 @@ export async function requireAdminRequestContext() {
     };
   }
 
-  if (
-    session.organizationId &&
-    session.organizationId !== setup.organizationId
-  ) {
-    return {
-      ok: false as const,
-      response: NextResponse.json(
-        { ok: false, error: "Admin session is not valid for this organization." },
-        { status: 403 },
-      ),
-    };
-  }
-
   const hasAccess = await userHasAdminAccessToOrganization({
-    userId: session.userId,
+    userId: authSession.user.id,
     organizationId: setup.organizationId,
   });
   if (!hasAccess) {
@@ -74,7 +66,11 @@ export async function requireAdminRequestContext() {
     ok: true as const,
     context: {
       organizationId: setup.organizationId,
-      session,
+      session: {
+        userId: authSession.user.id,
+        email: authSession.user.email,
+        expiresAt: authSession.session.expiresAt.getTime(),
+      },
     } satisfies AdminRequestContext,
   };
 }

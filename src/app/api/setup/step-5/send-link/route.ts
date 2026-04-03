@@ -68,7 +68,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await sendFirstAdminMagicLink();
+    const result = await sendFirstAdminMagicLink(request.headers);
     return NextResponse.json({ ok: true, ...result });
   } catch {
     const message = SAFE_EXTERNAL_ERROR_MESSAGES.adminMagicLink;

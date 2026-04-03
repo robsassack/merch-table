@@ -1,11 +1,8 @@
 import { NextResponse } from "next/server";
 
-import {
-  createAdminSessionCookieValue,
-  getAdminSessionCookieName,
-  getAdminSessionTtlSeconds,
-} from "@/lib/auth/admin-session";
+import { serializeSignedSessionTokenCookie } from "@/lib/auth/better-auth-session-cookie";
 import { getSetupSessionCookieName } from "@/lib/auth/setup-session";
+import { auth } from "@/lib/better-auth";
 import { claimBootstrapSetupToken } from "@/lib/bootstrap/setup-token";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
@@ -20,6 +17,20 @@ import { getStepThreeState, isStepThreeComplete } from "@/lib/setup/step-three";
 import { getStepTwoState, isStepTwoComplete } from "@/lib/setup/step-two";
 
 export const runtime = "nodejs";
+
+async function setBetterAuthSessionCookie(
+  response: NextResponse,
+  input: { userId: string },
+) {
+  const context = await auth.$context;
+  const session = await context.internalAdapter.createSession(input.userId);
+  const serialized = await serializeSignedSessionTokenCookie({
+    token: session.token,
+    secret: context.secret,
+    cookie: context.authCookies.sessionToken,
+  });
+  response.headers.append("set-cookie", serialized);
+}
 
 export async function POST(request: Request) {
   const csrfError = enforceCsrfProtection(request);
@@ -99,7 +110,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const setupResult = await completeSetup({
+  await completeSetup({
     orgName: stepOneState.orgName,
     storeName: stepOneState.storeName,
     contactEmail: stepOneState.contactEmail,
@@ -109,7 +120,7 @@ export async function POST(request: Request) {
 
   const user = await prisma.user.findUnique({
     where: { email: stepFiveState.adminEmail.trim().toLowerCase() },
-    select: { id: true, email: true },
+    select: { id: true },
   });
 
   if (!user) {
@@ -121,24 +132,12 @@ export async function POST(request: Request) {
 
   const response = NextResponse.json({ ok: true, redirectTo: "/admin" });
   response.cookies.set({
-    name: getAdminSessionCookieName(),
-    value: createAdminSessionCookieValue({
-      userId: user.id,
-      email: user.email,
-      organizationId: setupResult.organizationId,
-    }),
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: getAdminSessionTtlSeconds(),
-  });
-  response.cookies.set({
     name: getSetupSessionCookieName(),
     value: "",
     path: "/",
     maxAge: 0,
   });
+  await setBetterAuthSessionCookie(response, { userId: user.id });
 
   return response;
 }

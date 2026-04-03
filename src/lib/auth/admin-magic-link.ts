@@ -1,5 +1,3 @@
-import crypto from "node:crypto";
-
 import nodemailer from "nodemailer";
 
 import { decryptSecret } from "@/lib/crypto/secret-box";
@@ -9,13 +7,14 @@ import { prisma } from "@/lib/prisma";
 const MAGIC_LINK_EXPIRY_MINUTES = 30;
 const DEFAULT_APP_BASE_URL = "http://localhost:3000";
 
-function hashToken(token: string) {
-  return crypto.createHash("sha256").update(token).digest("hex");
-}
-
-function generateToken() {
-  return crypto.randomBytes(24).toString("base64url");
-}
+type SmtpConfig = {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUsername: string;
+  smtpPassword: string;
+  smtpSecure: boolean;
+  smtpFromEmail: string;
+};
 
 function getMagicLinkUrl(token: string) {
   const appBaseUrl = process.env.APP_BASE_URL ?? DEFAULT_APP_BASE_URL;
@@ -27,14 +26,9 @@ function getMagicLinkUrl(token: string) {
   return `${normalized}/admin/auth/magic-link#token=${encodeURIComponent(token)}`;
 }
 
-type SmtpConfig = {
-  smtpHost: string;
-  smtpPort: number;
-  smtpUsername: string;
-  smtpPassword: string;
-  smtpSecure: boolean;
-  smtpFromEmail: string;
-};
+export function getAdminMagicLinkExpiryMinutes() {
+  return MAGIC_LINK_EXPIRY_MINUTES;
+}
 
 async function getSmtpConfig(): Promise<SmtpConfig> {
   const state = await prisma.setupWizardState.findUnique({
@@ -75,18 +69,12 @@ async function getSmtpConfig(): Promise<SmtpConfig> {
   };
 }
 
-export async function sendAdminMagicLink(email: string) {
+export async function sendAdminMagicLinkEmail(input: {
+  email: string;
+  token: string;
+}) {
   const smtp = await getSmtpConfig();
-  const token = generateToken();
-  const expiresAt = new Date(Date.now() + MAGIC_LINK_EXPIRY_MINUTES * 60_000);
-
-  await prisma.adminMagicLinkToken.create({
-    data: {
-      email,
-      tokenHash: hashToken(token),
-      expiresAt,
-    },
-  });
+  const magicLinkUrl = getMagicLinkUrl(input.token);
 
   const transporter = nodemailer.createTransport({
     host: smtp.smtpHost,
@@ -100,10 +88,9 @@ export async function sendAdminMagicLink(email: string) {
 
   await transporter.verify();
 
-  const magicLinkUrl = getMagicLinkUrl(token);
   await transporter.sendMail({
     from: smtp.smtpFromEmail,
-    to: email,
+    to: input.email,
     subject: "Your Merch Table admin sign-in link",
     html: getAdminMagicLinkEmailHtml({
       magicLinkUrl,
@@ -113,48 +100,7 @@ export async function sendAdminMagicLink(email: string) {
 
   return {
     sentAt: new Date().toISOString(),
-    adminEmail: email,
-    expiresAt: expiresAt.toISOString(),
-  };
-}
-
-export async function consumeAdminMagicLinkToken(token: string) {
-  const tokenHash = hashToken(token);
-  const now = new Date();
-
-  const matchingToken = await prisma.adminMagicLinkToken.findFirst({
-    where: {
-      tokenHash,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    select: {
-      id: true,
-      email: true,
-    },
-  });
-
-  if (!matchingToken) {
-    return null;
-  }
-
-  const consumeResult = await prisma.adminMagicLinkToken.updateMany({
-    where: {
-      id: matchingToken.id,
-      usedAt: null,
-      expiresAt: { gt: now },
-    },
-    data: {
-      usedAt: now,
-    },
-  });
-
-  if (consumeResult.count !== 1) {
-    return null;
-  }
-
-  return {
-    email: matchingToken.email,
-    consumedAt: now.toISOString(),
+    adminEmail: input.email,
+    expiresInMinutes: MAGIC_LINK_EXPIRY_MINUTES,
   };
 }
