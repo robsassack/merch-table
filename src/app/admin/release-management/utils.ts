@@ -10,6 +10,12 @@ import type {
 } from "./types";
 
 const DEFAULT_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
+const TRACK_STATUS_CHIP_BASE_CLASS_NAME =
+  "inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-medium leading-none";
+
+function withTrackStatusTone(toneClassName: string) {
+  return `${TRACK_STATUS_CHIP_BASE_CLASS_NAME} ${toneClassName}`;
+}
 
 export function moveItemInArray<T>(items: T[], fromIndex: number, toIndex: number) {
   if (fromIndex === toIndex) {
@@ -360,8 +366,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
   if (track.previewMode === "FULL") {
     return {
       label: "full preview",
-      className:
-        "rounded-full border border-sky-700/70 bg-sky-950/40 px-2 py-0.5 text-[11px] font-medium text-sky-300",
+      className: withTrackStatusTone("border-sky-700/70 bg-sky-950/40 text-sky-300"),
     };
   }
 
@@ -394,8 +399,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
   if (runningJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
       label: previewAsset ? "preview updating" : "preview running",
-      className:
-        "rounded-full border border-indigo-700/70 bg-indigo-950/40 px-2 py-0.5 text-[11px] font-medium text-indigo-300",
+      className: withTrackStatusTone("border-indigo-700/70 bg-indigo-950/40 text-indigo-300"),
     };
   }
 
@@ -403,8 +407,7 @@ export function getTrackPreviewStatus(track: TrackRecord) {
   if (queuedJob && (!previewAsset || !previewMatchesCurrentConfig)) {
     return {
       label: previewAsset ? "preview updating" : "preview queued",
-      className:
-        "rounded-full border border-blue-700/70 bg-blue-950/40 px-2 py-0.5 text-[11px] font-medium text-blue-300",
+      className: withTrackStatusTone("border-blue-700/70 bg-blue-950/40 text-blue-300"),
     };
   }
 
@@ -412,15 +415,13 @@ export function getTrackPreviewStatus(track: TrackRecord) {
     if (!previewMatchesCurrentConfig) {
       return {
         label: "preview pending update",
-        className:
-          "rounded-full border border-amber-700/70 bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-300",
+        className: withTrackStatusTone("border-amber-700/70 bg-amber-950/40 text-amber-300"),
       };
     }
 
     return {
       label: "preview ready",
-      className:
-        "rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300",
+      className: withTrackStatusTone("border-emerald-700/70 bg-emerald-950/40 text-emerald-300"),
     };
   }
 
@@ -428,15 +429,13 @@ export function getTrackPreviewStatus(track: TrackRecord) {
   if (failedJob) {
     return {
       label: "preview failed",
-      className:
-        "rounded-full border border-rose-700/70 bg-rose-950/40 px-2 py-0.5 text-[11px] font-medium text-rose-300",
+      className: withTrackStatusTone("border-rose-700/70 bg-rose-950/40 text-rose-300"),
     };
   }
 
   return {
     label: "no preview",
-    className:
-      "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
+    className: withTrackStatusTone("border-slate-700/80 bg-slate-900/70 text-zinc-400"),
   };
 }
 
@@ -501,8 +500,7 @@ export function getTrackDeliveryStatus(
   if (!hasLosslessMaster && available.size === 0) {
     return {
       label: "delivery n/a",
-      className:
-        "rounded-full border border-slate-700/80 bg-slate-900/70 px-2 py-0.5 text-[11px] font-medium text-zinc-400",
+      className: withTrackStatusTone("border-slate-700/80 bg-slate-900/70 text-zinc-400"),
     };
   }
 
@@ -510,23 +508,20 @@ export function getTrackDeliveryStatus(
   if (available.size >= enabled.size) {
     return {
       label: `delivery ready ${completeLabel}`,
-      className:
-        "rounded-full border border-emerald-700/70 bg-emerald-950/40 px-2 py-0.5 text-[11px] font-medium text-emerald-300",
+      className: withTrackStatusTone("border-emerald-700/70 bg-emerald-950/40 text-emerald-300"),
     };
   }
 
   if (available.size > 0) {
     return {
       label: `delivery partial ${completeLabel}`,
-      className:
-        "rounded-full border border-amber-700/70 bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-300",
+      className: withTrackStatusTone("border-amber-700/70 bg-amber-950/40 text-amber-300"),
     };
   }
 
   return {
     label: `delivery pending ${completeLabel}`,
-    className:
-      "rounded-full border border-blue-700/70 bg-blue-950/40 px-2 py-0.5 text-[11px] font-medium text-blue-300",
+    className: withTrackStatusTone("border-blue-700/70 bg-blue-950/40 text-blue-300"),
   };
 }
 

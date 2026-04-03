@@ -91,8 +91,8 @@ export function ReleaseManagementCreateForm(props: {
           </div>
         </div>
 
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+        <div className="mt-3 grid gap-3 md:grid-cols-2">
+          <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
             Artist (required)
             <select
               required
@@ -112,7 +112,7 @@ export function ReleaseManagementCreateForm(props: {
             </select>
           </label>
 
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+          <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
             Title (required)
             <input
               required
@@ -131,7 +131,7 @@ export function ReleaseManagementCreateForm(props: {
           </label>
 
           {createAdvancedOpen ? (
-            <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+            <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
               URL
               <input
                 maxLength={160}
@@ -143,13 +143,13 @@ export function ReleaseManagementCreateForm(props: {
                 className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
                 placeholder="release-title"
               />
-              <span className="text-[11px] text-zinc-500">
+              <span className="rm-break-anywhere text-[11px] text-zinc-500">
                 Preview: {getReleaseUrlPreview(newTitle, newSlug)}
               </span>
             </label>
           ) : null}
 
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+          <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
             Description
             <textarea
               rows={3}
@@ -161,7 +161,7 @@ export function ReleaseManagementCreateForm(props: {
             />
           </label>
 
-          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
             <p className="font-medium text-zinc-300">Cover artwork</p>
             <p className="mt-1">
               Upload square artwork for this release. JPEG, PNG, WEBP, AVIF, and GIF are supported.
@@ -262,7 +262,7 @@ export function ReleaseManagementCreateForm(props: {
           </label>
 
           {newPricingMode === "FIXED" ? (
-            <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+            <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
               Fixed price ({storeCurrency})
               <input
                 type="number"
@@ -278,7 +278,7 @@ export function ReleaseManagementCreateForm(props: {
           ) : null}
 
           {newPricingMode === "PWYW" ? (
-            <div className="flex flex-col gap-2 text-xs text-zinc-500 sm:col-span-2">
+            <div className="flex flex-col gap-2 text-xs text-zinc-500 md:col-span-2">
               <label className="flex flex-col gap-1">
                 PWYW minimum ({storeCurrency})
                 <input
@@ -309,7 +309,7 @@ export function ReleaseManagementCreateForm(props: {
             </div>
           ) : null}
 
-          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
             <p className="font-medium text-zinc-300">Pricing estimate</p>
             {renderPricingDetails(
               {
@@ -334,7 +334,7 @@ export function ReleaseManagementCreateForm(props: {
             )}
           </div>
 
-          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
             <p className="font-medium text-zinc-300">Master quality workflow</p>
             <p className="mt-1">
               Upload lossless masters first when possible. If you only have lossy files, mark this
@@ -367,7 +367,7 @@ export function ReleaseManagementCreateForm(props: {
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+          <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
             <p className="font-medium text-zinc-300">Download formats</p>
             <p className="mt-1">
               Choose which transcode formats can be generated for buyer downloads on this
@@ -412,7 +412,7 @@ export function ReleaseManagementCreateForm(props: {
           </div>
         </div>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex justify-stretch sm:justify-end">
           <button
             type="submit"
             disabled={
@@ -421,7 +421,7 @@ export function ReleaseManagementCreateForm(props: {
               activeArtists.length === 0 ||
               newDeliveryFormats.length === 0
             }
-            className={primaryButtonClassName}
+            className={`${primaryButtonClassName} w-full sm:w-auto`}
           >
             {createPending ? "Creating..." : "Create Release"}
           </button>

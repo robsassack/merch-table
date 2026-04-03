@@ -22,7 +22,7 @@ export function ReleaseManagementPanelView(props: {
 
   if (!isHydrated) {
     return (
-      <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
+      <section className="release-management-panel mt-6 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-4 sm:mt-8 sm:p-6">
         <p className="text-sm text-zinc-500">Loading release management…</p>
       </section>
     );
@@ -31,8 +31,8 @@ export function ReleaseManagementPanelView(props: {
   return (
     <>
       <ReleaseManagementToastStack controller={props.controller} />
-      <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
+      <section className="release-management-panel mt-6 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-4 sm:mt-8 sm:p-6">
+        <div className="flex flex-col gap-1 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Release Management</h2>
           <p className="text-xs text-zinc-500">
             {releases.length} total, {deletedCount} deleted

@@ -292,12 +292,12 @@ export function ReleaseManagementStorefrontPreview(props: {
   };
 
   return (
-    <section className="mt-4 rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+    <section className="mt-4 rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
       <p className="font-medium text-zinc-300">Storefront preview sandbox</p>
       <p className="mt-1">
         Quick playback check for generated clips/full-preview behavior on this release.
       </p>
-      <label className="mt-3 flex max-w-xs flex-col gap-1 text-xs text-zinc-500">
+      <label className="mt-3 flex w-full max-w-sm flex-col gap-1 text-xs text-zinc-500">
         Playback source
         <select
           value={playbackSource}

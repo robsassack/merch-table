@@ -14,7 +14,7 @@ type AdminWorkspaceProps = {
 export type AdminTab = "artists" | "releases";
 
 const tabClassName =
-  "inline-flex items-center rounded-lg px-3 py-2 text-sm font-medium transition";
+  "inline-flex flex-1 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition sm:flex-none";
 
 function getStatusStyle(status: StoreStatus) {
   if (status === "PUBLIC") {
@@ -56,7 +56,7 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
           </div>
         </div>
 
-        <div className="inline-flex rounded-xl border border-slate-700 bg-slate-900/70 p-1">
+        <div className="flex w-full rounded-xl border border-slate-700 bg-slate-900/70 p-1 sm:inline-flex sm:w-auto">
           <Link
             href="/admin/artists"
             aria-current={activeTab === "artists" ? "page" : undefined}

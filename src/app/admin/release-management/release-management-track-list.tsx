@@ -12,6 +12,11 @@ import {
   toTrackDraft,
 } from "./utils";
 
+const trackMetaChipClassName =
+  "inline-flex items-center rounded-full border border-slate-700/80 bg-slate-900/70 px-2.5 py-1 text-[11px] font-medium leading-none text-zinc-300";
+const trackMetaMutedChipClassName =
+  "inline-flex items-center rounded-full border border-slate-700/70 bg-slate-950/70 px-2.5 py-1 text-[11px] font-medium leading-none text-zinc-400";
+
 function normalizeDeliveryAssetFormat(format: string) {
   const normalized = format.trim().toUpperCase();
   if (normalized === "MP3") {
@@ -80,6 +85,10 @@ export function ReleaseManagementTrackList(props: {
       !showFailedOnly ||
       track.transcodeJobs.some((job) => job.status === "FAILED"),
   );
+  const orderedTracks = sortTracks(release.tracks);
+  const orderedTrackIndexById = new Map(
+    orderedTracks.map((track, index) => [track.id, index] as const),
+  );
 
   return (
                       <div className="mt-3 space-y-3">
@@ -96,6 +105,13 @@ export function ReleaseManagementTrackList(props: {
                           const trackUploadPending = pendingTrackUploadId === track.id;
                           const isTrackDragging = draggingTrackIdForRelease === track.id;
                           const isTrackDragOver = dragOverTrackIdForRelease === track.id;
+                          const trackOrderIndex = orderedTrackIndexById.get(track.id) ?? -1;
+                          const moveUpTargetTrackId =
+                            trackOrderIndex > 0 ? orderedTracks[trackOrderIndex - 1]?.id ?? null : null;
+                          const moveDownTargetTrackId =
+                            trackOrderIndex >= 0 && trackOrderIndex < orderedTracks.length - 1
+                              ? orderedTracks[trackOrderIndex + 1]?.id ?? null
+                              : null;
                           const trackActionPending = trackPending || trackRequeuePending;
                           const trackUploadProgress = trackUploadProgressById[track.id] ?? 0;
                           const trackUploadRole = trackUploadRoleById[track.id] ?? "MASTER";
@@ -203,10 +219,14 @@ export function ReleaseManagementTrackList(props: {
                           return (
                             <div
                               key={track.id}
-                              className={`rounded-lg border bg-slate-950/60 p-3 ${
+                              className={`rounded-lg border bg-slate-950/60 p-3 transition-opacity ${
                                 isTrackDragOver
-                                  ? "border-emerald-500/70"
+                                  ? "border-emerald-500/70 bg-emerald-950/10"
                                   : "border-slate-700"
+                              } ${
+                                isTrackDragging
+                                  ? "opacity-70"
+                                  : "opacity-100"
                               }`}
                               onDragOver={(event) => {
                                 if (!draggingTrackIdForRelease || reorderTrackPending) {
@@ -224,8 +244,8 @@ export function ReleaseManagementTrackList(props: {
                                 void onReorderTrackDrop(release, track.id);
                               }}
                             >
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
+                              <div className="flex flex-col gap-2 md:grid md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:gap-3">
+                                <div className="flex min-w-0 items-start gap-2 md:items-center md:gap-3">
                                   <span
                                     draggable={!reorderTrackPending}
                                     onDragStart={(event) => {
@@ -249,7 +269,7 @@ export function ReleaseManagementTrackList(props: {
                                         [release.id]: null,
                                       }));
                                     }}
-                                    className={`select-none rounded border px-1 py-0 text-[11px] ${
+                                    className={`hidden select-none rounded border px-1 py-0.5 text-[11px] md:inline-flex md:w-4 md:shrink-0 md:justify-center ${
                                       isTrackDragging
                                         ? "border-emerald-500/70 text-emerald-300"
                                         : "border-slate-600 text-zinc-400"
@@ -257,14 +277,77 @@ export function ReleaseManagementTrackList(props: {
                                     aria-label={`Drag to reorder ${track.title}`}
                                     title="Drag to reorder"
                                   >
-                                    ||
+                                    <svg
+                                      xmlns="http://www.w3.org/2000/svg"
+                                      viewBox="0 0 12 14"
+                                      className="h-3.5 w-3.5"
+                                      fill="currentColor"
+                                      aria-hidden="true"
+                                    >
+                                      <circle cx="3" cy="2" r="1" />
+                                      <circle cx="9" cy="2" r="1" />
+                                      <circle cx="3" cy="7" r="1" />
+                                      <circle cx="9" cy="7" r="1" />
+                                      <circle cx="3" cy="12" r="1" />
+                                      <circle cx="9" cy="12" r="1" />
+                                    </svg>
                                   </span>
-                                  <p className="text-left text-xs font-medium text-zinc-200">
+                                  <p className="min-w-0 break-words text-left text-xs font-medium text-zinc-200">
                                     Track {track.trackNumber} • {track.title} •{" "}
                                     {formatTrackDuration(track.durationMs)}
                                   </p>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                                  <button
+                                    type="button"
+                                    className={`${buttonClassName} px-2 py-1.5 md:hidden`}
+                                    aria-label={`Move ${track.title} up`}
+                                    title="Move up"
+                                    disabled={
+                                      isPending ||
+                                      trackActionPending ||
+                                      importTrackPending ||
+                                      previewApplyPending ||
+                                      reorderTrackPending ||
+                                      trackUploadPending ||
+                                      moveUpTargetTrackId === null
+                                    }
+                                    onClick={() => {
+                                      if (!moveUpTargetTrackId) {
+                                        return;
+                                      }
+                                      void onReorderTrackDrop(release, moveUpTargetTrackId, {
+                                        draggedTrackId: track.id,
+                                      });
+                                    }}
+                                  >
+                                    ↑
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`${buttonClassName} px-2 py-1.5 md:hidden`}
+                                    aria-label={`Move ${track.title} down`}
+                                    title="Move down"
+                                    disabled={
+                                      isPending ||
+                                      trackActionPending ||
+                                      importTrackPending ||
+                                      previewApplyPending ||
+                                      reorderTrackPending ||
+                                      trackUploadPending ||
+                                      moveDownTargetTrackId === null
+                                    }
+                                    onClick={() => {
+                                      if (!moveDownTargetTrackId) {
+                                        return;
+                                      }
+                                      void onReorderTrackDrop(release, moveDownTargetTrackId, {
+                                        draggedTrackId: track.id,
+                                      });
+                                    }}
+                                  >
+                                    ↓
+                                  </button>
                                   <button
                                     type="button"
                                     className={`${dangerButtonClassName} px-2 py-1.5`}
@@ -348,7 +431,7 @@ export function ReleaseManagementTrackList(props: {
                                   </button>
                                 </div>
                               </div>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 pl-6">
+                              <div className="mt-3 flex flex-wrap items-center gap-2 md:mt-2 md:pl-7">
                                 <span className={previewStatus.className}>
                                   {previewStatus.label}
                                 </span>
@@ -356,18 +439,18 @@ export function ReleaseManagementTrackList(props: {
                                   {deliveryStatus.label}
                                 </span>
                                 {failedJobsCount > 0 ? (
-                                  <span className="rounded-full border border-rose-700/70 bg-rose-950/40 px-2 py-0.5 text-[11px] font-medium text-rose-300">
+                                  <span className="inline-flex items-center rounded-full border border-rose-700/70 bg-rose-950/40 px-2.5 py-1 text-[11px] font-medium leading-none text-rose-300">
                                     {failedJobsCount} failed
                                   </span>
                                 ) : null}
-                                <span className="text-[11px] text-zinc-500">
+                                <span className={trackMetaMutedChipClassName}>
                                   assets: {masterCount} master, {deliveryCountLabel} delivery,{" "}
                                   {previewCount} preview
                                 </span>
                                 {uploadedMasterFileName ? (
-                                  <span className="max-w-full truncate text-[11px] text-zinc-500">
-                                    uploaded:{" "}
-                                    <span className="font-medium text-zinc-300">
+                                  <span className={`${trackMetaChipClassName} min-w-0 max-w-full`}>
+                                    <span className="text-zinc-400">uploaded:</span>
+                                    <span className="ml-1 min-w-0 truncate font-medium text-zinc-200">
                                       {uploadedMasterFileName}
                                     </span>
                                   </span>
@@ -376,8 +459,8 @@ export function ReleaseManagementTrackList(props: {
 
                               {isTrackExpanded ? (
                                 <>
-                                  <div className="mt-3 grid gap-3 sm:grid-cols-6">
-                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 sm:col-span-4">
+                                  <div className="mt-3 grid gap-3 md:grid-cols-6">
+                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-4">
                                   Title
                                   <input
                                     value={trackDraft.title}
@@ -400,7 +483,7 @@ export function ReleaseManagementTrackList(props: {
                                     }
                                   />
                                 </label>
-                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 sm:col-span-2">
+                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-2">
                                   Track Number
                                   <input
                                     value={trackDraft.trackNumber}
@@ -424,7 +507,7 @@ export function ReleaseManagementTrackList(props: {
                                     }
                                   />
                                 </label>
-                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 sm:col-span-3">
+                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-3">
                                   Credits
                                   <textarea
                                     rows={3}
@@ -448,7 +531,7 @@ export function ReleaseManagementTrackList(props: {
                                     }
                                   />
                                 </label>
-                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 sm:col-span-3">
+                                <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-3">
                                   Lyrics
                                   <textarea
                                     rows={3}

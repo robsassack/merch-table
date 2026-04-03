@@ -64,10 +64,15 @@ export function ReleaseManagementSelectedReleaseList(props: {
               localCoverPreviewById[release.id] ?? draft.coverImageUrl;
 
             return (
-              <article key={release.id} className="rounded-xl border border-slate-700 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold text-zinc-100">{release.title}</h3>
+              <article
+                key={release.id}
+                className="overflow-x-clip rounded-xl border border-slate-700 p-3 sm:p-4"
+              >
+                <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <h3 className="min-w-0 break-words text-sm font-semibold text-zinc-100">
+                      {release.title}
+                    </h3>
                     {release.deletedAt ? (
                       <span className="rounded-full border border-amber-700/70 bg-amber-950/50 px-2 py-0.5 text-[11px] font-medium text-amber-300">
                         deleted
@@ -80,13 +85,13 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     ) : null}
                   </div>
 
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-zinc-500 sm:text-right">
                     {release._count.tracks} tracks • {release._count.files} files • {release._count.orderItems} orders
                   </p>
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
                     Artist
                     <select
                       value={draft.artistId}
@@ -111,7 +116,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     </select>
                   </label>
 
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+                  <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
                     Title
                     <input
                       required
@@ -128,7 +133,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                   </label>
 
                   {advancedById[release.id] ? (
-                    <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
                       URL
                       <input
                         maxLength={160}
@@ -144,13 +149,13 @@ export function ReleaseManagementSelectedReleaseList(props: {
                         }
                         className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
                       />
-                      <span className="text-[11px] text-zinc-500">
+                      <span className="rm-break-anywhere text-[11px] text-zinc-500">
                         Preview: {getReleaseUrlPreview(draft.title, draft.slug)}
                       </span>
                     </label>
                   ) : null}
 
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+                  <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
                     Description
                     <textarea
                       rows={3}
@@ -166,7 +171,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     />
                   </label>
 
-                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <p className="font-medium text-zinc-300">Cover artwork</p>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
                       <label className={buttonClassName}>
@@ -288,7 +293,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                   </label>
 
                   {draft.pricingMode === "FIXED" ? (
-                    <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+                    <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
                       Fixed price ({release.currency})
                       <input
                         type="number"
@@ -311,7 +316,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                   ) : null}
 
                   {draft.pricingMode === "PWYW" ? (
-                    <div className="flex flex-col gap-2 text-xs text-zinc-500 sm:col-span-2">
+                    <div className="flex flex-col gap-2 text-xs text-zinc-500 md:col-span-2">
                       <label className="flex flex-col gap-1">
                         PWYW minimum ({release.currency})
                         <input
@@ -356,12 +361,12 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     </div>
                   ) : null}
 
-                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <p className="font-medium text-zinc-300">Pricing estimate</p>
                     {renderPricingDetails(draft, release.currency || "USD")}
                   </div>
 
-                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <p className="font-medium text-zinc-300">Master quality workflow</p>
                     <p className="mt-1">
                       Release assets tracked: {release.trackAssetCount}. Lossless masters detected: {release.hasLosslessMasters ? "yes" : "no"}.
@@ -409,7 +414,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <p className="font-medium text-zinc-300">Download formats</p>
                     <p className="mt-1">
                       Choose which transcode formats are available for buyer downloads.

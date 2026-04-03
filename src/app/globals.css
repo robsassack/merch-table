@@ -81,6 +81,43 @@ code {
   color: #8f9cbc;
 }
 
+.operator-theme .release-management-panel {
+  overflow-x: clip;
+}
+
+.operator-theme .release-management-panel * {
+  min-width: 0;
+}
+
+.operator-theme .release-management-panel input:not(
+    [type="checkbox"]
+  ):not([type="radio"]):not([type="file"]),
+.operator-theme .release-management-panel select,
+.operator-theme .release-management-panel textarea {
+  min-width: 0;
+}
+
+.operator-theme .release-management-panel .rm-break-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 767px) {
+  .operator-theme .release-management-panel input:not(
+      [type="checkbox"]
+    ):not([type="radio"]):not([type="file"]),
+  .operator-theme .release-management-panel select,
+  .operator-theme .release-management-panel textarea {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .operator-theme .release-management-panel p,
+  .operator-theme .release-management-panel span {
+    overflow-wrap: anywhere;
+  }
+}
+
 @keyframes step-enter {
   from {
     opacity: 0;

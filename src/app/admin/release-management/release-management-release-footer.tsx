@@ -68,7 +68,7 @@ export function ReleaseManagementReleaseFooter(props: {
               [release.id]: !previous[release.id],
             }))
           }
-          className={buttonClassName}
+          className={`${buttonClassName} w-full sm:w-auto`}
         >
           {advancedById[release.id] ? "Hide Advanced" : "Advanced"}
         </button>
@@ -82,7 +82,7 @@ export function ReleaseManagementReleaseFooter(props: {
             draft.deliveryFormats.length === 0
           }
           onClick={() => void onUpdateRelease(release.id)}
-          className={buttonClassName}
+          className={`${buttonClassName} w-full sm:w-auto`}
         >
           {isPending ? "Saving..." : "Save"}
         </button>
@@ -92,7 +92,7 @@ export function ReleaseManagementReleaseFooter(props: {
             type="button"
             disabled={isPending || createPending}
             onClick={() => void onGenerateDownloadFormats(release)}
-            className={buttonClassName}
+            className={`${buttonClassName} w-full sm:w-auto`}
           >
             {isPending ? "Queueing..." : "Generate Download Formats"}
           </button>
@@ -103,7 +103,7 @@ export function ReleaseManagementReleaseFooter(props: {
             type="button"
             disabled={isPending || createPending || failedJobsCount === 0}
             onClick={() => void onRequeueFailedTranscodes(release)}
-            className={buttonClassName}
+            className={`${buttonClassName} w-full sm:w-auto`}
           >
             {isPending
               ? "Queueing..."
@@ -125,7 +125,7 @@ export function ReleaseManagementReleaseFooter(props: {
 
               void onForceRequeueTranscodes(release);
             }}
-            className={buttonClassName}
+            className={`${buttonClassName} w-full sm:w-auto`}
           >
             {isPending ? "Queueing..." : "Force Requeue Jobs"}
           </button>
@@ -135,7 +135,7 @@ export function ReleaseManagementReleaseFooter(props: {
           type="button"
           disabled={isPending || createPending}
           onClick={() => void onSoftDeleteOrRestoreRelease(release)}
-          className={buttonClassName}
+          className={`${buttonClassName} w-full sm:w-auto`}
         >
           {isPending
             ? release.deletedAt
@@ -154,7 +154,7 @@ export function ReleaseManagementReleaseFooter(props: {
               setPurgeDialogRelease(release);
               setPurgeConfirmInput("");
             }}
-            className={dangerButtonClassName}
+            className={`${dangerButtonClassName} w-full sm:w-auto`}
           >
             {isPending ? "Purging..." : "Permanent Purge"}
           </button>

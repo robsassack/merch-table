@@ -42,9 +42,9 @@ export function ReleaseManagementTasksCard(props: {
 
   return (
     <div className="mt-4 rounded-xl border border-slate-700/80 bg-slate-900/50 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-zinc-100">Tasks</p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             className={buttonClassName}
@@ -63,7 +63,7 @@ export function ReleaseManagementTasksCard(props: {
         <p className="mt-2 text-xs text-rose-300">{tasksError}</p>
       ) : null}
 
-      <div className="mt-3 grid gap-2 text-xs text-zinc-400 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-3 grid gap-2 text-xs text-zinc-400 md:grid-cols-2 lg:grid-cols-4">
         <p>
           Queue depth (waiting):{" "}
           <span className="font-medium text-zinc-200">
@@ -91,7 +91,7 @@ export function ReleaseManagementTasksCard(props: {
           </span>
         </p>
       </div>
-      <div className="mt-2 grid gap-2 text-xs text-zinc-400 sm:grid-cols-2">
+      <div className="mt-2 grid gap-2 text-xs text-zinc-400 md:grid-cols-2">
         <p>
           Last success:{" "}
           <span className="font-medium text-zinc-200">

@@ -247,8 +247,12 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
     }
   };
 
-  const onReorderTrackDrop = async (release: ReleaseRecord, targetTrackId: string) => {
-    const draggedTrackId = draggingTrackIdByReleaseId[release.id] ?? null;
+  const onReorderTrackDrop = async (
+    release: ReleaseRecord,
+    targetTrackId: string,
+    options?: { draggedTrackId?: string | null },
+  ) => {
+    const draggedTrackId = options?.draggedTrackId ?? draggingTrackIdByReleaseId[release.id] ?? null;
     if (!draggedTrackId || draggedTrackId === targetTrackId) {
       setDragOverTrackIdByReleaseId((previous) => ({
         ...previous,

@@ -49,7 +49,7 @@ export function ReleaseManagementTrackManagement(props: {
   const showFailedOnly = failedTrackCount > 0 && (showFailedOnlyByReleaseId[release.id] ?? false);
 
   return (
-                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 sm:col-span-2">
+                  <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="font-medium text-zinc-300">Track Management</p>
                       <div className="flex flex-wrap items-center gap-2">
@@ -75,15 +75,15 @@ export function ReleaseManagementTrackManagement(props: {
                       </div>
                     </div>
 
-                    <div className="mt-3 grid gap-2 sm:grid-cols-6">
+                    <div className="mt-3 grid gap-2 md:grid-cols-6">
                       {(() => {
                         const previewDraft =
                           previewByReleaseId[release.id] ?? toReleasePreviewDraft(release);
 
                         return (
                           <>
-                            <div className="mb-2 grid gap-2 rounded-md border border-slate-700/70 bg-slate-950/60 p-2 sm:col-span-6 sm:grid-cols-6">
-                              <label className="flex flex-col gap-1 text-[11px] text-zinc-500 sm:col-span-2">
+                            <div className="mb-2 grid gap-2 rounded-md border border-slate-700/70 bg-slate-950/60 p-2 md:col-span-6 md:grid-cols-6">
+                              <label className="flex flex-col gap-1 text-[11px] text-zinc-500 md:col-span-2">
                                 Release preview mode
                                 <select
                                   value={previewDraft.previewMode}
@@ -119,7 +119,7 @@ export function ReleaseManagementTrackManagement(props: {
                                   ))}
                                 </select>
                               </label>
-                              <label className="flex flex-col gap-1 text-[11px] text-zinc-500 sm:col-span-2">
+                              <label className="flex flex-col gap-1 text-[11px] text-zinc-500 md:col-span-2">
                                 Release preview seconds
                                 <input
                                   value={previewDraft.previewSeconds}
@@ -157,13 +157,13 @@ export function ReleaseManagementTrackManagement(props: {
                                   }
                                 />
                               </label>
-                              <div className="sm:col-span-2" />
-                              <p className="text-[11px] text-zinc-500 sm:col-span-6">
+                              <div className="md:col-span-2" />
+                              <p className="text-[11px] text-zinc-500 md:col-span-6">
                                 New and existing tracks use this release preview setting
                                 automatically.
                               </p>
                             </div>
-                            <div className="mb-2 flex flex-wrap items-center gap-2 sm:col-span-6">
+                            <div className="mb-2 flex flex-col items-start gap-2 md:col-span-6 md:flex-row md:flex-wrap md:items-center">
                               <label className={buttonClassName}>
                                 <input
                                   type="file"
@@ -188,7 +188,7 @@ export function ReleaseManagementTrackManagement(props: {
                               </p>
                             </div>
                             {importJobs.length > 0 ? (
-                              <div className="mb-2 space-y-1 rounded-md border border-slate-700/70 bg-slate-950/60 p-2 text-[11px] text-zinc-400 sm:col-span-6">
+                              <div className="mb-2 space-y-1 rounded-md border border-slate-700/70 bg-slate-950/60 p-2 text-[11px] text-zinc-400 md:col-span-6">
                                 {importJobs.map((job) => (
                                   <p key={job.id}>
                                     #{job.plannedTrackNumber} {job.title} ({formatTrackDuration(job.durationMs)}){" "}
