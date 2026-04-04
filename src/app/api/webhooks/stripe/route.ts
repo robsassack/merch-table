@@ -3,6 +3,12 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 
+import {
+  buildLibraryMagicLinkUrl,
+  createBuyerLibraryTokenExpiresAt,
+} from "@/lib/checkout/buyer-library-link";
+import { sendPurchaseConfirmationEmail } from "@/lib/checkout/purchase-confirmation-email";
+import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { decryptSecret } from "@/lib/crypto/secret-box";
 import { prisma } from "@/lib/prisma";
 
@@ -82,8 +88,17 @@ async function readStripeWebhookSecret() {
 }
 
 type FinalizeResult =
-  | { status: "created"; orderId: string }
-  | { status: "duplicate" };
+  | {
+      status: "send-email";
+      duplicate: boolean;
+      orderId: string;
+      customerEmail: string;
+      releaseTitle: string;
+      totalCents: number;
+      currency: string;
+      libraryMagicLinkUrl: string;
+    }
+  | { status: "duplicate-noop" };
 
 async function finalizeCheckoutSession(
   session: Stripe.Checkout.Session,
@@ -103,15 +118,63 @@ async function finalizeCheckoutSession(
   const taxCents = session.total_details?.amount_tax ?? 0;
   const paymentIntentId =
     typeof session.payment_intent === "string" ? session.payment_intent : null;
+  const expiresAt = createBuyerLibraryTokenExpiresAt(now);
 
   try {
     return await prisma.$transaction(async (tx) => {
       const existingOrder = await tx.order.findUnique({
         where: { checkoutSessionId },
-        select: { id: true },
+        select: {
+          id: true,
+          organizationId: true,
+          customerId: true,
+          emailStatus: true,
+          currency: true,
+          totalCents: true,
+          customer: {
+            select: { email: true },
+          },
+          items: {
+            orderBy: { lineNumber: "asc" },
+            take: 1,
+            select: {
+              release: {
+                select: { title: true },
+              },
+            },
+          },
+        },
       });
       if (existingOrder) {
-        return { status: "duplicate" };
+        if (existingOrder.emailStatus === "SENT") {
+          return { status: "duplicate-noop" };
+        }
+
+        const releaseTitle = existingOrder.items[0]?.release.title;
+        if (!releaseTitle) {
+          throw new Error("Order is missing release details.");
+        }
+
+        const libraryToken = await tx.buyerLibraryToken.create({
+          data: {
+            organizationId: existingOrder.organizationId,
+            customerId: existingOrder.customerId,
+            token: createToken(),
+            expiresAt,
+          },
+          select: { token: true },
+        });
+
+        return {
+          status: "send-email",
+          duplicate: true,
+          orderId: existingOrder.id,
+          customerEmail: existingOrder.customer.email,
+          releaseTitle,
+          totalCents: existingOrder.totalCents,
+          currency: normalizeCurrency(existingOrder.currency),
+          libraryMagicLinkUrl: buildLibraryMagicLinkUrl(libraryToken.token),
+        };
       }
 
       const release = await tx.release.findFirst({
@@ -122,17 +185,11 @@ async function finalizeCheckoutSession(
         },
         select: {
           id: true,
-          files: {
-            select: { id: true },
-          },
+          title: true,
         },
       });
       if (!release) {
         throw new Error("Release not found for checkout session.");
-      }
-
-      if (release.files.length === 0) {
-        throw new Error("Release has no downloadable files.");
       }
 
       const customer = await tx.customer.upsert({
@@ -180,8 +237,17 @@ async function finalizeCheckoutSession(
         select: { id: true },
       });
 
+      const releaseFiles = await ensureReleaseFilesForCheckout(tx, {
+        releaseId: release.id,
+        organizationId,
+      });
+
+      if (releaseFiles.length === 0) {
+        throw new Error("Release has no downloadable files.");
+      }
+
       await tx.downloadEntitlement.createMany({
-        data: release.files.map((file) => ({
+        data: releaseFiles.map((file) => ({
           customerId: customer.id,
           releaseId: release.id,
           releaseFileId: file.id,
@@ -190,11 +256,30 @@ async function finalizeCheckoutSession(
         })),
       });
 
-      return { status: "created", orderId: order.id };
+      const libraryToken = await tx.buyerLibraryToken.create({
+        data: {
+          organizationId,
+          customerId: customer.id,
+          token: createToken(),
+          expiresAt,
+        },
+        select: { token: true },
+      });
+
+      return {
+        status: "send-email",
+        duplicate: false,
+        orderId: order.id,
+        customerEmail,
+        releaseTitle: release.title,
+        totalCents,
+        currency: normalizeCurrency(session.currency),
+        libraryMagicLinkUrl: buildLibraryMagicLinkUrl(libraryToken.token),
+      };
     });
   } catch (error) {
     if (isCheckoutSessionIdUniqueConstraintError(error)) {
-      return { status: "duplicate" };
+      return { status: "duplicate-noop" };
     }
 
     throw error;
@@ -245,9 +330,50 @@ export async function POST(request: Request) {
 
   try {
     const finalized = await finalizeCheckoutSession(session);
+    if (finalized.status === "duplicate-noop") {
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+      });
+    }
+
+    try {
+      await sendPurchaseConfirmationEmail({
+        email: finalized.customerEmail,
+        releaseTitle: finalized.releaseTitle,
+        libraryMagicLinkUrl: finalized.libraryMagicLinkUrl,
+        amountPaidCents: finalized.totalCents,
+        currency: finalized.currency,
+      });
+
+      await prisma.order.update({
+        where: { id: finalized.orderId },
+        data: {
+          emailStatus: "SENT",
+          emailSentAt: new Date(),
+        },
+      });
+    } catch {
+      await prisma.order.update({
+        where: { id: finalized.orderId },
+        data: {
+          emailStatus: "FAILED",
+          emailSentAt: null,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Could not send purchase confirmation email.",
+        },
+        { status: 502 },
+      );
+    }
+
     return NextResponse.json({
       ok: true,
-      duplicate: finalized.status === "duplicate",
+      duplicate: finalized.duplicate,
     });
   } catch {
     return NextResponse.json(

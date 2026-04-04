@@ -1,6 +1,7 @@
-type FreeLibraryLinkTemplateInput = {
+type PurchaseConfirmationTemplateInput = {
   releaseTitle: string;
   libraryMagicLinkUrl: string;
+  amountPaidDisplay: string;
 };
 
 function escapeHtml(value: string) {
@@ -12,18 +13,20 @@ function escapeHtml(value: string) {
     .replaceAll("'", "&#39;");
 }
 
-export function getFreeLibraryLinkEmailHtml({
+export function getPurchaseConfirmationEmailHtml({
   releaseTitle,
   libraryMagicLinkUrl,
-}: FreeLibraryLinkTemplateInput) {
+  amountPaidDisplay,
+}: PurchaseConfirmationTemplateInput) {
   const safeReleaseTitle = escapeHtml(releaseTitle);
   const safeLibraryMagicLinkUrl = escapeHtml(libraryMagicLinkUrl);
+  const safeAmountPaidDisplay = escapeHtml(amountPaidDisplay);
 
   return `
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
-      <h1 style="font-size: 18px; margin: 0 0 12px;">Your Library Link</h1>
+      <h1 style="font-size: 18px; margin: 0 0 12px;">Thanks For Your Purchase</h1>
       <p style="margin: 0 0 12px;">
-        You unlocked <strong>${safeReleaseTitle}</strong> on Merch Table.
+        You purchased <strong>${safeReleaseTitle}</strong> for <strong>${safeAmountPaidDisplay}</strong>.
       </p>
       <p style="margin: 0 0 12px;">
         Use this secure link to open your library:

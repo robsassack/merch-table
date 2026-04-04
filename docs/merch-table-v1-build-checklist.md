@@ -168,9 +168,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Email templates
 
-- [ ] Purchase confirmation email (library magic-link, release name, amount paid)
-- [ ] Free-release library link email (library magic-link, release name)
-- [ ] `emailStatus` tracking on Order (`PENDING`, `SENT`, `FAILED`)
+- [x] Purchase confirmation email (library magic-link, release name, amount paid)
+- [x] Free-release library link email (library magic-link, release name)
+- [x] `emailStatus` tracking on Order (`PENDING`, `SENT`, `FAILED`)
 
 ### Mock email provider
 

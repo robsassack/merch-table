@@ -3,7 +3,12 @@ import crypto from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  buildLibraryMagicLinkUrl,
+  createBuyerLibraryTokenExpiresAt,
+} from "@/lib/checkout/buyer-library-link";
 import { sendFreeLibraryLinkEmail } from "@/lib/checkout/free-library-link-email";
+import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { prisma } from "@/lib/prisma";
 import { checkoutRateLimitPolicies } from "@/lib/security/checkout-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
@@ -13,8 +18,6 @@ import {
 } from "@/lib/security/rate-limit";
 
 export const runtime = "nodejs";
-
-const DEFAULT_APP_BASE_URL = "http://localhost:3000";
 
 const freeCheckoutSchema = z.object({
   releaseId: z.string().trim().min(1),
@@ -30,19 +33,6 @@ function normalizeCurrency(raw: string | null | undefined) {
   return trimmed.toUpperCase();
 }
 
-function readBuyerLibraryTokenTtlSecondsFromEnv() {
-  const raw = process.env.BUYER_LIBRARY_TOKEN_TTL_SECONDS?.trim();
-  if (!raw) {
-    return null;
-  }
-
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return Math.floor(parsed);
-}
 
 function createToken() {
   return crypto.randomBytes(32).toString("base64url");
@@ -52,16 +42,6 @@ function createOrderNumber() {
   const timestamp = new Date().toISOString().replace(/\D/g, "").slice(0, 14);
   const suffix = crypto.randomBytes(3).toString("hex").toUpperCase();
   return `FREE-${timestamp}-${suffix}`;
-}
-
-function buildLibraryMagicLinkUrl(token: string) {
-  const appBaseUrl = process.env.APP_BASE_URL ?? DEFAULT_APP_BASE_URL;
-  const normalized = appBaseUrl.endsWith("/")
-    ? appBaseUrl.slice(0, -1)
-    : appBaseUrl;
-
-  // Keep token out of referrers by using a fragment.
-  return `${normalized}/library#token=${encodeURIComponent(token)}`;
 }
 
 export async function POST(request: Request) {
@@ -133,9 +113,6 @@ export async function POST(request: Request) {
       select: {
         id: true,
         title: true,
-        files: {
-          select: { id: true },
-        },
       },
     });
 
@@ -146,19 +123,8 @@ export async function POST(request: Request) {
       );
     }
 
-    if (release.files.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Release has no downloadable files yet." },
-        { status: 409 },
-      );
-    }
-
     const now = new Date();
-    const tokenTtlSeconds = readBuyerLibraryTokenTtlSecondsFromEnv();
-    const expiresAt =
-      tokenTtlSeconds === null
-        ? null
-        : new Date(now.getTime() + tokenTtlSeconds * 1_000);
+    const expiresAt = createBuyerLibraryTokenExpiresAt(now);
 
     const creationResult = await prisma.$transaction(async (tx) => {
       const customer = await tx.customer.upsert({
@@ -203,8 +169,17 @@ export async function POST(request: Request) {
         select: { id: true },
       });
 
+      const releaseFiles = await ensureReleaseFilesForCheckout(tx, {
+        releaseId: release.id,
+        organizationId: settings.organizationId,
+      });
+
+      if (releaseFiles.length === 0) {
+        throw new Error("Release has no downloadable files yet.");
+      }
+
       await tx.downloadEntitlement.createMany({
-        data: release.files.map((file) => ({
+        data: releaseFiles.map((file) => ({
           customerId: customer.id,
           releaseId: release.id,
           releaseFileId: file.id,
@@ -275,6 +250,16 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Release has no downloadable files yet."
+    ) {
+      return NextResponse.json(
+        { ok: false, error: "Release has no downloadable files yet." },
+        { status: 409 },
+      );
+    }
+
     if (error instanceof z.ZodError) {
       const missingEmail = error.issues.some(
         (issue) => issue.path[0] === "email" && issue.code === "invalid_type",
