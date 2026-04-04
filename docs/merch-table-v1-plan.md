@@ -65,7 +65,12 @@
   - Free releases (`PricingMode: FREE`) bypass Stripe entirely. Buyer submits an email address; server creates an Order and issues a `BuyerLibraryToken` directly. Email is required — no anonymous free downloads.
   - Entitlements are unlimited; buyer receives email magic-link to library with re-download access.
   - Add a self-serve "Find my purchases" flow: buyer submits purchase email in a public interface, server issues a fresh library-link email when matches exist, and endpoint always returns a generic success response (no account-existence disclosure).
-  - Download endpoint (`GET /api/download/:entitlementToken/:assetId`) validates that the token is not revoked and not expired, then generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused; the buyer always hits this endpoint first. The signed URL includes a `Content-Disposition: attachment` header with a human-readable filename derived from artist, release, and track title (e.g., `Artist - Track Title.flac`), so browsers save the file with a meaningful name rather than a storage key or UUID.
+  - Primary buyer download endpoint (`GET /api/download-release/:libraryToken/:releaseId`) validates that the library token is not revoked and not expired, confirms ownership of the release, and returns a ZIP archive.
+  - ZIP naming rules:
+    - Archive filename: `Artist Name - Release Name.zip`.
+    - Track entry filename: `Artist Name - Release Name - <track number with leading zero> <Track Name>.<ext>`.
+    - Include release cover art in the ZIP when cover art exists.
+  - Secondary per-file endpoint (`GET /api/download/:entitlementToken/:releaseFileId`) remains available for individual downloads and generates a fresh signed object URL on each request with a 15-minute expiry (configurable via env var). URL is never cached or reused.
 - File upload:
   - Admin requests a presigned PUT URL via `POST /api/admin/assets/upload-url`; browser uploads directly to Garage/S3, bypassing the Next.js server.
   - Upload UI shows filename, file size, and progress; save action is disabled while an upload is in progress.
@@ -87,7 +92,8 @@
   - Rate-limited endpoints and default thresholds:
     - `POST /api/checkout/free` (free release email capture): strict limit to prevent email-bombing and entitlement spam.
     - `POST /api/library/resend` (library-link recovery): strict limit to prevent email-bombing and account enumeration abuse.
-    - `GET /api/download/:entitlementToken/:assetId` (download): moderate limit to prevent bulk scraping of signed URLs.
+    - `GET /api/download/:entitlementToken/:releaseFileId` (single-file download): moderate limit to prevent bulk scraping of signed URLs.
+    - `GET /api/download-release/:libraryToken/:releaseId` (release ZIP download): moderate limit to prevent bulk scraping.
     - `POST /api/admin/assets/upload-url` (presigned upload URL generation): moderate limit per admin session.
     - `POST /api/checkout/session` (Stripe session creation): moderate limit to prevent session flooding.
   - Rate limit thresholds are configurable via env vars with sensible defaults.
@@ -144,7 +150,8 @@
   - `POST /api/library/resend` (request fresh library-link email by purchase email address).
   - `POST /api/webhooks/stripe` (verify signature, finalize order/entitlements).
   - `GET /api/library/:token` (resolve buyer library).
-  - `GET /api/download/:entitlementToken/:assetId` (validate token, generate fresh signed URL, redirect).
+  - `GET /api/download/:entitlementToken/:releaseFileId` (validate token, generate fresh signed URL, redirect single-file download).
+  - `GET /api/download-release/:libraryToken/:releaseId` (validate library token + ownership and return release ZIP download).
   - `POST /api/admin/assets/upload-url` (generate presigned PUT URL for direct-to-storage upload).
   - `GET /api/health/live` (app is running).
   - `GET /api/health/ready` (app is running and all dependencies — database, Redis, storage — are reachable; returns component-level status JSON).
@@ -206,16 +213,18 @@
   - Each email template (purchase confirmation, free-release library link, admin magic-link, setup test) renders valid HTML with the correct dynamic values (release name, library URL, amount).
   - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on free checkout endpoint.
   - Rate limiter returns 429 with `Retry-After` header when threshold is exceeded on library resend endpoint.
-  - Rate limiter returns 429 on download endpoint when threshold is exceeded; valid requests succeed again after the window resets.
+  - Rate limiter returns 429 on download endpoints when threshold is exceeded (`GET /api/download/:entitlementToken/:releaseFileId` and `GET /api/download-release/:libraryToken/:releaseId`); valid requests succeed again after the window resets.
   - Stripe webhook endpoint is not rate-limited; rapid consecutive webhook deliveries are all processed.
   - Concurrent free checkouts with the same email + release result in exactly one `Order` and one `BuyerLibraryToken`; the second request receives a graceful response with no duplicate side effects.
   - Mock email counter asserts exactly one `free_library_link` email queued per free checkout, even under concurrent submission.
   - `accessCount` increments correctly under concurrent download requests to the same entitlement token (no lost updates).
   - Concurrent free checkout: two simultaneous `POST /api/checkout/free` requests with the same email and release ID result in exactly one `Order`, one `BuyerLibraryToken`, and one queued email. Mock email counter confirms no duplicate sends.
-  - Concurrent download: multiple simultaneous requests to `GET /api/download/:entitlementToken/:assetId` each receive a valid signed URL; `accessCount` on `BuyerLibraryToken` reflects the correct final count (no lost updates).
+  - Concurrent single-file download: multiple simultaneous requests to `GET /api/download/:entitlementToken/:releaseFileId` each receive a valid signed URL; `accessCount` on `BuyerLibraryToken` reflects the correct final count (no lost updates).
+  - Release ZIP download returns an archive with expected track files and cover art (when present), with required archive and entry filename formats.
 - Load tests (k6, scripts in `/tests/load/`, run against local Compose stack with `.env.test`):
   - Burst free checkout: ramp to 20 concurrent VUs submitting `POST /api/checkout/free` with the same email+release; assert zero duplicate orders and p95 response time under 500ms.
-  - Download burst: 50 concurrent VUs hitting `GET /api/download/:entitlementToken/:assetId` with a valid token; assert all receive signed URLs and no 5xx responses.
+  - Single-file download burst: 50 concurrent VUs hitting `GET /api/download/:entitlementToken/:releaseFileId` with a valid token; assert all receive signed URLs and no 5xx responses.
+  - Release ZIP burst: 20 concurrent VUs hitting `GET /api/download-release/:libraryToken/:releaseId`; assert successful ZIP responses and no 5xx responses.
   - Transcode queue backlog: simulate 20 simultaneous track uploads all queuing preview clip jobs; assert all jobs reach `SUCCEEDED` within a timeout and no jobs are lost or duplicated.
 - End-to-end scenarios:
   - Fresh container start → bootstrap token in logs → setup wizard completes → store moves to `PRIVATE`.
@@ -234,7 +243,10 @@
   - Clicking a second track while one is playing stops the first and starts the second; player UI updates to reflect the new track.
   - Admin revokes a `BuyerLibraryToken`; buyer receives 403 on next download attempt.
   - Admin sees retry option for an undelivered purchase confirmation in the orders panel.
-  - Downloaded file has a human-readable filename (e.g., `Artist - Track Title.flac`), not a UUID or storage key.
+  - Buyer can download a full release as `Artist Name - Release Name.zip`.
+  - Release ZIP includes expected track files named `Artist Name - Release Name - <track number with leading zero> <Track Name>.<ext>`.
+  - Release ZIP includes cover art when present.
+  - Downloaded single file has a human-readable filename (e.g., `Artist - Track Title.flac`), not a UUID or storage key.
   - Admin soft-deletes a release with existing orders; release disappears from storefront but buyer retains download access. Admin restores the release and it reappears on the storefront.
   - Admin permanently purges a soft-deleted release's assets; storage files are removed and buyer download returns 404.
   - Storefront pages pass automated accessibility audit (axe-core or equivalent) with no critical or serious violations at WCAG 2.1 AA level.
@@ -284,8 +296,9 @@
 - PWYW artist-set minimum is enforced both client-side and server-side. `POST /api/checkout/session` rejects amounts below `minimumPriceCents`.
 - A system-level minimum price floor (configurable via env var, e.g., $0.50) prevents transactions that would be consumed entirely by Stripe fees. Applies to both `fixedPriceCents` and `minimumPriceCents`. The admin pricing UI surfaces this floor and shows estimated Stripe fees and net payout dynamically.
 - Free releases do not use Stripe. Buyer provides an email address; the server issues entitlements and sends a library magic-link directly. Email is required on free checkout to prevent anonymous bulk requests.
-- Signed URLs for downloads are generated fresh on every request to the download endpoint and expire after 15 minutes (configurable). URLs are never cached or reused.
+- Signed URLs for single-file downloads are generated fresh on every request to `GET /api/download/:entitlementToken/:releaseFileId` and expire after 15 minutes (configurable). URLs are never cached or reused.
+- Release ZIP downloads are served as attachment responses from `GET /api/download-release/:libraryToken/:releaseId` with archive and entry names derived from artist/release/track metadata.
 - Preview clips are generated automatically by the worker at upload time and stored as a discrete `TrackAsset` with `assetRole: PREVIEW`. Masters are never streamed directly to the public.
 - Artist and release deletion is soft delete (`deletedAt` timestamp). Soft-deleted records are hidden from the storefront but preserved for order history. Existing buyers retain download access until assets are permanently purged. Hard deletion of storage assets is a separate, explicit admin action.
 - Storefront and admin target WCAG 2.1 AA compliance. Automated accessibility checks (axe-core or equivalent) are run as part of E2E testing.
-- Download signed URLs include `Content-Disposition: attachment` with a human-readable filename derived from artist, release, and track metadata.
+- Download responses include `Content-Disposition: attachment` with human-readable filenames for both single-file downloads and release ZIP archives.

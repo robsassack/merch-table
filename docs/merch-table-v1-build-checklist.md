@@ -192,17 +192,43 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Buyers can access their library and download files.
 
-- [ ] `GET /api/library/:token` — resolve buyer library; validate token not revoked/expired
+### Contract & decisions
+
+- [x] Lock secondary per-file download contract to `releaseFileId` (`GET /api/download/:entitlementToken/:releaseFileId`)
+- [ ] Lock release ZIP contract (`GET /api/download-release/:libraryToken/:releaseId`) as the primary buyer download flow
+
+### Backend APIs
+
+- [x] `GET /api/library/:token` — resolve buyer library and validate token not revoked/expired
+- [x] `BuyerLibraryToken` access tracking: update `lastUsedAt` and atomically increment `accessCount` on each access
+- [x] Library response uses `cache-control: no-store`
+- [x] `GET /api/download/:entitlementToken/:releaseFileId` — validate token + file relation and generate a fresh signed URL per request
+- [ ] `GET /api/download-release/:libraryToken/:releaseId` — validate library token + release ownership and return release ZIP
+- [ ] ZIP filename format: `Artist Name - Release Name.zip`
+- [ ] ZIP contains cover art file for the release (when present)
+- [ ] ZIP track entry format: `Artist Name - Release Name - <track number with leading zero> <Track Name>.<ext>`
+- [x] Signed URL expires after 15 minutes (configurable via env var); never cached or reused
+- [x] `Content-Disposition: attachment` with human-readable filename (`Artist - Track Title.flac`)
+- [ ] Revoked token returns `403`; expired token returns `403`
 - [ ] `POST /api/library/resend` — buyer submits purchase email to request a fresh library link; always return generic success response to avoid account enumeration
-- [ ] Public "Find my purchases" interface with email form + confirmation state for library-link resend requests
-- [ ] `BuyerLibraryToken` access tracking: update `lastUsedAt` and `accessCount` on each access
-- [ ] `GET /api/download/:entitlementToken/:assetId` — validate token, generate fresh signed URL per request
-- [ ] Signed URL expires after 15 minutes (configurable via env var); never cached or reused
-- [ ] `Content-Disposition: attachment` with human-readable filename (`Artist - Track Title.flac`)
-- [ ] Revoked token returns 403; expired token returns 403
-- [ ] Rate limiting on download endpoint (moderate, prevents bulk scraping)
-- [ ] Rate limiting on checkout session creation (moderate)
+
+### Security & rate limiting
+
+- [x] Rate limiting on download endpoint (moderate, prevents bulk scraping)
 - [ ] Strict rate limiting on library resend endpoint (prevents email-bombing and abuse)
+
+### Public UX
+
+- [ ] Public "Find my purchases" interface with email form + confirmation state for library-link resend requests
+- [ ] Public `/library` page wired to token-based API response
+- [ ] `/library` shows primary "Download ZIP" action per owned release
+- [ ] Optional secondary per-track/per-file download links remain available
+
+### Testing & documentation
+
+- [ ] Integration tests: library access tracking, resend behavior, download URL freshness, and `429` + `Retry-After`
+- [ ] Integration tests: ZIP includes expected track files + cover art and uses required filename conventions
+- [ ] Update `.env.example` and docs for any new/confirmed Phase 6 env flags
 
 ---
 
@@ -302,7 +328,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Rate limiting (Redis-backed, IP-based)
 
 - [ ] `POST /api/checkout/free` — strict limit
-- [ ] `GET /api/download/:entitlementToken/:assetId` — moderate limit
+- [ ] `GET /api/download/:entitlementToken/:releaseFileId` — moderate limit
+- [ ] `GET /api/download-release/:libraryToken/:releaseId` — moderate limit
 - [ ] `POST /api/admin/upload/upload-url` — moderate limit
 - [ ] `POST /api/checkout/session` — moderate limit
 - [ ] Thresholds configurable via env vars
