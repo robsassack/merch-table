@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function ComingSoonPage() {
   return (
     <main className="operator-theme min-h-screen w-full px-4 py-10 sm:px-6 sm:py-16">
@@ -8,6 +10,13 @@ export default function ComingSoonPage() {
           </h1>
           <p className="mt-2 text-sm text-zinc-600">
             This storefront is not public yet. Please check back soon.
+          </p>
+          <p className="mt-6 text-sm text-zinc-500">
+            Existing buyers can still access{" "}
+            <Link href="/find-my-purchases" className="font-medium text-zinc-300 underline">
+              Find My Purchases
+            </Link>
+            .
           </p>
         </section>
       </div>

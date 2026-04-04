@@ -136,7 +136,7 @@
 - Store published state:
   - `storeStatus` enum on `StoreSettings`: `SETUP | PRIVATE | PUBLIC`.
   - `SETUP`: all routes redirect to `/setup`.
-  - `PRIVATE`: admin accessible; public visitors see a maintenance page.
+  - `PRIVATE`: admin accessible; public visitors see a maintenance page, while buyer fulfillment routes (`/find-my-purchases`, `/library`, and related `/api/library/*` + download APIs) remain accessible.
   - `PUBLIC`: store fully live.
   - Admin can toggle `PRIVATE` ↔ `PUBLIC` from the dashboard without re-running setup.
 - Re-running setup:

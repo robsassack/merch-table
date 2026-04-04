@@ -72,6 +72,8 @@ export async function proxy(request: NextRequest) {
   const isApiPath = pathname.startsWith("/api/");
   const isMaintenancePath = pathname === "/coming-soon";
   const isSetupMagicLinkPath = pathname.startsWith("/admin/auth/magic-link");
+  const isLibraryPath = pathname === "/library";
+  const isFindPurchasesPath = pathname === "/find-my-purchases";
 
   if (setup.storeStatus === "SETUP" || !setup.setupComplete) {
     if (isSetupPath || isSetupMagicLinkPath) {
@@ -87,7 +89,8 @@ export async function proxy(request: NextRequest) {
   }
 
   if (setup.storeStatus === "PRIVATE") {
-    if (!isAdminPath && !isMaintenancePath && !isApiPath) {
+    const isBuyerFulfillmentPath = isLibraryPath || isFindPurchasesPath;
+    if (!isAdminPath && !isMaintenancePath && !isApiPath && !isBuyerFulfillmentPath) {
       return NextResponse.redirect(new URL("/coming-soon", request.url));
     }
   }

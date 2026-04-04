@@ -6,7 +6,12 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const settings = await prisma.storeSettings.findFirst({
-    select: { setupComplete: true, storeStatus: true },
+    select: {
+      setupComplete: true,
+      storeStatus: true,
+      storeName: true,
+      brandName: true,
+    },
     orderBy: { createdAt: "asc" },
   });
 
@@ -14,6 +19,8 @@ export async function GET() {
     {
       setupComplete: settings?.setupComplete ?? false,
       storeStatus: settings?.storeStatus ?? "SETUP",
+      storeName: settings?.storeName ?? null,
+      brandName: settings?.brandName ?? null,
     },
     {
       headers: {

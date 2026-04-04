@@ -197,6 +197,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [x] Lock secondary per-file download contract to `releaseFileId` (`GET /api/download/:entitlementToken/:releaseFileId`)
 - [x] Lock release ZIP contract (`GET /api/download-release/:libraryToken/:releaseId`) as the primary buyer download flow
+- [x] Buyer fulfillment paths remain available while store is `PRIVATE` (`/find-my-purchases`, `/library`, and library/download APIs)
 
 ### Backend APIs
 
@@ -221,10 +222,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Public UX
 
-- [ ] Public "Find my purchases" interface with email form + confirmation state for library-link resend requests
-- [ ] Public `/library` page wired to token-based API response
-- [ ] `/library` shows primary "Download ZIP" action per owned release
-- [ ] Optional secondary per-track/per-file download links remain available
+- [x] Public "Find my purchases" interface with email form + confirmation state for library-link resend requests
+- [x] Public `/library` page wired to token-based API response
+- [x] `/library` shows primary "Download ZIP" action per owned release
+- [x] Optional secondary per-track/per-file download links remain available
 
 ### Testing & documentation
 
@@ -243,6 +244,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [ ] List published releases (exclude soft-deleted)
 - [ ] Respect `storeStatus` middleware (private = maintenance page)
+- [ ] Show artist image on release cards and organization logo in storefront header (with graceful fallback when missing)
 
 ### Global storefront footer
 
@@ -303,6 +305,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Toggle `PRIVATE` ↔ `PUBLIC` from dashboard
 - [ ] Settings UI: allow updating org name
 - [ ] Settings UI: allow updating store name
+- [ ] Settings UI: allow uploading/updating organization logo and artist profile images
 - [ ] Settings UI: allow updating contact email
 - [ ] Settings UI: allow updating store currency
 - [ ] Settings UI: allow updating SMTP/email configuration
