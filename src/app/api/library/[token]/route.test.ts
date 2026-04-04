@@ -39,15 +39,19 @@ describe("GET /api/library/:token", () => {
       ),
     );
 
+    let buyerLibraryTokenUpdateInput: AnyRecord | null = null;
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "update",
-        async () => ({
-          lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
-          accessCount: 3,
-          expiresAt: null,
-        }),
+        async (input: AnyRecord) => {
+          buyerLibraryTokenUpdateInput = input;
+          return {
+            lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
+            accessCount: 3,
+            expiresAt: null,
+          };
+        },
       ),
     );
 
@@ -115,6 +119,19 @@ describe("GET /api/library/:token", () => {
     assert.deepEqual(payload.availableDownloadFormatsByReleaseId["release-1"], [
       "flac",
     ]);
+    assert.equal(
+      (buyerLibraryTokenUpdateInput?.where as AnyRecord)?.id,
+      "lib-token-1",
+    );
+    assert.equal(
+      ((buyerLibraryTokenUpdateInput?.data as AnyRecord)?.accessCount as AnyRecord)
+        ?.increment,
+      1,
+    );
+    assert.ok(
+      ((buyerLibraryTokenUpdateInput?.data as AnyRecord)?.lastUsedAt as unknown) instanceof
+        Date,
+    );
   });
 
   it("returns 403 when the token has expired", async () => {

@@ -16,6 +16,10 @@ function patchMethod(target: AnyRecord, name: string, replacement: unknown) {
   };
 }
 
+function resetInMemoryRateLimitStore() {
+  delete (globalThis as AnyRecord)["__merch_table_rate_limit_store__"];
+}
+
 describe("POST /api/library/resend", () => {
   const restore: Array<() => void> = [];
 
@@ -27,6 +31,8 @@ describe("POST /api/library/resend", () => {
     resetMockEmailProviderState();
     delete process.env.EMAIL_PROVIDER;
     delete process.env.SMTP_FROM;
+    delete process.env.REDIS_URL;
+    resetInMemoryRateLimitStore();
   });
 
   it("returns generic success even when no matching purchases exist", async () => {
@@ -136,5 +142,48 @@ describe("POST /api/library/resend", () => {
     const body = (await response.json()) as { ok: boolean };
     assert.equal(body.ok, true);
     assert.equal(getMockEmailSentCount("free_library_link"), 1);
+  });
+
+  it("returns 429 with retry-after when resend requests exceed the rate limit", async () => {
+    process.env.DATABASE_URL =
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    delete process.env.REDIS_URL;
+    resetInMemoryRateLimitStore();
+    const { prisma } = await import("@/lib/prisma");
+
+    restore.push(
+      patchMethod(
+        prisma.storeSettings as unknown as AnyRecord,
+        "findFirst",
+        async () => ({
+          setupComplete: false,
+          organizationId: "org-1",
+        }),
+      ),
+    );
+
+    const { POST } = await import("@/app/api/library/resend/route");
+
+    let limitedResponse: Response | null = null;
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const response = await POST(
+        new Request("http://localhost:3000/api/library/resend", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: "buyer-rate-limit@example.com" }),
+        }),
+      );
+      if (response.status === 429) {
+        limitedResponse = response;
+        break;
+      }
+    }
+
+    assert.ok(limitedResponse);
+    assert.equal(limitedResponse.status, 429);
+
+    const retryAfterHeader = limitedResponse.headers.get("retry-after");
+    assert.ok(retryAfterHeader);
+    assert.ok(Number(retryAfterHeader) >= 1);
   });
 });

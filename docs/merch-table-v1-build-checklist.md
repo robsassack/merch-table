@@ -229,10 +229,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Testing & documentation
 
-- [ ] Integration tests: library access tracking, resend behavior, download URL freshness, and `429` + `Retry-After`
-- [ ] Integration tests: ZIP includes expected track files + cover art and uses required filename conventions
-- [ ] Integration tests: downloads continue to work while release transcode jobs are queued/running
-- [ ] Update `.env.example` and docs for any new/confirmed Phase 6 env flags
+- [x] Integration tests: library access tracking, resend behavior, download URL freshness, and `429` + `Retry-After`
+- [x] Integration tests: ZIP includes expected track files + cover art and uses required filename conventions
+- [x] Integration tests: downloads continue to work while release transcode jobs are queued/running
+- [x] Update `.env.example` and docs for any new/confirmed Phase 6 env flags
 
 ---
 
