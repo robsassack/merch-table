@@ -45,4 +45,14 @@ export const checkoutRateLimitPolicies = {
     { maxRequests: 30, windowSeconds: 3_600 },
     "RATE_LIMIT_CHECKOUT_SESSION",
   ),
+  freeByIp: readPolicy(
+    "checkout-free-ip",
+    { maxRequests: 5, windowSeconds: 3_600 },
+    "RATE_LIMIT_FREE_CHECKOUT",
+  ),
+  freeByEmail: readPolicy(
+    "checkout-free-email",
+    { maxRequests: 2, windowSeconds: 3_600 },
+    "RATE_LIMIT_FREE_CHECKOUT_EMAIL",
+  ),
 };

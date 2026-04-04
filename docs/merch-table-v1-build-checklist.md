@@ -155,9 +155,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Free checkout
 
-- [ ] `POST /api/checkout/free` — email capture, create Order, issue `BuyerLibraryToken`, send library magic-link
-- [ ] Reject requests with no email address
-- [ ] Rate limiting (strict, to prevent email-bombing)
+- [x] `POST /api/checkout/free` — email capture, create Order, issue `BuyerLibraryToken`, send library magic-link
+- [x] Reject requests with no email address
+- [x] Rate limiting (strict, to prevent email-bombing)
 
 ### Webhook
 
