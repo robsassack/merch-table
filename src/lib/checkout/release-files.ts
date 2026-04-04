@@ -103,10 +103,6 @@ export async function resolveCurrentReleaseSourceAssets(input: {
     },
   })) as CurrentReleaseSourceAsset[];
 
-  if (deliveryAssets.length > 0) {
-    return dedupeLatestAssetsByTrackAndFormat(deliveryAssets);
-  }
-
   const lossyMasterAssets = (await input.db.trackAsset.findMany({
     where: {
       assetRole: "MASTER",
@@ -115,7 +111,6 @@ export async function resolveCurrentReleaseSourceAssets(input: {
         releaseId: input.releaseId,
         release: {
           ...releaseFilter,
-          isLossyOnly: true,
         },
       },
     },
@@ -136,11 +131,29 @@ export async function resolveCurrentReleaseSourceAssets(input: {
     },
   })) as CurrentReleaseSourceAsset[];
 
-  return dedupeLatestAssetsByTrackAndFormat(lossyMasterAssets);
+  if (deliveryAssets.length === 0) {
+    return dedupeLatestAssetsByTrackAndFormat(lossyMasterAssets);
+  }
+
+  // Keep explicit DELIVERY assets as the primary source, but fill gaps for
+  // newly uploaded master-only tracks so buyers can still download them.
+  const trackIdsWithDelivery = new Set(deliveryAssets.map((asset) => asset.trackId));
+  const lossyMasterFallbackAssets = lossyMasterAssets.filter(
+    (asset) => !trackIdsWithDelivery.has(asset.trackId),
+  );
+
+  if (lossyMasterFallbackAssets.length === 0) {
+    return dedupeLatestAssetsByTrackAndFormat(deliveryAssets);
+  }
+
+  return dedupeLatestAssetsByTrackAndFormat([
+    ...deliveryAssets,
+    ...lossyMasterFallbackAssets,
+  ]);
 }
 
 export async function ensureReleaseFilesForCheckout(
-  tx: Prisma.TransactionClient,
+  tx: Pick<Prisma.TransactionClient, "trackAsset" | "releaseFile">,
   input: {
     releaseId: string;
     organizationId: string;
@@ -156,27 +169,45 @@ export async function ensureReleaseFilesForCheckout(
     return [];
   }
 
-  await tx.releaseFile.createMany({
-    data: sourceAssets.map((asset, index) => {
-      const extension = inferExtensionFromMimeType(asset.mimeType, asset.format);
-      const resolvedTrackArtistName = asset.track.artistOverride?.trim() || null;
+  const desiredReleaseFiles = sourceAssets.map((asset, index) => {
+    const extension = inferExtensionFromMimeType(asset.mimeType, asset.format);
+    const resolvedTrackArtistName = asset.track.artistOverride?.trim() || null;
 
-      return {
-        releaseId: input.releaseId,
-        fileName: formatDeliveryFileName(
-          asset.track.trackNumber,
-          resolvedTrackArtistName,
-          asset.track.title,
-          extension,
-        ),
-        storageKey: asset.storageKey,
-        mimeType: asset.mimeType,
-        sizeBytes: asset.fileSizeBytes,
-        sortOrder: index,
-      };
-    }),
+    return {
+      releaseId: input.releaseId,
+      fileName: formatDeliveryFileName(
+        asset.track.trackNumber,
+        resolvedTrackArtistName,
+        asset.track.title,
+        extension,
+      ),
+      storageKey: asset.storageKey,
+      mimeType: asset.mimeType,
+      sizeBytes: asset.fileSizeBytes,
+      sortOrder: index,
+    };
+  });
+
+  await tx.releaseFile.createMany({
+    data: desiredReleaseFiles,
     skipDuplicates: true,
   });
+
+  // Keep existing release-file metadata in sync with current track/release details.
+  for (const desiredFile of desiredReleaseFiles) {
+    await tx.releaseFile.updateMany({
+      where: {
+        releaseId: input.releaseId,
+        storageKey: desiredFile.storageKey,
+      },
+      data: {
+        fileName: desiredFile.fileName,
+        mimeType: desiredFile.mimeType,
+        sizeBytes: desiredFile.sizeBytes,
+        sortOrder: desiredFile.sortOrder,
+      },
+    });
+  }
 
   return tx.releaseFile.findMany({
     where: {

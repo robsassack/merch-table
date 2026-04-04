@@ -81,6 +81,7 @@ describe("POST /api/webhooks/stripe", () => {
               hasReleaseFiles = true;
               return { count: 1 };
             },
+            updateMany: async () => ({ count: 1 }),
           },
           trackAsset: {
             findMany: async () => [

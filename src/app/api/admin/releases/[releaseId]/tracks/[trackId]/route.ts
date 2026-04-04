@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  ensureReleaseFilesForCheckout,
+  resolveCurrentReleaseSourceAssets,
+} from "@/lib/checkout/release-files";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
@@ -96,7 +100,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           id: releaseId,
           organizationId: auth.context.organizationId,
         },
-        select: { id: true },
+        select: { id: true, organizationId: true },
       }),
       prisma.storeSettings.findFirst({
         where: { organizationId: auth.context.organizationId },
@@ -309,6 +313,54 @@ export async function PATCH(request: Request, context: RouteContext) {
           data: {
             trackNumber: { decrement: shiftOffset + 1 },
           },
+        });
+
+        const sourceAssets = await resolveCurrentReleaseSourceAssets({
+          db: tx,
+          releaseId: release.id,
+          organizationId: release.organizationId,
+        });
+        const sourceStorageKeys = Array.from(
+          new Set(sourceAssets.map((asset) => asset.storageKey)),
+        );
+
+        if (sourceStorageKeys.length > 0) {
+          await tx.downloadEntitlement.deleteMany({
+            where: {
+              releaseId: release.id,
+              releaseFile: {
+                storageKey: {
+                  notIn: sourceStorageKeys,
+                },
+              },
+            },
+          });
+
+          await tx.releaseFile.deleteMany({
+            where: {
+              releaseId: release.id,
+              storageKey: {
+                notIn: sourceStorageKeys,
+              },
+            },
+          });
+        } else {
+          await tx.downloadEntitlement.deleteMany({
+            where: {
+              releaseId: release.id,
+            },
+          });
+
+          await tx.releaseFile.deleteMany({
+            where: {
+              releaseId: release.id,
+            },
+          });
+        }
+
+        await ensureReleaseFilesForCheckout(tx, {
+          releaseId: release.id,
+          organizationId: release.organizationId,
         });
       });
 

@@ -31,14 +31,35 @@ type LibraryReleaseGroup = {
   artistName: string;
   coverImageUrl: string | null;
   downloads: LibraryDownload[];
+  tracks: LibraryTrackGroup[];
   availableFormats: DownloadFormat[];
   zipFormat: DownloadFormat | null;
+  canSelectZipFormat: boolean;
+};
+
+type LibraryTrackDownloadOption = {
+  downloadPath: string;
+  fileName: string;
+  format: DownloadFormat | null;
+  formatLabel: string;
+};
+
+type LibraryTrackGroup = {
+  key: string;
+  number: string;
+  title: string;
+  downloadOptions: LibraryTrackDownloadOption[];
 };
 
 type LibraryState = "idle" | "loading" | "ready" | "error";
 
 type LibraryPageClientProps = {
   brandLabel: string;
+};
+
+type MixedZipPromptState = {
+  releaseId: string;
+  releaseTitle: string;
 };
 
 function normalizeToken(value: string) {
@@ -67,6 +88,84 @@ function toTrackDisplay(fileName: string) {
     number: match[1].padStart(2, "0"),
     title: match[2],
   };
+}
+
+function withoutExtension(fileName: string) {
+  const extIndex = fileName.lastIndexOf(".");
+  return extIndex > 0 ? fileName.slice(0, extIndex) : fileName;
+}
+
+function resolveFormatOptionLabel(download: LibraryDownload) {
+  if (download.format) {
+    return formatLabel(download.format);
+  }
+
+  const ext = download.fileName.split(".").pop()?.trim().toUpperCase();
+  return ext && ext.length > 0 ? ext : "Unknown";
+}
+
+function buildTrackGroups(downloads: LibraryDownload[]) {
+  const groups = new Map<string, LibraryTrackGroup>();
+
+  for (const download of downloads) {
+    const fileStem = withoutExtension(download.fileName).trim();
+    const key = fileStem.toLowerCase();
+    const existing = groups.get(key);
+    if (existing) {
+      existing.downloadOptions.push({
+        downloadPath: download.downloadPath,
+        fileName: download.fileName,
+        format: download.format,
+        formatLabel: resolveFormatOptionLabel(download),
+      });
+      continue;
+    }
+
+    const track = toTrackDisplay(download.fileName);
+    groups.set(key, {
+      key,
+      number: track.number,
+      title: track.title,
+      downloadOptions: [
+        {
+          downloadPath: download.downloadPath,
+          fileName: download.fileName,
+          format: download.format,
+          formatLabel: resolveFormatOptionLabel(download),
+        },
+      ],
+    });
+  }
+
+  return Array.from(groups.values())
+    .map((group) => ({
+      ...group,
+      downloadOptions: [...group.downloadOptions].sort((a, b) => {
+        const rank = (format: DownloadFormat | null) => {
+          if (format === "flac") {
+            return 0;
+          }
+          if (format === "m4a") {
+            return 1;
+          }
+          if (format === "mp3") {
+            return 2;
+          }
+          return 3;
+        };
+        const formatDelta = rank(a.format) - rank(b.format);
+        if (formatDelta !== 0) {
+          return formatDelta;
+        }
+        return a.fileName.localeCompare(b.fileName);
+      }),
+    }))
+    .sort((a, b) => {
+      if (a.number !== b.number) {
+        return a.number.localeCompare(b.number);
+      }
+      return a.title.localeCompare(b.title);
+    });
 }
 
 function extractTokenFromWindow() {
@@ -111,11 +210,87 @@ function chooseZipFormat(formats: DownloadFormat[]) {
   return null;
 }
 
+function sortFormats(formats: DownloadFormat[]) {
+  const priority: Record<DownloadFormat, number> = {
+    flac: 0,
+    m4a: 1,
+    mp3: 2,
+  };
+
+  return [...formats].sort((a, b) => priority[a] - priority[b]);
+}
+
+function getFileStem(fileName: string) {
+  const dotIndex = fileName.lastIndexOf(".");
+  if (dotIndex <= 0) {
+    return fileName.trim().toLowerCase();
+  }
+  return fileName.slice(0, dotIndex).trim().toLowerCase();
+}
+
+function canSelectZipFormatForRelease(
+  downloads: LibraryDownload[],
+  availableFormats: DownloadFormat[],
+) {
+  if (availableFormats.length < 2) {
+    return false;
+  }
+
+  const formatSet = new Set(availableFormats);
+  const formatsByTrackStem = new Map<string, Set<DownloadFormat>>();
+
+  for (const download of downloads) {
+    if (!download.format || !formatSet.has(download.format)) {
+      return false;
+    }
+
+    const stem = getFileStem(download.fileName);
+    const existing = formatsByTrackStem.get(stem) ?? new Set<DownloadFormat>();
+    existing.add(download.format);
+    formatsByTrackStem.set(stem, existing);
+  }
+
+  if (formatsByTrackStem.size === 0) {
+    return false;
+  }
+
+  for (const trackFormats of formatsByTrackStem.values()) {
+    if (trackFormats.size !== availableFormats.length) {
+      return false;
+    }
+    for (const format of availableFormats) {
+      if (!trackFormats.has(format)) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+}
+
 function resolveCoverSrc(coverImageUrl: string | null) {
   if (!coverImageUrl) {
     return null;
   }
   return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
+}
+
+function createReleaseZipPath(input: {
+  token: string;
+  releaseId: string;
+  format?: DownloadFormat;
+  mode?: "all";
+}) {
+  const basePath = `/api/download-release/${encodeURIComponent(input.token)}/${encodeURIComponent(input.releaseId)}`;
+  const params = new URLSearchParams();
+  if (input.format) {
+    params.set("format", input.format);
+  }
+  if (input.mode === "all") {
+    params.set("mode", "all");
+  }
+  const query = params.toString();
+  return query.length > 0 ? `${basePath}?${query}` : basePath;
 }
 
 function groupDownloadsByRelease(payload: LibrarySuccessPayload): LibraryReleaseGroup[] {
@@ -136,15 +311,74 @@ function groupDownloadsByRelease(payload: LibrarySuccessPayload): LibraryRelease
       artistName: download.release.artistName,
       coverImageUrl: download.release.coverImageUrl,
       downloads: [download],
+      tracks: [],
       availableFormats,
       zipFormat: chooseZipFormat(availableFormats),
+      canSelectZipFormat: false,
     });
   }
 
   return Array.from(groups.values()).map((group) => ({
     ...group,
     downloads: [...group.downloads].sort((a, b) => a.fileName.localeCompare(b.fileName)),
+    tracks: buildTrackGroups(group.downloads),
+    canSelectZipFormat: canSelectZipFormatForRelease(
+      group.downloads,
+      group.availableFormats,
+    ),
   }));
+}
+
+function TrackDownloadControl({
+  options,
+}: {
+  options: LibraryTrackDownloadOption[];
+}) {
+  const [selectedPath, setSelectedPath] = useState(options[0]?.downloadPath ?? "");
+
+  useEffect(() => {
+    setSelectedPath(options[0]?.downloadPath ?? "");
+  }, [options]);
+
+  const selectedOption =
+    options.find((option) => option.downloadPath === selectedPath) ?? options[0] ?? null;
+
+  const formatCount = new Set(options.map((option) => option.formatLabel)).size;
+  const showFormatSelect = formatCount > 1;
+
+  if (!selectedOption) {
+    return null;
+  }
+
+  return (
+    <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
+      {showFormatSelect ? (
+        <label className="sr-only" htmlFor={`track-download-${selectedOption.downloadPath}`}>
+          Download format
+        </label>
+      ) : null}
+      {showFormatSelect ? (
+        <select
+          id={`track-download-${selectedOption.downloadPath}`}
+          value={selectedPath}
+          onChange={(event) => setSelectedPath(event.target.value)}
+          className="h-8 min-w-0 flex-1 rounded-lg border border-zinc-300 bg-white px-2 text-xs font-medium text-zinc-800 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300 sm:flex-none"
+        >
+          {options.map((option) => (
+            <option key={option.downloadPath} value={option.downloadPath}>
+              {option.formatLabel}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      <a
+        href={selectedOption.downloadPath}
+        className="shrink-0 rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-100"
+      >
+        Download
+      </a>
+    </div>
+  );
 }
 
 export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps) {
@@ -154,6 +388,7 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
   const [state, setState] = useState<LibraryState>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [library, setLibrary] = useState<LibrarySuccessPayload | null>(null);
+  const [mixedZipPrompt, setMixedZipPrompt] = useState<MixedZipPromptState | null>(null);
 
   useEffect(() => {
     const applyTokenFromUrl = () => {
@@ -246,6 +481,48 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
 
   return (
     <main className={buyerTheme.page}>
+      {mixedZipPrompt ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 px-4">
+          <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
+            <h2 className="text-lg font-semibold tracking-tight">Mixed File Types Detected</h2>
+            <p className="mt-2 text-sm text-zinc-600">
+              "{mixedZipPrompt.releaseTitle}" has mixed track formats. Do you want one best file
+              per track, or every available variant?
+            </p>
+            <div className="mt-4 flex flex-col gap-2">
+              <a
+                href={createReleaseZipPath({
+                  token,
+                  releaseId: mixedZipPrompt.releaseId,
+                })}
+                className={buyerTheme.buttonPrimary}
+                onClick={() => setMixedZipPrompt(null)}
+              >
+                Best Available (Recommended)
+              </a>
+              <a
+                href={createReleaseZipPath({
+                  token,
+                  releaseId: mixedZipPrompt.releaseId,
+                  mode: "all",
+                })}
+                className="inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-zinc-300 px-5 py-1.5 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-100"
+                onClick={() => setMixedZipPrompt(null)}
+              >
+                All Files
+              </a>
+              <button
+                type="button"
+                onClick={() => setMixedZipPrompt(null)}
+                className="mt-1 inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-xl px-5 py-1.5 text-sm font-semibold text-zinc-600 transition hover:bg-zinc-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <header className={buyerTheme.header}>
         <div className={buyerTheme.headerInner}>
           <div className="flex items-center gap-3">
@@ -375,12 +652,60 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
 
                     <div className="mt-5 flex flex-wrap items-center gap-2.5">
                       {release.zipFormat ? (
-                        <a
-                          href={`/api/download-release/${encodeURIComponent(token)}/${encodeURIComponent(release.id)}?format=${release.zipFormat}`}
-                          className={buyerTheme.buttonPrimary}
-                        >
-                          Download ZIP ({formatLabel(release.zipFormat)})
-                        </a>
+                        release.canSelectZipFormat ? (
+                          <form
+                            action={createReleaseZipPath({
+                              token,
+                              releaseId: release.id,
+                            })}
+                            method="get"
+                            className="flex flex-wrap items-center gap-2.5"
+                          >
+                            <label htmlFor={`zip-format-${release.id}`} className="sr-only">
+                              Select ZIP format for {release.title}
+                            </label>
+                            <select
+                              id={`zip-format-${release.id}`}
+                              name="format"
+                              defaultValue={release.zipFormat}
+                              className="h-8 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300"
+                            >
+                              {sortFormats(release.availableFormats).map((format) => (
+                                <option key={format} value={format}>
+                                  {formatLabel(format)}
+                                </option>
+                              ))}
+                            </select>
+                            <button type="submit" className={buyerTheme.buttonPrimary}>
+                              Download ZIP
+                            </button>
+                          </form>
+                        ) : (
+                          release.availableFormats.length > 1 ? (
+                            <button
+                              type="button"
+                              className={buyerTheme.buttonPrimary}
+                              onClick={() =>
+                                setMixedZipPrompt({
+                                  releaseId: release.id,
+                                  releaseTitle: release.title,
+                                })
+                              }
+                            >
+                              Download ZIP
+                            </button>
+                          ) : (
+                            <a
+                              href={createReleaseZipPath({
+                                token,
+                                releaseId: release.id,
+                              })}
+                              className={buyerTheme.buttonPrimary}
+                            >
+                              Download ZIP
+                            </a>
+                          )
+                        )
                       ) : (
                         <span className={buyerTheme.statusError}>
                           ZIP unavailable
@@ -393,17 +718,16 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
                 <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50">
                   <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2.5 text-xs uppercase tracking-[0.16em] text-zinc-500">
                     <span>Tracklist</span>
-                    <span>{release.downloads.length} files</span>
+                    <span>{release.tracks.length} tracks</span>
                   </div>
                   <ul className="divide-y divide-zinc-200/70">
-                    {release.downloads.map((download) => {
-                      const track = toTrackDisplay(download.fileName);
+                    {release.tracks.map((track) => {
                       return (
                         <li
-                          key={`${download.downloadPath}-${download.fileName}`}
-                          className="flex items-center justify-between gap-3 px-3 py-2.5"
+                          key={track.key}
+                          className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
                         >
-                          <div className="flex min-w-0 items-center gap-3">
+                          <div className="flex min-w-0 items-center gap-3 sm:flex-1">
                             <span className="w-6 text-right text-xs font-medium text-zinc-500">
                               {track.number}
                             </span>
@@ -411,19 +735,9 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
                               <p className="truncate text-sm text-zinc-900">
                                 {track.title}
                               </p>
-                              <p className="text-xs text-zinc-500">
-                                {download.format
-                                  ? formatLabel(download.format)
-                                  : "Unknown format"}
-                              </p>
                             </div>
                           </div>
-                          <a
-                            href={download.downloadPath}
-                            className="shrink-0 rounded-xl border border-zinc-300 px-3 py-1.5 text-xs font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-100"
-                          >
-                            Download file
-                          </a>
+                          <TrackDownloadControl options={track.downloadOptions} />
                         </li>
                       );
                     })}

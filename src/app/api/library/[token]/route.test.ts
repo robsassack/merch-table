@@ -91,6 +91,9 @@ describe("GET /api/library/:token", () => {
         ],
       ),
     );
+    restore.push(
+      patchMethod(prisma.orderItem as unknown as AnyRecord, "findMany", async () => []),
+    );
 
     const { GET } = await import("@/app/api/library/[token]/route");
 
@@ -119,19 +122,211 @@ describe("GET /api/library/:token", () => {
     assert.deepEqual(payload.availableDownloadFormatsByReleaseId["release-1"], [
       "flac",
     ]);
+    assert.ok(buyerLibraryTokenUpdateInput);
+    const updateInput = buyerLibraryTokenUpdateInput as AnyRecord;
+    assert.equal((updateInput.where as AnyRecord)?.id, "lib-token-1");
     assert.equal(
-      (buyerLibraryTokenUpdateInput?.where as AnyRecord)?.id,
-      "lib-token-1",
-    );
-    assert.equal(
-      ((buyerLibraryTokenUpdateInput?.data as AnyRecord)?.accessCount as AnyRecord)
-        ?.increment,
+      ((updateInput.data as AnyRecord)?.accessCount as AnyRecord)?.increment,
       1,
     );
-    assert.ok(
-      ((buyerLibraryTokenUpdateInput?.data as AnyRecord)?.lastUsedAt as unknown) instanceof
-        Date,
+    assert.ok(((updateInput.data as AnyRecord)?.lastUsedAt as unknown) instanceof Date);
+  });
+
+  it("adds missing entitlements for newly added release files before returning library downloads", async () => {
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    const { prisma } = await import("@/lib/prisma");
+
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "findUnique",
+        async () => ({
+          id: "lib-token-3",
+          customerId: "customer-1",
+          revokedAt: null,
+          expiresAt: null,
+        }),
+      ),
     );
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "update",
+        async () => ({
+          lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
+          accessCount: 4,
+          expiresAt: null,
+        }),
+      ),
+    );
+
+    let entitlementReadCount = 0;
+    restore.push(
+      patchMethod(
+        prisma.downloadEntitlement as unknown as AnyRecord,
+        "findMany",
+        async () => {
+          entitlementReadCount += 1;
+          if (entitlementReadCount === 1) {
+            return [
+              {
+                token: "ent-1",
+                createdAt: new Date("2026-04-04T10:00:00.000Z"),
+                releaseFileId: "file-1",
+                releaseFile: {
+                  id: "file-1",
+                  fileName: "01 - Track One.flac",
+                  sizeBytes: 123456,
+                  mimeType: "audio/flac",
+                },
+                release: {
+                  id: "release-1",
+                  title: "Release One",
+                  slug: "release-one",
+                  coverImageUrl: null,
+                  artist: {
+                    name: "Artist One",
+                  },
+                },
+                orderItem: {
+                  order: {
+                    id: "order-1",
+                    orderNumber: "ORDER-1",
+                    paidAt: new Date("2026-04-03T12:00:00.000Z"),
+                    createdAt: new Date("2026-04-03T12:00:00.000Z"),
+                  },
+                },
+              },
+            ];
+          }
+
+          return [
+            {
+              token: "ent-2",
+              createdAt: new Date("2026-04-04T11:00:00.000Z"),
+              releaseFileId: "file-2",
+              releaseFile: {
+                id: "file-2",
+                fileName: "02 - New Song.flac",
+                sizeBytes: 654321,
+                mimeType: "audio/flac",
+              },
+              release: {
+                id: "release-1",
+                title: "Release One",
+                slug: "release-one",
+                coverImageUrl: null,
+                artist: {
+                  name: "Artist One",
+                },
+              },
+              orderItem: {
+                order: {
+                  id: "order-1",
+                  orderNumber: "ORDER-1",
+                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
+                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
+                },
+              },
+            },
+            {
+              token: "ent-1",
+              createdAt: new Date("2026-04-04T10:00:00.000Z"),
+              releaseFileId: "file-1",
+              releaseFile: {
+                id: "file-1",
+                fileName: "01 - Track One.flac",
+                sizeBytes: 123456,
+                mimeType: "audio/flac",
+              },
+              release: {
+                id: "release-1",
+                title: "Release One",
+                slug: "release-one",
+                coverImageUrl: null,
+                artist: {
+                  name: "Artist One",
+                },
+              },
+              orderItem: {
+                order: {
+                  id: "order-1",
+                  orderNumber: "ORDER-1",
+                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
+                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
+                },
+              },
+            },
+          ];
+        },
+      ),
+    );
+
+    restore.push(
+      patchMethod(
+        prisma.orderItem as unknown as AnyRecord,
+        "findMany",
+        async () => [
+          {
+            id: "order-item-1",
+            releaseId: "release-1",
+            release: {
+              organizationId: "org-1",
+            },
+          },
+        ],
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.trackAsset as unknown as AnyRecord,
+        "findMany",
+        async () => [],
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.releaseFile as unknown as AnyRecord,
+        "findMany",
+        async () => [
+          { id: "file-1", releaseId: "release-1" },
+          { id: "file-2", releaseId: "release-1" },
+        ],
+      ),
+    );
+
+    let createManyInput: AnyRecord | null = null;
+    restore.push(
+      patchMethod(
+        prisma.downloadEntitlement as unknown as AnyRecord,
+        "createMany",
+        async (input: AnyRecord) => {
+          createManyInput = input;
+          return { count: 1 };
+        },
+      ),
+    );
+
+    const { GET } = await import("@/app/api/library/[token]/route");
+    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
+      params: Promise.resolve({ token: "lib-token" }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = (await response.json()) as {
+      ok: boolean;
+      downloads: Array<{ fileName: string }>;
+    };
+    assert.equal(payload.ok, true);
+    assert.equal(payload.downloads.length, 2);
+    assert.equal(payload.downloads[0]?.fileName, "02 - New Song.flac");
+    assert.equal(payload.downloads[1]?.fileName, "01 - Track One.flac");
+    assert.ok(createManyInput);
+    const createData = (createManyInput as AnyRecord).data as AnyRecord[];
+    assert.equal(createData.length, 1);
+    assert.equal(createData[0]?.releaseFileId, "file-2");
+    assert.equal(createData[0]?.orderItemId, "order-item-1");
   });
 
   it("returns 403 when the token has expired", async () => {
@@ -158,5 +353,152 @@ describe("GET /api/library/:token", () => {
     });
 
     assert.equal(response.status, 403);
+  });
+
+  it("returns refreshed file names after release-file metadata is reconciled", async () => {
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    const { prisma } = await import("@/lib/prisma");
+
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "findUnique",
+        async () => ({
+          id: "lib-token-4",
+          customerId: "customer-1",
+          revokedAt: null,
+          expiresAt: null,
+        }),
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "update",
+        async () => ({
+          lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
+          accessCount: 7,
+          expiresAt: null,
+        }),
+      ),
+    );
+
+    let entitlementReadCount = 0;
+    restore.push(
+      patchMethod(
+        prisma.downloadEntitlement as unknown as AnyRecord,
+        "findMany",
+        async () => {
+          entitlementReadCount += 1;
+          const fileName =
+            entitlementReadCount === 1
+              ? "01 - Old Name.flac"
+              : "01 - Renamed Track.flac";
+          return [
+            {
+              token: "ent-rename-1",
+              createdAt: new Date("2026-04-04T10:00:00.000Z"),
+              releaseFileId: "file-1",
+              releaseFile: {
+                id: "file-1",
+                fileName,
+                sizeBytes: 111111,
+                mimeType: "audio/flac",
+              },
+              release: {
+                id: "release-1",
+                title: "Renamed Album",
+                slug: "renamed-album",
+                coverImageUrl: null,
+                artist: {
+                  name: "Artist One",
+                },
+              },
+              orderItem: {
+                order: {
+                  id: "order-1",
+                  orderNumber: "ORDER-1",
+                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
+                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
+                },
+              },
+            },
+          ];
+        },
+      ),
+    );
+
+    restore.push(
+      patchMethod(
+        prisma.orderItem as unknown as AnyRecord,
+        "findMany",
+        async () => [
+          {
+            id: "order-item-1",
+            releaseId: "release-1",
+            release: {
+              organizationId: "org-1",
+            },
+          },
+        ],
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.trackAsset as unknown as AnyRecord,
+        "findMany",
+        async () => [
+          {
+            trackId: "track-1",
+            storageKey: "org/releases/release-1/01-renamed-track.flac",
+            mimeType: "audio/flac",
+            fileSizeBytes: 111111,
+            format: "FLAC",
+            track: {
+              title: "Renamed Track",
+              artistOverride: null,
+              trackNumber: 1,
+            },
+          },
+        ],
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.releaseFile as unknown as AnyRecord,
+        "createMany",
+        async () => ({ count: 0 }),
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.releaseFile as unknown as AnyRecord,
+        "updateMany",
+        async () => ({ count: 1 }),
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.releaseFile as unknown as AnyRecord,
+        "findMany",
+        async () => [{ id: "file-1", releaseId: "release-1" }],
+      ),
+    );
+
+    const { GET } = await import("@/app/api/library/[token]/route");
+    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
+      params: Promise.resolve({ token: "lib-token" }),
+    });
+
+    assert.equal(response.status, 200);
+    const payload = (await response.json()) as {
+      ok: boolean;
+      downloads: Array<{ fileName: string }>;
+    };
+    assert.equal(payload.ok, true);
+    assert.equal(payload.downloads.length, 1);
+    assert.equal(payload.downloads[0]?.fileName, "01 - Renamed Track.flac");
+    assert.equal(entitlementReadCount, 2);
   });
 });

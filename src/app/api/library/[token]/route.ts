@@ -1,5 +1,8 @@
+import crypto from "node:crypto";
+
 import { NextResponse } from "next/server";
 
+import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
 import { prisma } from "@/lib/prisma";
 
@@ -11,6 +14,149 @@ type RouteContext = {
 
 function isExpired(expiresAt: Date | null, now: Date) {
   return Boolean(expiresAt && expiresAt.getTime() <= now.getTime());
+}
+
+function createToken() {
+  return crypto.randomBytes(32).toString("base64url");
+}
+
+async function fetchLibraryEntitlements(customerId: string) {
+  return prisma.downloadEntitlement.findMany({
+    where: {
+      customerId,
+    },
+    orderBy: [{ createdAt: "desc" }],
+    select: {
+      token: true,
+      createdAt: true,
+      releaseFileId: true,
+      releaseFile: {
+        select: {
+          id: true,
+          fileName: true,
+          sizeBytes: true,
+          mimeType: true,
+        },
+      },
+      release: {
+        select: {
+          id: true,
+          title: true,
+          slug: true,
+          coverImageUrl: true,
+          artist: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      },
+      orderItem: {
+        select: {
+          order: {
+            select: {
+              id: true,
+              orderNumber: true,
+              paidAt: true,
+              createdAt: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+async function syncMissingReleaseFileEntitlements(input: {
+  customerId: string;
+  existingEntitlements: Array<{ releaseId: string; releaseFileId: string }>;
+}) {
+  const ownedReleaseOrderItems = await prisma.orderItem.findMany({
+    where: {
+      order: {
+        customerId: input.customerId,
+        status: {
+          in: ["PAID", "FULFILLED"],
+        },
+      },
+    },
+    orderBy: [{ createdAt: "asc" }],
+    select: {
+      id: true,
+      releaseId: true,
+      release: {
+        select: {
+          organizationId: true,
+        },
+      },
+    },
+  });
+  if (ownedReleaseOrderItems.length === 0) {
+    return false;
+  }
+
+  const orderItemByReleaseId = new Map<
+    string,
+    { orderItemId: string; organizationId: string }
+  >();
+  for (const orderItem of ownedReleaseOrderItems) {
+    if (!orderItemByReleaseId.has(orderItem.releaseId)) {
+      orderItemByReleaseId.set(orderItem.releaseId, {
+        orderItemId: orderItem.id,
+        organizationId: orderItem.release.organizationId,
+      });
+    }
+  }
+
+  await Promise.all(
+    Array.from(orderItemByReleaseId.entries()).map(([releaseId, value]) =>
+      ensureReleaseFilesForCheckout(prisma, {
+        releaseId,
+        organizationId: value.organizationId,
+      }),
+    ),
+  );
+
+  const releaseIds = Array.from(orderItemByReleaseId.keys());
+  const allReleaseFiles = await prisma.releaseFile.findMany({
+    where: {
+      releaseId: {
+        in: releaseIds,
+      },
+    },
+    select: {
+      id: true,
+      releaseId: true,
+    },
+  });
+  if (allReleaseFiles.length === 0) {
+    return false;
+  }
+
+  const existingKeys = new Set(
+    input.existingEntitlements.map(
+      (entitlement) => `${entitlement.releaseId}:${entitlement.releaseFileId}`,
+    ),
+  );
+  const missingEntitlements = allReleaseFiles.filter(
+    (releaseFile) => !existingKeys.has(`${releaseFile.releaseId}:${releaseFile.id}`),
+  );
+  if (missingEntitlements.length === 0) {
+    return true;
+  }
+
+  await prisma.downloadEntitlement.createMany({
+    data: missingEntitlements.map((releaseFile) => ({
+      customerId: input.customerId,
+      releaseId: releaseFile.releaseId,
+      releaseFileId: releaseFile.id,
+      orderItemId: orderItemByReleaseId.get(releaseFile.releaseId)!.orderItemId,
+      token: createToken(),
+    })),
+    skipDuplicates: true,
+  });
+
+  return true;
 }
 
 export async function GET(_request: Request, context: RouteContext) {
@@ -67,50 +213,18 @@ export async function GET(_request: Request, context: RouteContext) {
     },
   });
 
-  const entitlements = await prisma.downloadEntitlement.findMany({
-    where: {
-      customerId: libraryToken.customerId,
-    },
-    orderBy: [{ createdAt: "desc" }],
-    select: {
-      token: true,
-      createdAt: true,
-      releaseFileId: true,
-      releaseFile: {
-        select: {
-          id: true,
-          fileName: true,
-          sizeBytes: true,
-          mimeType: true,
-        },
-      },
-      release: {
-        select: {
-          id: true,
-          title: true,
-          slug: true,
-          coverImageUrl: true,
-          artist: {
-            select: {
-              name: true,
-            },
-          },
-        },
-      },
-      orderItem: {
-        select: {
-          order: {
-            select: {
-              id: true,
-              orderNumber: true,
-              paidAt: true,
-              createdAt: true,
-            },
-          },
-        },
-      },
-    },
+  let entitlements = await fetchLibraryEntitlements(libraryToken.customerId);
+
+  const addedMissingEntitlements = await syncMissingReleaseFileEntitlements({
+    customerId: libraryToken.customerId,
+    existingEntitlements: entitlements.map((entitlement) => ({
+      releaseId: entitlement.release.id,
+      releaseFileId: entitlement.releaseFileId,
+    })),
   });
+  if (addedMissingEntitlements) {
+    entitlements = await fetchLibraryEntitlements(libraryToken.customerId);
+  }
 
   const availableDownloadFormatsByReleaseId: Record<string, Array<"mp3" | "m4a" | "flac">> =
     {};

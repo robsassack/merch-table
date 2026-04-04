@@ -24,6 +24,7 @@ type NodeWebReadableStream = import("node:stream/web").ReadableStream<Uint8Array
 
 type ReleaseDownloadRow = {
   track: {
+    id: string;
     title: string;
     artistName: string;
     trackNumber: number;
@@ -94,6 +95,45 @@ function parseRequestedFormat(request: Request) {
   return null;
 }
 
+function parseZipDownloadMode(request: Request) {
+  const value = new URL(request.url).searchParams.get("mode")?.trim().toLowerCase();
+  if (value === "all") {
+    return "all" as const;
+  }
+  return "best" as const;
+}
+
+function resolveStorageKeyFromPublicCoverUrl(sourceUrl: string) {
+  const publicBase = process.env.STORAGE_PUBLIC_BASE_URL?.trim();
+  if (!publicBase) {
+    return null;
+  }
+
+  try {
+    const parsedBase = new URL(publicBase.endsWith("/") ? publicBase : `${publicBase}/`);
+    const parsedSource = new URL(sourceUrl);
+    if (parsedBase.origin !== parsedSource.origin) {
+      return null;
+    }
+
+    const basePath = parsedBase.pathname.endsWith("/")
+      ? parsedBase.pathname
+      : `${parsedBase.pathname}/`;
+    if (!parsedSource.pathname.startsWith(basePath)) {
+      return null;
+    }
+
+    const relative = parsedSource.pathname.slice(basePath.length).trim();
+    if (!relative) {
+      return null;
+    }
+
+    return decodeURIComponent(relative);
+  } catch {
+    return null;
+  }
+}
+
 function createTrackZipEntryName(input: {
   trackArtistName: string;
   releaseTitle: string;
@@ -112,6 +152,50 @@ function createCoverZipEntryName(input: {
   extension: string;
 }) {
   return `${sanitizeFileName(`${input.artistName} - ${input.releaseTitle} - Cover`)}${input.extension}`;
+}
+
+function getFormatRank(format: DownloadFormat | null) {
+  if (format === "flac") {
+    return 0;
+  }
+  if (format === "m4a") {
+    return 1;
+  }
+  if (format === "mp3") {
+    return 2;
+  }
+  return 3;
+}
+
+function selectBestAvailableDownloads(downloads: ReleaseDownloadRow[]) {
+  const bestByTrackId = new Map<string, ReleaseDownloadRow>();
+  for (const entry of downloads) {
+    const key = entry.track.id;
+    const nextFormat = resolveReleaseFileFormat({
+      fileName: entry.file.fileName,
+      mimeType: entry.file.mimeType,
+    });
+    const existing = bestByTrackId.get(key);
+    if (!existing) {
+      bestByTrackId.set(key, entry);
+      continue;
+    }
+
+    const existingFormat = resolveReleaseFileFormat({
+      fileName: existing.file.fileName,
+      mimeType: existing.file.mimeType,
+    });
+    if (getFormatRank(nextFormat) < getFormatRank(existingFormat)) {
+      bestByTrackId.set(key, entry);
+    }
+  }
+
+  return Array.from(bestByTrackId.values()).sort((a, b) => {
+    if (a.track.trackNumber !== b.track.trackNumber) {
+      return a.track.trackNumber - b.track.trackNumber;
+    }
+    return a.track.title.localeCompare(b.track.title);
+  });
 }
 
 function resolveCoverArtExtension(input: {
@@ -272,6 +356,7 @@ async function resolveOwnedReleaseDownloads(input: {
         : extension;
       return {
         track: {
+          id: asset.trackId,
           title: asset.track.title,
           artistName: entitledRelease.release.artist.name,
           trackNumber: asset.track.trackNumber,
@@ -304,12 +389,7 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   const requestedFormat = parseRequestedFormat(request);
-  if (!requestedFormat) {
-    return NextResponse.json(
-      { ok: false, error: "A format query parameter is required (mp3, m4a, or flac)." },
-      { status: 400 },
-    );
-  }
+  const zipMode = parseZipDownloadMode(request);
 
   const resolved = await resolveOwnedReleaseDownloads({
     libraryToken,
@@ -322,13 +402,18 @@ export async function GET(request: Request, context: RouteContext) {
     );
   }
 
-  const downloads = resolved.downloads.filter((entry) => {
-    const fileFormat = resolveReleaseFileFormat({
-      fileName: entry.file.fileName,
-      mimeType: entry.file.mimeType,
-    });
-    return fileFormat === requestedFormat;
-  });
+  const downloads =
+    requestedFormat === null
+      ? zipMode === "all"
+        ? resolved.downloads
+        : selectBestAvailableDownloads(resolved.downloads)
+      : resolved.downloads.filter((entry) => {
+          const fileFormat = resolveReleaseFileFormat({
+            fileName: entry.file.fileName,
+            mimeType: entry.file.mimeType,
+          });
+          return fileFormat === requestedFormat;
+        });
 
   const availableFormats = Array.from(
     new Set(
@@ -343,7 +428,7 @@ export async function GET(request: Request, context: RouteContext) {
     ),
   );
 
-  if (downloads.length === 0) {
+  if (downloads.length === 0 && requestedFormat !== null) {
     return NextResponse.json(
       {
         ok: false,
@@ -405,11 +490,15 @@ export async function GET(request: Request, context: RouteContext) {
     if (coverImageUrl.length > 0) {
       try {
         const coverImageAbsoluteUrl = new URL(coverImageUrl, request.url).toString();
-        const coverResponse = await fetch(coverImageAbsoluteUrl, {
-          cache: "no-store",
-          signal: AbortSignal.timeout(10_000),
-        });
-        if (coverResponse.ok && coverResponse.body) {
+        const appendCoverFromHttp = async () => {
+          const coverResponse = await fetch(coverImageAbsoluteUrl, {
+            cache: "no-store",
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!coverResponse.ok || !coverResponse.body) {
+            return false;
+          }
+
           const coverExtension = resolveCoverArtExtension({
             sourceUrl: coverImageAbsoluteUrl,
             contentType: coverResponse.headers.get("content-type"),
@@ -425,9 +514,48 @@ export async function GET(request: Request, context: RouteContext) {
               coverResponse.body as unknown as NodeWebReadableStream,
             ),
             {
-            name: coverZipEntryName,
+              name: coverZipEntryName,
             },
           );
+          return true;
+        };
+
+        const appendCoverFromStorage = async () => {
+          const coverStorageKey = resolveStorageKeyFromPublicCoverUrl(
+            coverImageAbsoluteUrl,
+          );
+          if (!coverStorageKey) {
+            return false;
+          }
+
+          const coverObject = await storage.getClient().send(
+            new GetObjectCommand({
+              Bucket: storage.bucket,
+              Key: coverStorageKey,
+            }),
+          );
+          const coverExtension = resolveCoverArtExtension({
+            sourceUrl: coverImageAbsoluteUrl,
+            contentType:
+              typeof coverObject.ContentType === "string"
+                ? coverObject.ContentType
+                : null,
+          });
+          const coverZipEntryName = createCoverZipEntryName({
+            artistName,
+            releaseTitle,
+            extension: coverExtension,
+          });
+
+          archive.append(toNodeReadable(coverObject.Body), {
+            name: coverZipEntryName,
+          });
+          return true;
+        };
+
+        const appendedFromHttp = await appendCoverFromHttp();
+        if (!appendedFromHttp) {
+          await appendCoverFromStorage();
         }
       } catch {
         // Cover art is optional for ZIP assembly; skip on fetch failure.
