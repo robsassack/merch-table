@@ -263,6 +263,7 @@ Setup API security:
 - `RATE_LIMIT_LIBRARY_RESEND_EMAIL_MAX` / `RATE_LIMIT_LIBRARY_RESEND_EMAIL_WINDOW_SECONDS`: hashed-email rate limit for `POST /api/library/resend`.
 - `RATE_LIMIT_DOWNLOAD_MAX` / `RATE_LIMIT_DOWNLOAD_WINDOW_SECONDS`: shared limit for `GET /api/download/:entitlementToken/:releaseFileId` and `GET /api/download-release/:libraryToken/:releaseId`.
 - `TRUST_PROXY_HEADERS` (default `false`): keep `false` unless a trusted proxy sets real client IP headers; affects IP-based rate limiting behavior.
+- Phase 6 implementation + operational verification summary: `docs/phase-6-release-note.md`.
 
 Store status behavior:
 - `SETUP`: routes redirect to `/setup` (except setup/magic-link completion paths).

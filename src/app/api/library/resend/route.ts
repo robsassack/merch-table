@@ -41,9 +41,19 @@ function genericSuccessResponse() {
   );
 }
 
+function readRetryAfterSeconds(response: Response) {
+  const retryAfter = response.headers.get("retry-after");
+  if (!retryAfter) {
+    return null;
+  }
+  const parsed = Number.parseInt(retryAfter, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 export async function POST(request: Request) {
   const csrfError = enforceCsrfProtection(request);
   if (csrfError) {
+    console.warn("[library.resend] CSRF validation failed.");
     return csrfError;
   }
 
@@ -52,6 +62,9 @@ export async function POST(request: Request) {
     libraryRateLimitPolicies.resendByIp,
   );
   if (ipRateLimitError) {
+    console.warn("[library.resend] Rate limit hit (ip).", {
+      retryAfterSeconds: readRetryAfterSeconds(ipRateLimitError),
+    });
     return ipRateLimitError;
   }
 
@@ -68,6 +81,10 @@ export async function POST(request: Request) {
       },
     );
     if (emailRateLimitError) {
+      console.warn("[library.resend] Rate limit hit (email).", {
+        emailHash: createHashedRateLimitKey(normalizedEmail).slice(0, 12),
+        retryAfterSeconds: readRetryAfterSeconds(emailRateLimitError),
+      });
       return emailRateLimitError;
     }
 
@@ -134,20 +151,27 @@ export async function POST(request: Request) {
         releaseTitle: latestEntitlement.release.title,
         libraryMagicLinkUrl: buildLibraryMagicLinkUrl(libraryToken.token),
       });
-    } catch {
+    } catch (error) {
       // Keep response generic and non-enumerating even if email delivery fails.
+      console.warn("[library.resend] Email send failed.", {
+        emailHash: createHashedRateLimitKey(normalizedEmail).slice(0, 12),
+        reason: error instanceof Error ? error.message : "unknown_error",
+      });
     }
 
     return genericSuccessResponse();
   } catch (error) {
     if (error instanceof z.ZodError) {
+      console.warn("[library.resend] Invalid request payload.");
       return NextResponse.json(
         { ok: false, error: "Invalid library resend payload." },
         { status: 400 },
       );
     }
 
+    console.error("[library.resend] Unexpected error.", {
+      reason: error instanceof Error ? error.message : "unknown_error",
+    });
     return genericSuccessResponse();
   }
 }
-

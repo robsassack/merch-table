@@ -233,6 +233,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Integration tests: ZIP includes expected track files + cover art and uses required filename conventions
 - [x] Integration tests: downloads continue to work while release transcode jobs are queued/running
 - [x] Update `.env.example` and docs for any new/confirmed Phase 6 env flags
+- [x] Capture a short Phase 6 release note for future regression checks
 
 ---
 

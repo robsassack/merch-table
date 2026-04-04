@@ -101,6 +101,9 @@ export async function GET(request: Request, context: RouteContext) {
   });
 
   if (!entitlement) {
+    console.warn("[library.download] Entitlement token not found.", {
+      releaseFileId,
+    });
     return NextResponse.json(
       { ok: false, error: "Download entitlement not found." },
       { status: 404 },
@@ -108,6 +111,10 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   if (entitlement.releaseFileId !== releaseFileId) {
+    console.warn("[library.download] Entitlement/release-file mismatch.", {
+      requestedReleaseFileId: releaseFileId,
+      entitledReleaseFileId: entitlement.releaseFileId,
+    });
     return NextResponse.json(
       { ok: false, error: "Release file was not granted by this entitlement." },
       { status: 404 },
@@ -115,6 +122,9 @@ export async function GET(request: Request, context: RouteContext) {
   }
 
   if (isExpired(entitlement.expiresAt, new Date())) {
+    console.warn("[library.download] Entitlement expired.", {
+      releaseFileId,
+    });
     return NextResponse.json(
       { ok: false, error: "Download entitlement has expired." },
       { status: 403 },
@@ -134,17 +144,30 @@ export async function GET(request: Request, context: RouteContext) {
   });
 
   const storage = getStorageAdapterFromEnv();
-  const signedUrl = await getSignedUrl(
-    storage.getClient(),
-    new GetObjectCommand({
-      Bucket: storage.bucket,
-      Key: entitlement.releaseFile.storageKey,
-      ResponseContentType:
-        entitlement.releaseFile.mimeType ?? "application/octet-stream",
-      ResponseContentDisposition: `attachment; filename="${fileName}"`,
-    }),
-    { expiresIn: expiresInSeconds },
-  );
+  let signedUrl: string;
+  try {
+    signedUrl = await getSignedUrl(
+      storage.getClient(),
+      new GetObjectCommand({
+        Bucket: storage.bucket,
+        Key: entitlement.releaseFile.storageKey,
+        ResponseContentType:
+          entitlement.releaseFile.mimeType ?? "application/octet-stream",
+        ResponseContentDisposition: `attachment; filename="${fileName}"`,
+      }),
+      { expiresIn: expiresInSeconds },
+    );
+  } catch (error) {
+    console.error("[library.download] Failed to create signed URL.", {
+      releaseFileId,
+      storageKey: entitlement.releaseFile.storageKey,
+      reason: error instanceof Error ? error.message : "unknown_error",
+    });
+    return NextResponse.json(
+      { ok: false, error: "Could not prepare download URL." },
+      { status: 500 },
+    );
+  }
 
   return NextResponse.redirect(signedUrl, {
     status: 302,

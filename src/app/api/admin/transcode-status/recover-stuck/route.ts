@@ -6,7 +6,7 @@ import {
   enqueueDueQueuedRetryJobs,
   recoverStaleQueuedTranscodeJobs,
   recoverStaleRunningTranscodeJobs,
-} from "@/lib/transcode/worker";
+} from "@/lib/transcode/worker-recovery";
 
 export const runtime = "nodejs";
 
