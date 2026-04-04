@@ -174,17 +174,17 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Mock email provider
 
-- [ ] Abstract email sending behind an `EMAIL_PROVIDER` env var (`resend` | `mock`)
-- [ ] Mock provider: logs payload to stdout, returns fake message ID, increments in-process counter keyed by template type
-- [ ] Counter resets between test cases; exported for use in integration test assertions
-- [ ] `.env.test` created with `EMAIL_PROVIDER=mock`, local DB URL, and test Stripe keys; used by all integration, load, and E2E test runs
+- [x] Abstract email sending behind an `EMAIL_PROVIDER` env var (`resend` | `mock`)
+- [x] Mock provider: logs payload to stdout, returns fake message ID, increments in-process counter keyed by template type
+- [x] Counter resets between test cases; exported for use in integration test assertions
+- [x] `.env.test` created with `EMAIL_PROVIDER=mock`, local DB URL, and test Stripe keys; used by all integration, load, and E2E test runs
 
 ### Email provider abstraction
 
-- [ ] Implement `EmailProvider` interface with `resend` and `mock` implementations
-- [ ] `EMAIL_PROVIDER` env var selects implementation at runtime (`resend` | `mock`)
-- [ ] Mock provider logs payload to stdout, returns fake message ID, exposes sent-email counter and `getLastEmail()` helper for test assertions
-- [ ] `.env.test` configured with `EMAIL_PROVIDER=mock`, local test DB, and test Stripe keys
+- [x] Implement `EmailProvider` interface with `resend` and `mock` implementations
+- [x] `EMAIL_PROVIDER` env var selects implementation at runtime (`resend` | `mock`)
+- [x] Mock provider logs payload to stdout, returns fake message ID, exposes sent-email counter and `getLastEmail()` helper for test assertions
+- [x] `.env.test` configured with `EMAIL_PROVIDER=mock`, local test DB, and test Stripe keys
 
 ---
 

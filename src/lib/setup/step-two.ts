@@ -1,7 +1,7 @@
-import nodemailer from "nodemailer";
 import { z } from "zod";
 
 import { decryptSecret, encryptSecret } from "@/lib/crypto/secret-box";
+import { sendEmail } from "@/lib/email/provider";
 import { getSetupTestEmailHtml } from "@/lib/email/setup-test-template";
 import { prisma } from "@/lib/prisma";
 
@@ -166,19 +166,8 @@ export async function sendSetupTestEmail() {
     throw new Error("Save complete SMTP settings before sending a test email.");
   }
 
-  const transporter = nodemailer.createTransport({
-    host: state.smtpHost,
-    port: state.smtpPort,
-    secure: state.smtpSecure,
-    auth: {
-      user: state.smtpUsername,
-      pass: smtpPassword,
-    },
-  });
-
-  await transporter.verify();
-
-  await transporter.sendMail({
+  await sendEmail({
+    templateType: "setup_test",
     from: state.smtpFromEmail,
     to: state.smtpTestRecipient,
     subject: "Merch Table setup test email",
