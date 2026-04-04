@@ -1,6 +1,8 @@
 import FindMyPurchasesPageClient from "@/app/find-my-purchases/find-my-purchases-page-client";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 function resolveBrandLabel(input: { storeName: string | null; brandName: string | null }) {
   const storeName = input.storeName?.trim();
   if (storeName) {
