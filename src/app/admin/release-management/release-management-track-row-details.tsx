@@ -102,6 +102,27 @@ export function ReleaseManagementTrackRowDetails(props: ReleaseManagementTrackRo
             disabled={disabled}
           />
         </label>
+        <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-6">
+          Artist Override (Advanced)
+          <input
+            value={trackDraft.artistOverride ?? ""}
+            onChange={(event) =>
+              controller.setTrackDraftsById((previous) => {
+                const baseDraft = previous[track.id] ?? trackDraft;
+                return {
+                  ...previous,
+                  [track.id]: {
+                    ...baseDraft,
+                    artistOverride: event.target.value,
+                  },
+                };
+              })
+            }
+            placeholder={`Leave blank to use release artist`}
+            className="rounded-lg border border-slate-500/80 bg-slate-900/80 px-2.5 py-2 text-sm text-zinc-100 shadow-inner outline-none transition focus:border-emerald-400/80 focus:ring-2 focus:ring-emerald-500/20"
+            disabled={disabled}
+          />
+        </label>
         <label className="flex flex-col gap-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 md:col-span-3">
           Credits
           <textarea

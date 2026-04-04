@@ -171,9 +171,55 @@ export function createReleaseTranscodeActions(input: ReleaseTranscodeActionsInpu
     }
   };
 
+  const onCancelReleaseTranscodes = async (release: ReleaseRecord) => {
+    setError(null);
+    setNotice(null);
+    setPendingReleaseId(release.id);
+
+    try {
+      const response = await fetch(`/api/admin/releases/${release.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "cancel-release-transcodes",
+        }),
+      });
+      const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
+      if (!response.ok || !body?.ok || !body.release) {
+        throw new Error(getMutationError(body, "Could not cancel release transcode jobs."));
+      }
+
+      replaceRelease(body.release);
+      const canceledQueuedJobs = body.canceledQueuedJobs ?? 0;
+      const canceledRunningJobs = body.canceledRunningJobs ?? 0;
+      const canceledTotal = body.canceledTranscodeJobs ?? canceledQueuedJobs + canceledRunningJobs;
+
+      if (canceledTotal === 0) {
+        setNotice("No queued or running transcode jobs were found for this release.");
+      } else if (canceledRunningJobs > 0) {
+        setNotice(
+          `Canceled ${canceledQueuedJobs} queued and ${canceledRunningJobs} running transcode job${canceledTotal === 1 ? "" : "s"} for this release.`,
+        );
+      } else {
+        setNotice(
+          `Canceled ${canceledQueuedJobs} queued transcode job${canceledQueuedJobs === 1 ? "" : "s"} for this release.`,
+        );
+      }
+    } catch (cancelError) {
+      setError(
+        cancelError instanceof Error
+          ? cancelError.message
+          : "Could not cancel release transcode jobs.",
+      );
+    } finally {
+      setPendingReleaseId(null);
+    }
+  };
+
   return {
     onGenerateDownloadFormats,
     onForceRequeueTranscodes,
     onRequeueFailedTranscodes,
+    onCancelReleaseTranscodes,
   };
 }

@@ -265,6 +265,7 @@ export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
 export function toTrackDraft(track: TrackRecord): TrackDraft {
   return {
     title: track.title,
+    artistOverride: track.artistOverride ?? "",
     trackNumber: String(track.trackNumber),
     lyrics: track.lyrics ?? "",
     credits: track.credits ?? "",
@@ -274,6 +275,7 @@ export function toTrackDraft(track: TrackRecord): TrackDraft {
 export function toNewTrackDraft(release: ReleaseRecord): NewTrackDraft {
   return {
     title: "",
+    artistOverride: "",
     trackNumber: String(release.tracks.length + 1),
     lyrics: "",
     credits: "",

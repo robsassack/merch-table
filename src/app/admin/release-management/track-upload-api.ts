@@ -9,6 +9,7 @@ import { uploadViaSignedPut } from "./utils";
 export async function createTrackForRelease(input: {
   releaseId: string;
   title: string;
+  artistOverride?: string | null;
   trackNumber?: number;
   durationMs?: number | null;
   previewMode: PreviewMode;
@@ -19,6 +20,7 @@ export async function createTrackForRelease(input: {
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       title: input.title,
+      artistOverride: input.artistOverride,
       trackNumber: input.trackNumber,
       durationMs: input.durationMs,
       previewMode: input.previewMode,

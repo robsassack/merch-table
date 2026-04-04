@@ -24,6 +24,7 @@ const updateTrackSchema = z
   .object({
     action: z.literal("update"),
     title: z.string().trim().min(1).max(220).optional(),
+    artistOverride: z.string().max(220).nullable().optional(),
     trackNumber: z.number().int().positive().optional(),
     durationMs: z.number().int().positive().nullable().optional(),
     lyrics: z.string().max(20_000).nullable().optional(),
@@ -34,6 +35,7 @@ const updateTrackSchema = z
   .refine(
     (value) =>
       value.title !== undefined ||
+      value.artistOverride !== undefined ||
       value.trackNumber !== undefined ||
       value.durationMs !== undefined ||
       value.lyrics !== undefined ||
@@ -327,6 +329,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         select: {
           id: true,
           title: true,
+          artistOverride: true,
           trackNumber: true,
           durationMs: true,
           lyrics: true,
@@ -366,6 +369,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
       const updateData = {
         title: parsed.title?.trim() ?? current.title,
+        artistOverride:
+          parsed.artistOverride === undefined
+            ? current.artistOverride
+            : normalizeTrackNullableText(parsed.artistOverride),
         durationMs:
           parsed.durationMs === undefined
             ? current.durationMs

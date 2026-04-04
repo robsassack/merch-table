@@ -231,6 +231,11 @@ export function ReleaseManagementTrackRow(props: ReleaseManagementTrackRowProps)
           <p className="min-w-0 wrap-break-word text-left text-xs font-medium text-zinc-200">
             Track {track.trackNumber} • {track.title} • {formatTrackDuration(track.durationMs)}
           </p>
+          {track.artistOverride ? (
+            <span className={trackMetaMutedChipClassName}>
+              artist override: {track.artistOverride}
+            </span>
+          ) : null}
         </div>
         <div className="flex flex-wrap items-center gap-2 md:justify-end">
           <button

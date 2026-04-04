@@ -47,6 +47,10 @@ export const requeueFailedTranscodesSchema = z.object({
   action: z.literal("requeue-failed-transcodes"),
 });
 
+export const cancelReleaseTranscodesSchema = z.object({
+  action: z.literal("cancel-release-transcodes"),
+});
+
 export const purgeSchema = z.object({
   action: z.literal("purge"),
   confirmTitle: z.string(),
@@ -64,6 +68,7 @@ export const releaseActionSchema = z.discriminatedUnion("action", [
   generateDownloadFormatsSchema,
   requeueFailedTranscodesSchema,
   forceRequeueTranscodesSchema,
+  cancelReleaseTranscodesSchema,
   purgeSchema,
   hardDeleteSchema,
 ]);
@@ -84,6 +89,10 @@ export type ForceRequeueTranscodesAction = Extract<
 export type RequeueFailedTranscodesAction = Extract<
   ReleaseAction,
   { action: "requeue-failed-transcodes" }
+>;
+export type CancelReleaseTranscodesAction = Extract<
+  ReleaseAction,
+  { action: "cancel-release-transcodes" }
 >;
 export type PurgeReleaseAction = Extract<ReleaseAction, { action: "purge" }>;
 export type HardDeleteReleaseAction = Extract<ReleaseAction, { action: "hard-delete" }>;

@@ -250,6 +250,7 @@ model ReleaseTrack {
   id             String         @id @default(cuid())
   releaseId      String
   title          String
+  artistOverride String?
   trackNumber    Int
   durationMs     Int?
   lyrics         String?

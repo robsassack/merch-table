@@ -157,6 +157,7 @@ export type AdminTrackTranscodeJobRecord = {
 export type AdminReleaseTrackRecord = {
   id: string;
   title: string;
+  artistOverride: string | null;
   trackNumber: number;
   durationMs: number | null;
   lyrics: string | null;

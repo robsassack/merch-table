@@ -20,6 +20,7 @@ type RouteContext = {
 
 const createTrackSchema = z.object({
   title: z.string().trim().min(1).max(220),
+  artistOverride: z.string().max(220).nullable().optional(),
   trackNumber: z.number().int().positive().optional(),
   durationMs: z.number().int().positive().nullable().optional(),
   lyrics: z.string().max(20_000).nullable().optional(),
@@ -181,6 +182,7 @@ export async function POST(request: Request, context: RouteContext) {
         data: {
           releaseId: release.id,
           title: parsed.title.trim(),
+          artistOverride: normalizeTrackNullableText(parsed.artistOverride),
           trackNumber,
           durationMs: normalizeTrackDurationMs(parsed.durationMs),
           lyrics: normalizeTrackNullableText(parsed.lyrics),

@@ -30,13 +30,32 @@ function sanitizeFileName(value: string) {
 
 function resolveDownloadFileName(input: { artistName: string; fileName: string }) {
   const baseName = path.basename(input.fileName.trim()) || "download.bin";
-  const combined = `${input.artistName.trim()} - ${baseName}`;
-  const sanitized = sanitizeFileName(combined);
+
+  const extension = path.extname(baseName);
+  const stem = baseName.slice(0, Math.max(0, baseName.length - extension.length)).trim();
+
+  // New naming convention: "01 - Track Artist - Track Title.ext".
+  // Legacy naming convention: "01 - Track Title.ext".
+  const prefixedStemMatch = stem.match(/^\d+\s*-\s*(.+)$/);
+  if (prefixedStemMatch) {
+    const payload = prefixedStemMatch[1]?.trim() ?? "";
+    const hasArtistPrefix = payload.includes(" - ");
+    const artistAndTitle = hasArtistPrefix
+      ? payload
+      : `${input.artistName.trim()} - ${payload}`;
+    const withResolvedArtist = `${artistAndTitle}${extension}`;
+    const sanitizedResolved = sanitizeFileName(withResolvedArtist);
+    if (sanitizedResolved.length > 0) {
+      return sanitizedResolved;
+    }
+  }
+
+  const sanitized = sanitizeFileName(baseName);
   if (sanitized.length > 0) {
     return sanitized;
   }
 
-  return sanitizeFileName(baseName) || "download.bin";
+  return "download.bin";
 }
 
 export async function GET(request: Request, context: RouteContext) {

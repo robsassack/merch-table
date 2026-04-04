@@ -81,6 +81,7 @@ export type TrackTranscodeJobRecord = {
 export type TrackRecord = {
   id: string;
   title: string;
+  artistOverride: string | null;
   trackNumber: number;
   durationMs: number | null;
   lyrics: string | null;
@@ -169,6 +170,9 @@ export type ReleaseMutationResponse = {
   queuedPreviewJobs?: number;
   queuedDeliveryJobs?: number;
   alreadyQueuedJobs?: number;
+  canceledTranscodeJobs?: number;
+  canceledQueuedJobs?: number;
+  canceledRunningJobs?: number;
 };
 
 export type TrackMutationResponse = {
@@ -236,6 +240,7 @@ export type ReleaseDraft = {
 
 export type TrackDraft = {
   title: string;
+  artistOverride: string;
   trackNumber: string;
   lyrics: string;
   credits: string;
@@ -243,6 +248,7 @@ export type TrackDraft = {
 
 export type NewTrackDraft = {
   title: string;
+  artistOverride: string;
   trackNumber: string;
   lyrics: string;
   credits: string;
@@ -291,6 +297,7 @@ export type PlannedTrackImport = {
 export type TrackRecordPatch = {
   id: string;
   title: string;
+  artistOverride: string | null;
   trackNumber: number;
   durationMs: number | null;
   lyrics: string | null;

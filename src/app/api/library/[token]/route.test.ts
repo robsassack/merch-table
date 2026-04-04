@@ -103,13 +103,18 @@ describe("GET /api/library/:token", () => {
     const payload = (await response.json()) as {
       ok: boolean;
       libraryToken: { accessCount: number };
-      downloads: Array<{ downloadPath: string }>;
+      availableDownloadFormatsByReleaseId: Record<string, string[]>;
+      downloads: Array<{ downloadPath: string; format: string | null }>;
     };
 
     assert.equal(payload.ok, true);
     assert.equal(payload.libraryToken.accessCount, 3);
     assert.equal(payload.downloads.length, 1);
     assert.equal(payload.downloads[0]?.downloadPath, "/api/download/ent-1/file-1");
+    assert.equal(payload.downloads[0]?.format, "flac");
+    assert.deepEqual(payload.availableDownloadFormatsByReleaseId["release-1"], [
+      "flac",
+    ]);
   });
 
   it("returns 403 when the token has expired", async () => {

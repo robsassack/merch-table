@@ -29,12 +29,21 @@ export function ReleaseManagementReleaseFooter(props: {
     onGenerateDownloadFormats,
     onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
+    onCancelReleaseTranscodes,
     setPurgeDialogRelease,
     setPurgeConfirmInput,
   } = props.controller;
   const failedJobsCount = release.tracks.reduce(
     (count, track) =>
       count + track.transcodeJobs.filter((job) => job.status === "FAILED").length,
+    0,
+  );
+  const activeJobsCount = release.tracks.reduce(
+    (count, track) =>
+      count +
+      track.transcodeJobs.filter(
+        (job) => job.status === "QUEUED" || job.status === "RUNNING",
+      ).length,
     0,
   );
 
@@ -128,6 +137,30 @@ export function ReleaseManagementReleaseFooter(props: {
             className={`${buttonClassName} w-full sm:w-auto`}
           >
             {isPending ? "Queueing..." : "Force Requeue Jobs"}
+          </button>
+        ) : null}
+
+        {!release.deletedAt ? (
+          <button
+            type="button"
+            disabled={isPending || createPending || activeJobsCount === 0}
+            onClick={() => {
+              if (activeJobsCount > 0) {
+                const confirmed = globalThis.confirm(
+                  "Cancel all queued/running transcode jobs for this release? Running jobs may continue briefly if already executing.",
+                );
+                if (!confirmed) {
+                  return;
+                }
+              }
+
+              void onCancelReleaseTranscodes(release);
+            }}
+            className={`${buttonClassName} w-full sm:w-auto`}
+          >
+            {isPending
+              ? "Canceling..."
+              : `Cancel Active Jobs (${activeJobsCount})`}
           </button>
         ) : null}
 

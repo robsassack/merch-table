@@ -10,6 +10,7 @@ export const MAX_TRACK_PREVIEW_SECONDS = 300;
 export const adminTrackSelect = {
   id: true,
   title: true,
+  artistOverride: true,
   trackNumber: true,
   durationMs: true,
   lyrics: true,
@@ -58,6 +59,7 @@ export function toAdminTrackRecord(track: AdminTrackRow): AdminReleaseTrackRecor
   return {
     id: track.id,
     title: track.title,
+    artistOverride: track.artistOverride,
     trackNumber: track.trackNumber,
     durationMs: track.durationMs,
     lyrics: track.lyrics,

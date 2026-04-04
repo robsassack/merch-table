@@ -6,6 +6,7 @@ import { prismaReleaseSupportsField } from "@/lib/admin/release-management";
 
 import { handlePurgeOrHardDeleteAction } from "./actions/purge-release";
 import {
+  handleCancelReleaseTranscodesAction,
   handleForceRequeueTranscodesAction,
   handleGenerateDownloadFormatsAction,
   handleRequeueFailedTranscodesAction,
@@ -114,6 +115,15 @@ export async function handleReleasePatchAction(input: {
 
     if (parsed.action === "requeue-failed-transcodes") {
       return handleRequeueFailedTranscodesAction({
+        parsed,
+        release,
+        organizationId,
+        releaseSelect,
+      });
+    }
+
+    if (parsed.action === "cancel-release-transcodes") {
+      return handleCancelReleaseTranscodesAction({
         parsed,
         release,
         organizationId,

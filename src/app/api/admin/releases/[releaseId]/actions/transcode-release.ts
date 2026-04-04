@@ -7,6 +7,7 @@ import { createTranscodeJobWithActiveDedupe } from "@/lib/transcode/job-dedupe";
 import { enqueueDeliveryFormatsJob, enqueuePreviewClipJob } from "@/lib/transcode/queue";
 
 import {
+  type CancelReleaseTranscodesAction,
   type ForceRequeueTranscodesAction,
   type GenerateDownloadFormatsAction,
   type ReleaseForActionState,
@@ -407,5 +408,75 @@ export async function handleRequeueFailedTranscodesAction<TSelect extends Prisma
     queuedPreviewJobs,
     queuedDeliveryJobs,
     queuedTranscodeJobs: queuedPreviewJobs + queuedDeliveryJobs,
+  });
+}
+
+export async function handleCancelReleaseTranscodesAction<TSelect extends Prisma.ReleaseSelect>(
+  input: {
+  parsed: CancelReleaseTranscodesAction;
+  release: ReleaseForActionState;
+  organizationId: string;
+  releaseSelect: TSelect;
+},
+) {
+  const { release, organizationId, releaseSelect } = input;
+  const canceledAt = new Date();
+  const cancelErrorMessage = "Canceled by admin from release management.";
+
+  const [canceledQueuedResult, canceledRunningResult] = await prisma.$transaction([
+    prisma.transcodeJob.updateMany({
+      where: {
+        track: {
+          releaseId: release.id,
+          release: {
+            organizationId,
+          },
+        },
+        status: "QUEUED",
+      },
+      data: {
+        status: "FAILED",
+        errorMessage: cancelErrorMessage,
+        finishedAt: canceledAt,
+        nextRetryAt: null,
+      },
+    }),
+    prisma.transcodeJob.updateMany({
+      where: {
+        track: {
+          releaseId: release.id,
+          release: {
+            organizationId,
+          },
+        },
+        status: "RUNNING",
+      },
+      data: {
+        status: "FAILED",
+        errorMessage: cancelErrorMessage,
+        finishedAt: canceledAt,
+        nextRetryAt: null,
+      },
+    }),
+  ]);
+
+  const refreshedResult = await refreshReleaseForResponse({
+    releaseId: release.id,
+    organizationId,
+    releaseSelect,
+    notFoundMessage: "Release not found after canceling transcode jobs.",
+  });
+  if ("response" in refreshedResult) {
+    return refreshedResult.response;
+  }
+
+  return NextResponse.json({
+    ok: true,
+    release: toAdminReleaseRecord(
+      refreshedResult.release as Parameters<typeof toAdminReleaseRecord>[0],
+    ),
+    canceledQueuedJobs: canceledQueuedResult.count,
+    canceledRunningJobs: canceledRunningResult.count,
+    canceledTranscodeJobs: canceledQueuedResult.count + canceledRunningResult.count,
   });
 }

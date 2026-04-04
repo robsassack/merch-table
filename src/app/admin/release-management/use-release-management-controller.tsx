@@ -405,6 +405,7 @@ export function useReleaseManagementController() {
     onGenerateDownloadFormats,
     onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
+    onCancelReleaseTranscodes,
     newCoverPreviewSrc,
   } = createReleaseActions({
     ...state,
@@ -454,6 +455,7 @@ export function useReleaseManagementController() {
     onGenerateDownloadFormats,
     onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
+    onCancelReleaseTranscodes,
     onRecoverStuckJobs,
     onImportTrackFiles,
     onResolveImportConflict,

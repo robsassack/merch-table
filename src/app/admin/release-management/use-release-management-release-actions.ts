@@ -473,8 +473,17 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     }
   };
 
-  const { onGenerateDownloadFormats, onForceRequeueTranscodes, onRequeueFailedTranscodes } =
-    createReleaseTranscodeActions({ setError, setNotice, setPendingReleaseId, replaceRelease });
+  const {
+    onGenerateDownloadFormats,
+    onForceRequeueTranscodes,
+    onRequeueFailedTranscodes,
+    onCancelReleaseTranscodes,
+  } = createReleaseTranscodeActions({
+    setError,
+    setNotice,
+    setPendingReleaseId,
+    replaceRelease,
+  });
 
   const newCoverPreviewSrc = newCoverPreviewUrl ?? newCoverImageUrl;
 
@@ -490,6 +499,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     onGenerateDownloadFormats,
     onRequeueFailedTranscodes,
     onForceRequeueTranscodes,
+    onCancelReleaseTranscodes,
     newCoverPreviewSrc,
   };
 }

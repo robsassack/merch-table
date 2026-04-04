@@ -163,6 +163,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           title: draft.title,
+          artistOverride: draft.artistOverride.trim().length > 0 ? draft.artistOverride : null,
           trackNumber: parsePositiveInteger(draft.trackNumber) ?? undefined,
           lyrics: draft.lyrics.trim().length > 0 ? draft.lyrics : null,
           credits: draft.credits.trim().length > 0 ? draft.credits : null,
@@ -184,6 +185,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         [release.id]: {
           ...previous[release.id],
           title: "",
+          artistOverride: "",
           trackNumber: "",
           lyrics: "",
           credits: "",
@@ -224,6 +226,7 @@ export function createTrackEditActions(input: TrackEditActionsInput) {
         body: JSON.stringify({
           action: "update",
           title: draft.title,
+          artistOverride: draft.artistOverride.trim().length > 0 ? draft.artistOverride : null,
           trackNumber: parsePositiveInteger(draft.trackNumber) ?? undefined,
           lyrics: draft.lyrics.trim().length > 0 ? draft.lyrics : null,
           credits: draft.credits.trim().length > 0 ? draft.credits : null,

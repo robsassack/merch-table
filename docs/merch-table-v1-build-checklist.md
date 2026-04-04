@@ -107,6 +107,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Track management
 
 - [x] Track CRUD within a release (title, track number, duration, lyrics/credits)
+- [x] Advanced track metadata: optional per-track artist override (supports various-artist compilations and featured artists)
 - [x] Associate `TrackAsset` records on upload (master, delivery roles)
 - [x] Preview mode controls per track (`CLIP` / `FULL`, `previewSeconds`)
 - [x] Automatic preview clip generation queued on asset upload when `previewMode` is `CLIP`
@@ -195,7 +196,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Contract & decisions
 
 - [x] Lock secondary per-file download contract to `releaseFileId` (`GET /api/download/:entitlementToken/:releaseFileId`)
-- [ ] Lock release ZIP contract (`GET /api/download-release/:libraryToken/:releaseId`) as the primary buyer download flow
+- [x] Lock release ZIP contract (`GET /api/download-release/:libraryToken/:releaseId`) as the primary buyer download flow
 
 ### Backend APIs
 
@@ -203,19 +204,20 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] `BuyerLibraryToken` access tracking: update `lastUsedAt` and atomically increment `accessCount` on each access
 - [x] Library response uses `cache-control: no-store`
 - [x] `GET /api/download/:entitlementToken/:releaseFileId` — validate token + file relation and generate a fresh signed URL per request
-- [ ] `GET /api/download-release/:libraryToken/:releaseId` — validate library token + release ownership and return release ZIP
-- [ ] ZIP filename format: `Artist Name - Release Name.zip`
-- [ ] ZIP contains cover art file for the release (when present)
-- [ ] ZIP track entry format: `Artist Name - Release Name - <track number with leading zero> <Track Name>.<ext>`
+- [x] `GET /api/download-release/:libraryToken/:releaseId` — validate library token + release ownership and return release ZIP
+- [x] ZIP filename format: `Artist Name - Release Name.zip`
+- [x] ZIP contains cover art file for the release (when present)
+- [x] ZIP track entry format: `Artist Name - Release Name - <track number with leading zero> <Track Name>.<ext>`
+- [x] Downloads remain available while transcode jobs are queued/running; only unavailable formats are blocked with a clear available-formats response
 - [x] Signed URL expires after 15 minutes (configurable via env var); never cached or reused
 - [x] `Content-Disposition: attachment` with human-readable filename (`Artist - Track Title.flac`)
-- [ ] Revoked token returns `403`; expired token returns `403`
-- [ ] `POST /api/library/resend` — buyer submits purchase email to request a fresh library link; always return generic success response to avoid account enumeration
+- [x] Revoked token returns `403`; expired token returns `403`
+- [x] `POST /api/library/resend` — buyer submits purchase email to request a fresh library link; always return generic success response to avoid account enumeration
 
 ### Security & rate limiting
 
 - [x] Rate limiting on download endpoint (moderate, prevents bulk scraping)
-- [ ] Strict rate limiting on library resend endpoint (prevents email-bombing and abuse)
+- [x] Strict rate limiting on library resend endpoint (prevents email-bombing and abuse)
 
 ### Public UX
 
@@ -228,6 +230,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [ ] Integration tests: library access tracking, resend behavior, download URL freshness, and `429` + `Retry-After`
 - [ ] Integration tests: ZIP includes expected track files + cover art and uses required filename conventions
+- [ ] Integration tests: downloads continue to work while release transcode jobs are queued/running
 - [ ] Update `.env.example` and docs for any new/confirmed Phase 6 env flags
 
 ---

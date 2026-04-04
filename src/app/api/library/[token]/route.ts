@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -111,6 +112,24 @@ export async function GET(_request: Request, context: RouteContext) {
     },
   });
 
+  const availableDownloadFormatsByReleaseId: Record<string, Array<"mp3" | "m4a" | "flac">> =
+    {};
+  for (const entitlement of entitlements) {
+    const releaseId = entitlement.release.id;
+    const format = resolveReleaseFileFormat({
+      fileName: entitlement.releaseFile.fileName,
+      mimeType: entitlement.releaseFile.mimeType,
+    });
+    if (!format) {
+      continue;
+    }
+
+    const existing = availableDownloadFormatsByReleaseId[releaseId] ?? [];
+    if (!existing.includes(format)) {
+      availableDownloadFormatsByReleaseId[releaseId] = [...existing, format];
+    }
+  }
+
   return NextResponse.json(
     {
       ok: true,
@@ -119,6 +138,7 @@ export async function GET(_request: Request, context: RouteContext) {
         lastUsedAt: updatedToken.lastUsedAt,
         accessCount: updatedToken.accessCount,
       },
+      availableDownloadFormatsByReleaseId,
       downloads: entitlements.map((entitlement) => ({
         entitlementToken: entitlement.token,
         releaseFileId: entitlement.releaseFileId,
@@ -126,6 +146,10 @@ export async function GET(_request: Request, context: RouteContext) {
         fileName: entitlement.releaseFile.fileName,
         mimeType: entitlement.releaseFile.mimeType,
         sizeBytes: entitlement.releaseFile.sizeBytes,
+        format: resolveReleaseFileFormat({
+          fileName: entitlement.releaseFile.fileName,
+          mimeType: entitlement.releaseFile.mimeType,
+        }),
         release: {
           id: entitlement.release.id,
           title: entitlement.release.title,
