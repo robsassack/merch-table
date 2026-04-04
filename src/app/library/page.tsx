@@ -1,6 +1,8 @@
 import LibraryPageClient from "@/app/library/library-page-client";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 function resolveBrandLabel(input: { storeName: string | null; brandName: string | null }) {
   const storeName = input.storeName?.trim();
   if (storeName) {
