@@ -161,10 +161,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Webhook
 
-- [ ] `POST /api/webhooks/stripe` — verify signature, finalize order, create entitlements
-- [ ] Idempotency: check existing `Order` by `checkoutSessionId` inside a transaction; skip if exists
-- [ ] Unique constraint on `Order.checkoutSessionId` as database-level safety net
-- [ ] Webhook endpoint is not rate-limited
+- [x] `POST /api/webhooks/stripe` — verify signature, finalize order, create entitlements
+- [x] Idempotency: check existing `Order` by `checkoutSessionId` inside a transaction; skip if exists
+- [x] Unique constraint on `Order.checkoutSessionId` as database-level safety net
+- [x] Webhook endpoint is not rate-limited
 
 ### Email templates
 
