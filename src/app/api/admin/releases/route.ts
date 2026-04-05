@@ -128,7 +128,7 @@ export async function GET() {
     prisma.storeSettings.findFirst({
       where: { organizationId: auth.context.organizationId },
       orderBy: { createdAt: "asc" },
-      select: { currency: true },
+      select: { currency: true, featuredReleaseId: true },
     }),
   ]);
 
@@ -138,6 +138,7 @@ export async function GET() {
       minimumPriceFloorCents,
       stripeFeeEstimate,
       storeCurrency: settings?.currency ?? "USD",
+      featuredReleaseId: settings?.featuredReleaseId ?? null,
       artists: artists.map((artist) => ({
         id: artist.id,
         name: artist.name,

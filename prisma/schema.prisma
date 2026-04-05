@@ -233,6 +233,7 @@ model StoreSettings {
   currency              String       @default("USD")
   defaultPreviewMode    PreviewMode  @default(CLIP)
   defaultPreviewSeconds Int          @default(30)
+  featuredReleaseId     String?
   contactEmail          String?
   contactName           String?
   supportEmail          String?

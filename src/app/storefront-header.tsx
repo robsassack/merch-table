@@ -12,30 +12,62 @@ type StorefrontHeaderProps = {
 function resolveBrandLabel(input: {
   storeName: string | null;
   brandName: string | null;
+  organizationName: string | null;
 }) {
   const storeName = input.storeName?.trim();
   if (storeName) return storeName;
   const brandName = input.brandName?.trim();
   if (brandName) return brandName;
+  const organizationName = input.organizationName?.trim();
+  if (organizationName) return organizationName;
   return "Storefront";
+}
+
+function resolveOptionalImageUrl(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
 }
 
 export default async function StorefrontHeader({
   activePage,
 }: StorefrontHeaderProps) {
-  const [settings, artistCount] = await Promise.all([
-    prisma.storeSettings.findFirst({
-      select: { storeName: true, brandName: true },
-      orderBy: { createdAt: "asc" },
-    }),
-    prisma.artist.count({ where: { deletedAt: null } }),
-  ]);
+  const settings = await prisma.storeSettings.findFirst({
+    select: {
+      organizationId: true,
+      storeName: true,
+      brandName: true,
+      organization: {
+        select: {
+          name: true,
+          owner: {
+            select: {
+              image: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const artistCount = await prisma.artist.count({
+    where: {
+      deletedAt: null,
+      ...(settings?.organizationId ? { organizationId: settings.organizationId } : {}),
+    },
+  });
 
   const brandLabel = resolveBrandLabel({
     storeName: settings?.storeName ?? null,
     brandName: settings?.brandName ?? null,
+    organizationName: settings?.organization?.name ?? null,
   });
   const brandGlyph = resolveBrandGlyph(brandLabel);
+  const organizationLogoUrl = resolveOptionalImageUrl(settings?.organization?.owner?.image);
   const showArtists = artistCount > 1;
 
   return (
@@ -46,7 +78,18 @@ export default async function StorefrontHeader({
           className="flex items-center gap-3 transition-opacity hover:opacity-80"
           aria-current={activePage === "home" ? "page" : undefined}
         >
-          <span className={buyerTheme.brandBadge}>{brandGlyph}</span>
+          {organizationLogoUrl ? (
+            <span className="inline-flex h-7 w-7 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={organizationLogoUrl}
+                alt={`${brandLabel} logo`}
+                className="h-full w-full object-cover"
+              />
+            </span>
+          ) : (
+            <span className={buyerTheme.brandBadge}>{brandGlyph}</span>
+          )}
           <p className="text-lg font-semibold tracking-tight">{brandLabel}</p>
         </Link>
         <nav className={buyerTheme.nav}>

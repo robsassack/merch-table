@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 
@@ -21,6 +22,17 @@ type StripeSettingsResponse = {
   message?: string;
 };
 
+type StoreStatus = "SETUP" | "PRIVATE" | "PUBLIC";
+
+type StoreSettingsResponse = {
+  ok?: boolean;
+  error?: string;
+  data?: {
+    contactEmail: string;
+    storeStatus: StoreStatus;
+  };
+};
+
 const primaryButtonClassName =
   "inline-flex items-center justify-center rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -28,8 +40,11 @@ const secondaryButtonClassName =
   "inline-flex items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-slate-700 hover:text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50";
 
 function ContactEmailForm() {
+  const router = useRouter();
   const [contactEmail, setContactEmail] = useState("");
+  const [storeStatus, setStoreStatus] = useState<StoreStatus>("SETUP");
   const [saving, setSaving] = useState(false);
+  const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const initialLoad = useRef(true);
@@ -40,9 +55,10 @@ function ContactEmailForm() {
 
     fetch("/api/admin/settings/store", { cache: "no-store" })
       .then((r) => r.json())
-      .then((body: { ok?: boolean; data?: { contactEmail: string } }) => {
+      .then((body: StoreSettingsResponse) => {
         if (body.ok && body.data) {
           setContactEmail(body.data.contactEmail);
+          setStoreStatus(body.data.storeStatus);
         }
       })
       .catch(() => undefined);
@@ -60,13 +76,13 @@ function ContactEmailForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ contactEmail }),
       });
-      const body = (await response.json().catch(() => null)) as {
-        ok?: boolean;
-        error?: string;
-      } | null;
-      if (!response.ok || !body?.ok) {
-        throw new Error(body?.error ?? "Could not save contact email.");
+      const body = (await response.json().catch(() => null)) as StoreSettingsResponse | null;
+      if (!response.ok || !body?.ok || !body.data) {
+        throw new Error(body?.error ?? "Could not save store settings.");
       }
+      setContactEmail(body.data.contactEmail);
+      setStoreStatus(body.data.storeStatus);
+      router.refresh();
       setNotice("Contact email saved.");
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "Could not save contact email.");
@@ -75,11 +91,59 @@ function ContactEmailForm() {
     }
   };
 
+  const onToggleStoreVisibility = async () => {
+    if (storeStatus !== "PRIVATE" && storeStatus !== "PUBLIC") {
+      return;
+    }
+
+    const nextStoreStatus = storeStatus === "PUBLIC" ? "PRIVATE" : "PUBLIC";
+    setError(null);
+    setNotice(null);
+    setSavingStatus(true);
+
+    try {
+      const response = await fetch("/api/admin/settings/store", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ storeStatus: nextStoreStatus }),
+      });
+      const body = (await response.json().catch(() => null)) as StoreSettingsResponse | null;
+      if (!response.ok || !body?.ok || !body.data) {
+        throw new Error(body?.error ?? "Could not update store visibility.");
+      }
+
+      setContactEmail(body.data.contactEmail);
+      setStoreStatus(body.data.storeStatus);
+      router.refresh();
+      setNotice(
+        body.data.storeStatus === "PUBLIC"
+          ? "Store is now public."
+          : "Store is now private.",
+      );
+    } catch (toggleError) {
+      setError(
+        toggleError instanceof Error ? toggleError.message : "Could not update store visibility.",
+      );
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
+  const storeIsPublic = storeStatus === "PUBLIC";
+  const storeStatusLabel =
+    storeStatus === "PUBLIC" ? "Public" : storeStatus === "PRIVATE" ? "Private" : "Setup";
+  const storeStatusToneClassName =
+    storeStatus === "PUBLIC"
+      ? "border-emerald-800/70 bg-emerald-950/60 text-emerald-300"
+      : storeStatus === "PRIVATE"
+        ? "border-amber-800/70 bg-amber-950/60 text-amber-300"
+        : "border-slate-700 bg-slate-900/70 text-zinc-300";
+
   return (
     <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
       <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Store Settings</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Contact email is shown to buyers on the Find My Purchases page.
+        Manage storefront visibility and buyer contact details.
       </p>
 
       {error ? (
@@ -93,6 +157,36 @@ function ContactEmailForm() {
           {notice}
         </div>
       ) : null}
+
+      <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/80 p-4">
+        <p className="text-xs uppercase tracking-wide text-zinc-500">Store visibility</p>
+        <div className="mt-2 flex flex-wrap items-center gap-3">
+          <span
+            className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${storeStatusToneClassName}`}
+          >
+            {storeStatusLabel}
+          </span>
+          <button
+            type="button"
+            onClick={onToggleStoreVisibility}
+            disabled={
+              saving || savingStatus || (storeStatus !== "PRIVATE" && storeStatus !== "PUBLIC")
+            }
+            className={secondaryButtonClassName}
+          >
+            {savingStatus
+              ? "Updating..."
+              : storeIsPublic
+                ? "Set Private"
+                : "Set Public"}
+          </button>
+        </div>
+        <p className="mt-2 text-xs text-zinc-500">
+          {storeIsPublic
+            ? "Public: catalog and release pages are visible to visitors."
+            : "Private: visitors are redirected to the maintenance page; buyer library routes stay available."}
+        </p>
+      </div>
 
       <form onSubmit={onSave} className="mt-4 flex flex-col gap-4">
         <label className="flex flex-col gap-1 text-sm text-zinc-300">
@@ -109,7 +203,7 @@ function ContactEmailForm() {
         <div>
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || savingStatus}
             className={primaryButtonClassName}
           >
             {saving ? "Saving..." : "Save"}

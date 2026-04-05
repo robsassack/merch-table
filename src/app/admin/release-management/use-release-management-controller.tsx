@@ -22,6 +22,7 @@ import {
   toTrackDraft,
   withReleaseDerivedTrackStats,
 } from "./utils";
+import { resolveNormalizedFeaturedReleaseId } from "./featured-release";
 
 export function useReleaseManagementController() {
   const TRANSCODE_POLL_INTERVAL_MS = 4_000;
@@ -53,6 +54,7 @@ export function useReleaseManagementController() {
     setArtists,
     setMinimumPriceFloorCents,
     setStoreCurrency,
+    setFeaturedReleaseId,
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
@@ -61,6 +63,7 @@ export function useReleaseManagementController() {
   } = state;
   const pollingInFlightRef = useRef(false);
   const [recoverStuckPending, setRecoverStuckPending] = useState(false);
+  const [pendingFeaturedReleaseId, setPendingFeaturedReleaseId] = useState<string | null>(null);
 
   const hasActiveTranscodeJobs = releases.some((release) =>
     release.tracks.some((track) =>
@@ -115,6 +118,7 @@ export function useReleaseManagementController() {
       syncTrackDrafts(hydratedReleases);
       setMinimumPriceFloorCents(body.minimumPriceFloorCents ?? 50);
       setStoreCurrency(body.storeCurrency ?? "USD");
+      setFeaturedReleaseId(body.featuredReleaseId ?? null);
       setStripeFeePercentBps(body.stripeFeeEstimate?.percentBps ?? 290);
       setStripeFeeFixedCents(body.stripeFeeEstimate?.fixedFeeCents ?? 30);
       const artistList = body.artists;
@@ -145,6 +149,7 @@ export function useReleaseManagementController() {
     syncTrackDrafts,
     setMinimumPriceFloorCents,
     setStoreCurrency,
+    setFeaturedReleaseId,
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
@@ -439,12 +444,85 @@ export function useReleaseManagementController() {
       getPricingEstimate,
     });
 
+  const onSetFeaturedRelease = useCallback(async (releaseId: string) => {
+    setError(null);
+    setNotice(null);
+    setPendingFeaturedReleaseId(releaseId);
+
+    try {
+      const response = await fetch("/api/admin/settings/store", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ featuredReleaseId: releaseId }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            error?: string;
+            data?: { featuredReleaseId?: string | null };
+          }
+        | null;
+
+      if (!response.ok || !body?.ok || !body.data) {
+        throw new Error(body?.error ?? "Could not set featured release.");
+      }
+
+      setFeaturedReleaseId(body.data.featuredReleaseId ?? null);
+      setNotice("Featured release updated.");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not set featured release.");
+    } finally {
+      setPendingFeaturedReleaseId(null);
+    }
+  }, [setError, setFeaturedReleaseId, setNotice]);
+
+  useEffect(() => {
+    if (pendingFeaturedReleaseId !== null) {
+      return;
+    }
+
+    const normalizedFeaturedReleaseId = resolveNormalizedFeaturedReleaseId({
+      currentFeaturedReleaseId: state.featuredReleaseId,
+      releases,
+    });
+
+    if (normalizedFeaturedReleaseId === state.featuredReleaseId) {
+      return;
+    }
+
+    setPendingFeaturedReleaseId(normalizedFeaturedReleaseId ?? "__clear__");
+
+    const payload = { featuredReleaseId: normalizedFeaturedReleaseId };
+    void fetch("/api/admin/settings/store", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then((response) => response.json().catch(() => null).then((body) => ({ response, body })))
+      .then(({ response, body }) => {
+        if (!response.ok || !body?.ok || !body?.data) {
+          return;
+        }
+
+        setFeaturedReleaseId(body.data.featuredReleaseId ?? null);
+      })
+      .finally(() => {
+        setPendingFeaturedReleaseId(null);
+      });
+  }, [
+    pendingFeaturedReleaseId,
+    releases,
+    setFeaturedReleaseId,
+    state.featuredReleaseId,
+  ]);
+
   return {
     ...state,
     tasksStatus,
     tasksLoading,
     tasksError,
     recoverStuckPending,
+    pendingFeaturedReleaseId,
     onNewCoverFileChange,
     onExistingCoverFileChange,
     onCreateRelease,
@@ -469,6 +547,7 @@ export function useReleaseManagementController() {
     getPricingEstimate,
     renderPricingDetails,
     newCoverPreviewSrc,
+    onSetFeaturedRelease,
   };
 }
 

@@ -283,7 +283,7 @@ export default function LibraryPageClient() {
                 className="rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_64px_-44px_rgba(15,23,42,0.35)] sm:p-6"
               >
                 <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-                  <div className="mx-auto aspect-square w-full max-w-[300px] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 md:mx-0 md:max-w-none">
+                  <div className="mx-auto aspect-square w-full max-w-75 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 md:mx-0 md:max-w-none">
                     {release.coverImageUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img

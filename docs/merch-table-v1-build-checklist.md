@@ -243,9 +243,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Home / catalog page
 
-- [ ] List published releases (exclude soft-deleted)
-- [ ] Respect `storeStatus` middleware (private = maintenance page)
-- [ ] Show artist image on release cards and organization logo in storefront header (with graceful fallback when missing)
+- [x] List published releases (exclude soft-deleted)
+- [x] Respect `storeStatus` middleware (private = maintenance page)
+- [x] Show artist image on release cards and organization logo in storefront header (with graceful fallback when missing)
 
 ### Global storefront footer
 
@@ -303,7 +303,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Store management
 
-- [ ] Toggle `PRIVATE` ↔ `PUBLIC` from dashboard
+- [x] Toggle `PRIVATE` ↔ `PUBLIC` from dashboard
 - [ ] Settings UI: allow updating org name
 - [ ] Settings UI: allow updating store name
 - [ ] Settings UI: allow uploading/updating organization logo and artist profile images

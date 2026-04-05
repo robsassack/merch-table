@@ -45,6 +45,7 @@ export function useReleaseManagementState() {
 
   const [minimumPriceFloorCents, setMinimumPriceFloorCents] = useState(50);
   const [storeCurrency, setStoreCurrency] = useState("USD");
+  const [featuredReleaseId, setFeaturedReleaseId] = useState<string | null>(null);
   const [stripeFeePercentBps, setStripeFeePercentBps] = useState(290);
   const [stripeFeeFixedCents, setStripeFeeFixedCents] = useState(30);
 
@@ -218,6 +219,8 @@ export function useReleaseManagementState() {
     setMinimumPriceFloorCents,
     storeCurrency,
     setStoreCurrency,
+    featuredReleaseId,
+    setFeaturedReleaseId,
     stripeFeePercentBps,
     setStripeFeePercentBps,
     stripeFeeFixedCents,

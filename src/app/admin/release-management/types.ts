@@ -99,6 +99,7 @@ export type ReleasesListResponse = {
   error?: string;
   minimumPriceFloorCents?: number;
   storeCurrency?: string;
+  featuredReleaseId?: string | null;
   stripeFeeEstimate?: {
     percentBps: number;
     fixedFeeCents: number;
