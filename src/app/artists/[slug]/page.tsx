@@ -6,9 +6,11 @@ import { buyerTheme } from "@/app/buyer-theme";
 import StorefrontHeader from "@/app/storefront-header";
 import { prisma } from "@/lib/prisma";
 
+const DEFAULT_COVER_SRC = "/default-artwork.png";
+
 function resolveCoverSrc(coverImageUrl: string | null) {
   if (!coverImageUrl) {
-    return null;
+    return DEFAULT_COVER_SRC;
   }
   return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
 }
@@ -215,16 +217,12 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                     aria-label={`Open release ${release.title}`}
                     className="group block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
                   >
-                    {release.coverImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={resolveCoverSrc(release.coverImageUrl) ?? undefined}
-                        alt={`${release.title} cover`}
-                        className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
-                      />
-                    ) : (
-                      <div className="h-full w-full bg-[radial-gradient(circle_at_22%_20%,#f43f5e_0%,transparent_35%),radial-gradient(circle_at_78%_75%,#0ea5e9_0%,transparent_40%),linear-gradient(145deg,#121317_0%,#09090a_100%)] transition-transform duration-300 ease-out group-hover:scale-[1.04]" />
-                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resolveCoverSrc(release.coverImageUrl)}
+                      alt={`${release.title} cover`}
+                      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                    />
                   </Link>
 
                   <div className="p-4">

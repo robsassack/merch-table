@@ -51,6 +51,8 @@ export type MixedZipPromptState = {
   releaseTitle: string;
 };
 
+const DEFAULT_COVER_SRC = "/default-artwork.png";
+
 export function normalizeToken(value: string) {
   return value.trim();
 }
@@ -259,7 +261,7 @@ function canSelectZipFormatForRelease(
 
 export function resolveCoverSrc(coverImageUrl: string | null) {
   if (!coverImageUrl) {
-    return null;
+    return DEFAULT_COVER_SRC;
   }
   return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
 }

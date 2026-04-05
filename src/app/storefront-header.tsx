@@ -2,26 +2,13 @@ import Link from "next/link";
 
 import { buyerTheme, resolveBrandGlyph } from "@/app/buyer-theme";
 import { prisma } from "@/lib/prisma";
+import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
 export type StorefrontActivePage = "home" | "artists" | "find-my-purchases";
 
 type StorefrontHeaderProps = {
   activePage?: StorefrontActivePage;
 };
-
-function resolveBrandLabel(input: {
-  storeName: string | null;
-  brandName: string | null;
-  organizationName: string | null;
-}) {
-  const storeName = input.storeName?.trim();
-  if (storeName) return storeName;
-  const brandName = input.brandName?.trim();
-  if (brandName) return brandName;
-  const organizationName = input.organizationName?.trim();
-  if (organizationName) return organizationName;
-  return "Storefront";
-}
 
 function resolveOptionalImageUrl(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -61,7 +48,7 @@ export default async function StorefrontHeader({
     },
   });
 
-  const brandLabel = resolveBrandLabel({
+  const brandLabel = resolveStorefrontBrandLabel({
     storeName: settings?.storeName ?? null,
     brandName: settings?.brandName ?? null,
     organizationName: settings?.organization?.name ?? null,

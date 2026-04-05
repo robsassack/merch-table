@@ -4,10 +4,13 @@ import type { Metadata } from "next";
 import { buyerTheme } from "@/app/buyer-theme";
 import StorefrontHeader from "@/app/storefront-header";
 import { prisma } from "@/lib/prisma";
+import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
+
+const DEFAULT_COVER_SRC = "/default-artwork.png";
 
 function resolveCoverSrc(coverImageUrl: string | null) {
   if (!coverImageUrl) {
-    return null;
+    return DEFAULT_COVER_SRC;
   }
   return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
 }
@@ -105,9 +108,31 @@ function ArtistAvatar({
 }
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Catalog",
-};
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await prisma.storeSettings.findFirst({
+    select: {
+      storeName: true,
+      brandName: true,
+      organization: {
+        select: { name: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const brandLabel = resolveStorefrontBrandLabel({
+    storeName: settings?.storeName ?? null,
+    brandName: settings?.brandName ?? null,
+    organizationName: settings?.organization?.name ?? null,
+  });
+
+  return {
+    title: {
+      absolute: brandLabel,
+    },
+  };
+}
 
 export default async function Home() {
   const settings = await prisma.storeSettings.findFirst({
@@ -184,16 +209,12 @@ export default async function Home() {
                 aria-label={`Open release ${featured.title}`}
                 className="group block aspect-square w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100"
               >
-                {featured.coverImageUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={resolveCoverSrc(featured.coverImageUrl) ?? undefined}
-                    alt={`${featured.title} cover`}
-                    className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
-                  />
-                ) : (
-                  <div className="h-full w-full bg-[radial-gradient(circle_at_22%_20%,#f43f5e_0%,transparent_35%),radial-gradient(circle_at_78%_75%,#0ea5e9_0%,transparent_40%),linear-gradient(145deg,#121317_0%,#09090a_100%)] transition-transform duration-300 ease-out group-hover:scale-[1.04]" />
-                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={resolveCoverSrc(featured.coverImageUrl)}
+                  alt={`${featured.title} cover`}
+                  className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                />
               </Link>
 
               <div>
@@ -272,16 +293,12 @@ export default async function Home() {
                       aria-label={`Open release ${release.title}`}
                       className="group block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
                     >
-                      {release.coverImageUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={resolveCoverSrc(release.coverImageUrl) ?? undefined}
-                          alt={`${release.title} cover`}
-                          className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
-                        />
-                      ) : (
-                        <div className="h-full w-full bg-[radial-gradient(circle_at_22%_20%,#f43f5e_0%,transparent_35%),radial-gradient(circle_at_78%_75%,#0ea5e9_0%,transparent_40%),linear-gradient(145deg,#121317_0%,#09090a_100%)] transition-transform duration-300 ease-out group-hover:scale-[1.04]" />
-                      )}
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={resolveCoverSrc(release.coverImageUrl)}
+                        alt={`${release.title} cover`}
+                        className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                      />
                     </Link>
 
                     <div className="p-4">

@@ -284,16 +284,12 @@ export default function LibraryPageClient() {
               >
                 <div className="grid gap-5 md:grid-cols-[220px_1fr]">
                   <div className="mx-auto aspect-square w-full max-w-75 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 md:mx-0 md:max-w-none">
-                    {release.coverImageUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={resolveCoverSrc(release.coverImageUrl) ?? undefined}
-                        alt={`${release.title} cover`}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="aspect-square w-full bg-[radial-gradient(circle_at_22%_20%,#f43f5e_0%,transparent_35%),radial-gradient(circle_at_78%_75%,#0ea5e9_0%,transparent_40%),linear-gradient(145deg,#121317_0%,#09090a_100%)]" />
-                    )}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={resolveCoverSrc(release.coverImageUrl)}
+                      alt={`${release.title} cover`}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
 
                   <div>
