@@ -50,15 +50,6 @@ export default function HomePageClient() {
     () => "light",
   );
 
-  const setTheme = (nextTheme: StorefrontTheme) => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    window.localStorage.setItem(STOREFRONT_THEME_KEY, nextTheme);
-    window.dispatchEvent(new Event(STOREFRONT_THEME_EVENT));
-  };
-
   const isDark = theme === "dark";
 
   return (
@@ -89,17 +80,6 @@ export default function HomePageClient() {
               Merch Table
             </h1>
           </div>
-          <button
-            type="button"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${
-              isDark
-                ? "border-slate-600 bg-slate-800 text-zinc-100 hover:bg-slate-700"
-                : "border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-100"
-            }`}
-          >
-            {isDark ? "Light Mode" : "Dark Mode"}
-          </button>
         </div>
 
         <p className={`${isDark ? "text-zinc-300" : "text-zinc-600"}`}>

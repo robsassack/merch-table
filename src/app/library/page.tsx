@@ -1,40 +1,19 @@
 import type { Metadata } from "next";
 
+import { buyerTheme } from "@/app/buyer-theme";
 import LibraryPageClient from "@/app/library/library-page-client";
-import { prisma } from "@/lib/prisma";
+import StorefrontHeader from "@/app/storefront-header";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Library",
 };
 
-function resolveBrandLabel(input: { storeName: string | null; brandName: string | null }) {
-  const storeName = input.storeName?.trim();
-  if (storeName) {
-    return storeName;
-  }
-
-  const brandName = input.brandName?.trim();
-  if (brandName) {
-    return brandName;
-  }
-
-  return "Storefront";
-}
-
-export default async function LibraryPage() {
-  const settings = await prisma.storeSettings.findFirst({
-    select: {
-      storeName: true,
-      brandName: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  const brandLabel = resolveBrandLabel({
-    storeName: settings?.storeName ?? null,
-    brandName: settings?.brandName ?? null,
-  });
-
-  return <LibraryPageClient brandLabel={brandLabel} />;
+export default function LibraryPage() {
+  return (
+    <div className={buyerTheme.page}>
+      <StorefrontHeader />
+      <LibraryPageClient />
+    </div>
+  );
 }

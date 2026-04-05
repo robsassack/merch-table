@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { buyerTheme, resolveBrandGlyph } from "@/app/buyer-theme";
+import { buyerTheme } from "@/app/buyer-theme";
 
 type RequestState = "idle" | "submitting";
 type ToastState = {
@@ -11,16 +10,15 @@ type ToastState = {
   message: string;
 } | null;
 
-type FindMyPurchasesPageClientProps = { brandLabel: string };
-
 function normalizeEmail(value: string) {
   return value.trim().toLowerCase();
 }
 
 export default function FindMyPurchasesPageClient({
-  brandLabel,
-}: FindMyPurchasesPageClientProps) {
-  const brandGlyph = resolveBrandGlyph(brandLabel);
+  contactEmail,
+}: {
+  contactEmail: string | null;
+}) {
   const [email, setEmail] = useState("");
   const [state, setState] = useState<RequestState>("idle");
   const [toast, setToast] = useState<ToastState>(null);
@@ -87,7 +85,7 @@ export default function FindMyPurchasesPageClient({
   }
 
   return (
-    <main className={buyerTheme.page}>
+    <main>
       {toast ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3">
           <div
@@ -114,41 +112,6 @@ export default function FindMyPurchasesPageClient({
           </div>
         </div>
       ) : null}
-
-      <header className={buyerTheme.header}>
-        <div className={buyerTheme.headerInner}>
-          <div className="flex items-center gap-3">
-            <span className={buyerTheme.brandBadge}>
-              {brandGlyph}
-            </span>
-            <p className="text-lg font-semibold tracking-tight">{brandLabel}</p>
-          </div>
-          <nav className={buyerTheme.nav}>
-            <Link
-              href="/library"
-              className={`${buyerTheme.navLink} inline-flex h-9 w-9 items-center justify-center rounded-full`}
-              aria-label="Library"
-              title="Library"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                library_music
-              </span>
-              <span className="sr-only">Library</span>
-            </Link>
-            <span
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"
-              aria-current="page"
-              aria-label="Find My Purchases"
-              title="Find My Purchases"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                receipt
-              </span>
-              <span className="sr-only">Find My Purchases</span>
-            </span>
-          </nav>
-        </div>
-      </header>
 
       <section className="mx-auto mb-12 flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
         <div className={`${buyerTheme.panel} w-full`}>
@@ -191,6 +154,19 @@ export default function FindMyPurchasesPageClient({
             </div>
           </form>
         </div>
+
+        {contactEmail ? (
+          <div className={`${buyerTheme.statusNeutral} w-full`}>
+            If you need help, contact{" "}
+            <a
+              href={`mailto:${contactEmail}`}
+              className="font-medium text-zinc-900 underline underline-offset-2 hover:text-emerald-700"
+            >
+              {contactEmail}
+            </a>
+            .
+          </div>
+        ) : null}
 
       </section>
     </main>

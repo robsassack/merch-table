@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 
@@ -26,6 +26,99 @@ const primaryButtonClassName =
 
 const secondaryButtonClassName =
   "inline-flex items-center justify-center rounded-lg border border-slate-600 bg-slate-800/60 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:bg-slate-700 hover:text-zinc-50 disabled:cursor-not-allowed disabled:opacity-50";
+
+function ContactEmailForm() {
+  const [contactEmail, setContactEmail] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const initialLoad = useRef(true);
+
+  useEffect(() => {
+    if (!initialLoad.current) return;
+    initialLoad.current = false;
+
+    fetch("/api/admin/settings/store", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((body: { ok?: boolean; data?: { contactEmail: string } }) => {
+        if (body.ok && body.data) {
+          setContactEmail(body.data.contactEmail);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const onSave = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError(null);
+    setNotice(null);
+    setSaving(true);
+
+    try {
+      const response = await fetch("/api/admin/settings/store", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ contactEmail }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        error?: string;
+      } | null;
+      if (!response.ok || !body?.ok) {
+        throw new Error(body?.error ?? "Could not save contact email.");
+      }
+      setNotice("Contact email saved.");
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "Could not save contact email.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
+      <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Store Settings</h2>
+      <p className="mt-1 text-sm text-zinc-400">
+        Contact email is shown to buyers on the Find My Purchases page.
+      </p>
+
+      {error ? (
+        <div className="mt-4 rounded-lg border border-red-800/70 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+          {error}
+        </div>
+      ) : null}
+
+      {notice ? (
+        <div className="mt-4 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+          {notice}
+        </div>
+      ) : null}
+
+      <form onSubmit={onSave} className="mt-4 flex flex-col gap-4">
+        <label className="flex flex-col gap-1 text-sm text-zinc-300">
+          Contact email
+          <input
+            type="email"
+            value={contactEmail}
+            onChange={(event) => setContactEmail(event.target.value)}
+            placeholder="you@example.com"
+            required
+            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+          />
+        </label>
+        <div>
+          <button
+            type="submit"
+            disabled={saving}
+            className={primaryButtonClassName}
+          >
+            {saving ? "Saving..." : "Save"}
+          </button>
+        </div>
+      </form>
+    </section>
+  );
+}
 
 export function SetupManagementPanel() {
   const [loading, setLoading] = useState(true);
@@ -163,13 +256,17 @@ export function SetupManagementPanel() {
 
   if (loading) {
     return (
-      <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
-        <p className="text-sm text-zinc-400">Loading Stripe settings...</p>
-      </section>
+      <>
+        <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
+          <p className="text-sm text-zinc-400">Loading Stripe settings...</p>
+        </section>
+        <ContactEmailForm />
+      </>
     );
   }
 
   return (
+    <>
     <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
       <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Setup</h2>
       <p className="mt-1 text-sm text-zinc-400">
@@ -295,5 +392,7 @@ export function SetupManagementPanel() {
         </div>
       </form>
     </section>
+    <ContactEmailForm />
+    </>
   );
 }

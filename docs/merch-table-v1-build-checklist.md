@@ -249,7 +249,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Global storefront footer
 
-- [ ] Show "Contact" link for the store owner using configured contact email (e.g., `mailto:` from `StoreSettings.contactEmail`) on public storefront pages
+- [x] Show "Contact" link for the store owner using configured contact email (e.g., `mailto:` from `StoreSettings.contactEmail`) on public storefront pages
 
 ### Release detail page
 

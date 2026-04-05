@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { buyerTheme, resolveBrandGlyph } from "@/app/buyer-theme";
+import { buyerTheme } from "@/app/buyer-theme";
 import {
   type LibraryState,
   type LibrarySuccessPayload,
@@ -20,9 +20,6 @@ import {
   writeTokenToHash,
 } from "./library-page-helpers";
 
-type LibraryPageClientProps = {
-  brandLabel: string;
-};
 
 function TrackDownloadControl({
   options,
@@ -78,8 +75,7 @@ function TrackDownloadControl({
   );
 }
 
-export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps) {
-  const brandGlyph = resolveBrandGlyph(brandLabel);
+export default function LibraryPageClient() {
   const [token, setToken] = useState("");
   const [tokenInput, setTokenInput] = useState("");
   const [state, setState] = useState<LibraryState>("idle");
@@ -177,7 +173,7 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
   }
 
   return (
-    <main className={buyerTheme.page}>
+    <main>
       {mixedZipPrompt ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 px-4">
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
@@ -219,41 +215,6 @@ export default function LibraryPageClient({ brandLabel }: LibraryPageClientProps
           </div>
         </div>
       ) : null}
-
-      <header className={buyerTheme.header}>
-        <div className={buyerTheme.headerInner}>
-          <div className="flex items-center gap-3">
-            <span className={buyerTheme.brandBadge}>
-              {brandGlyph}
-            </span>
-            <p className="text-lg font-semibold tracking-tight">{brandLabel}</p>
-          </div>
-          <nav className={buyerTheme.nav}>
-            <span
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-800"
-              aria-current="page"
-              aria-label="Library"
-              title="Library"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                library_music
-              </span>
-              <span className="sr-only">Library</span>
-            </span>
-            <Link
-              href="/find-my-purchases"
-              className={`${buyerTheme.navLink} inline-flex h-9 w-9 items-center justify-center rounded-full`}
-              aria-label="Find My Purchases"
-              title="Find My Purchases"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                receipt
-              </span>
-              <span className="sr-only">Find My Purchases</span>
-            </Link>
-          </nav>
-        </div>
-      </header>
 
       <section className="mx-auto mb-12 flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
         <div className={`${buyerTheme.panel} w-full`}>
