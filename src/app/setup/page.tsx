@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { hasValidSetupSession } from "@/lib/auth/setup-session";
@@ -18,6 +19,9 @@ import { StepTwoForm } from "./step-two-form";
 import { TokenEntryForm } from "./token-entry-form";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Setup",
+};
 
 type SetupPageProps = {
   searchParams: Promise<{

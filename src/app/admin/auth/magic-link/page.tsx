@@ -1,4 +1,10 @@
+import type { Metadata } from "next";
+
 import { MagicLinkClaim } from "./magic-link-claim";
+
+export const metadata: Metadata = {
+  title: "Admin Magic Link",
+};
 
 export default function AdminMagicLinkPage() {
   return (

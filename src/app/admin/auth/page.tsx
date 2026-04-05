@@ -1,10 +1,15 @@
 import { headers } from "next/headers";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { getSessionWithStrictLookup } from "@/lib/auth/admin-session-lookup";
 import { auth } from "@/lib/better-auth";
 
 import { AdminAuthRequestForm } from "./request-form";
+
+export const metadata: Metadata = {
+  title: "Admin Sign In",
+};
 
 export default async function AdminAuthPage() {
   const session = await getSessionWithStrictLookup({

@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
+
 import LibraryPageClient from "@/app/library/library-page-client";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: "Library",
+};
 
 function resolveBrandLabel(input: { storeName: string | null; brandName: string | null }) {
   const storeName = input.storeName?.trim();
