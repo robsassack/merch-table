@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 
+import { OWNED_RELEASE_HINT_COOKIE_NAME } from "@/lib/checkout/owned-release-hint-cookie";
+
 type AnyRecord = Record<string, unknown>;
 
 function patchMethod(target: AnyRecord, name: string, replacement: unknown) {
@@ -19,9 +21,11 @@ describe("GET /api/library/:token", () => {
       const fn = restore.pop();
       fn?.();
     }
+    delete process.env.AUTH_SECRET;
   });
 
   it("returns downloads and updates access tracking for a valid token", async () => {
+    process.env.AUTH_SECRET = "test-secret";
     process.env.DATABASE_URL ??=
       "postgresql://postgres:postgres@localhost:5432/merch_table_test";
     const { prisma } = await import("@/lib/prisma");
@@ -106,6 +110,9 @@ describe("GET /api/library/:token", () => {
       response.headers.get("cache-control"),
       "no-store, no-cache, must-revalidate, proxy-revalidate",
     );
+    const setCookie = response.headers.get("set-cookie");
+    assert.ok(setCookie);
+    assert.ok(setCookie?.includes(`${OWNED_RELEASE_HINT_COOKIE_NAME}=`));
 
     const payload = (await response.json()) as {
       ok: boolean;

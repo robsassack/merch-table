@@ -2,6 +2,11 @@ import crypto from "node:crypto";
 
 import { NextResponse } from "next/server";
 
+import {
+  createOwnedReleaseHintCookieValue,
+  OWNED_RELEASE_HINT_COOKIE_NAME,
+  OWNED_RELEASE_HINT_COOKIE_TTL_SECONDS,
+} from "@/lib/checkout/owned-release-hint-cookie";
 import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
 import { prisma } from "@/lib/prisma";
@@ -244,7 +249,7 @@ export async function GET(_request: Request, context: RouteContext) {
     }
   }
 
-  return NextResponse.json(
+  const response = NextResponse.json(
     {
       ok: true,
       libraryToken: {
@@ -287,4 +292,21 @@ export async function GET(_request: Request, context: RouteContext) {
       },
     },
   );
+
+  const ownedReleaseHintCookie = createOwnedReleaseHintCookieValue(
+    entitlements.map((entitlement) => entitlement.release.id),
+  );
+  if (ownedReleaseHintCookie) {
+    response.cookies.set({
+      name: OWNED_RELEASE_HINT_COOKIE_NAME,
+      value: ownedReleaseHintCookie,
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: OWNED_RELEASE_HINT_COOKIE_TTL_SECONDS,
+    });
+  }
+
+  return response;
 }

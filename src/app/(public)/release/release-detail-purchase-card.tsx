@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isReleaseOwnedInStorage } from "@/app/(public)/release/owned-release-storage";
 
 type PricingMode = "FREE" | "FIXED" | "PWYW";
 
@@ -10,6 +11,7 @@ type ReleaseDetailPurchaseCardProps = {
   currency: string;
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
+  initialMayOwnRelease?: boolean;
   hasDownloadableTracks: boolean;
   hasOnlyLossyDownloads: boolean;
 };
@@ -19,6 +21,9 @@ type ToastState = {
   message: string;
 } | null;
 
+const ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE =
+  "ALREADY_OWNED_CONFIRMATION_REQUIRED";
+
 function formatMoney(currency: string, cents: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -26,6 +31,19 @@ function formatMoney(currency: string, cents: number) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(cents / 100);
+}
+
+function resolveCurrencyPrefix(currency: string) {
+  const normalizedCurrency = currency || "USD";
+  const parts = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: normalizedCurrency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).formatToParts(0);
+
+  const currencyPart = parts.find((part) => part.type === "currency")?.value?.trim();
+  return currencyPart && currencyPart.length > 0 ? currencyPart : normalizedCurrency;
 }
 
 function resolveBuyLabel(input: {
@@ -55,6 +73,7 @@ export default function ReleaseDetailPurchaseCard({
   currency,
   fixedPriceCents,
   minimumPriceCents,
+  initialMayOwnRelease = false,
   hasDownloadableTracks,
   hasOnlyLossyDownloads,
 }: ReleaseDetailPurchaseCardProps) {
@@ -68,6 +87,11 @@ export default function ReleaseDetailPurchaseCard({
   const [confirmEmail, setConfirmEmail] = useState("");
   const [pwywAmount, setPwywAmount] = useState("");
   const [checkoutFormError, setCheckoutFormError] = useState<string | null>(null);
+  const [alreadyOwnedWarning, setAlreadyOwnedWarning] = useState<string | null>(null);
+  const [confirmAlreadyOwned, setConfirmAlreadyOwned] = useState(false);
+  const [mayAlreadyOwnRelease, setMayAlreadyOwnRelease] = useState(
+    initialMayOwnRelease,
+  );
 
   const buyLabel = useMemo(
     () =>
@@ -85,6 +109,8 @@ export default function ReleaseDetailPurchaseCard({
     [currency, minimumPriceCents],
   );
 
+  const pwywCurrencyPrefix = useMemo(() => resolveCurrencyPrefix(currency), [currency]);
+
   useEffect(() => {
     if (!isCheckoutDialogOpen) {
       return;
@@ -100,6 +126,23 @@ export default function ReleaseDetailPurchaseCard({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isCheckoutDialogOpen, isSubmitting]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      setMayAlreadyOwnRelease((currentValue) => {
+        if (currentValue) {
+          return true;
+        }
+        return isReleaseOwnedInStorage(window.localStorage, releaseId);
+      });
+    } catch {
+      // No-op. Some browser contexts can block localStorage access.
+    }
+  }, [releaseId]);
+
   function openCheckoutDialog() {
     if (isSubmitting) {
       return;
@@ -109,6 +152,8 @@ export default function ReleaseDetailPurchaseCard({
     setCheckoutEmail("");
     setConfirmEmail("");
     setCheckoutFormError(null);
+    setAlreadyOwnedWarning(null);
+    setConfirmAlreadyOwned(false);
     setPwywAmount(pricingMode === "PWYW" ? (minimum / 100).toFixed(2) : "");
     setIsCheckoutDialogOpen(true);
   }
@@ -134,6 +179,10 @@ export default function ReleaseDetailPurchaseCard({
 
     if (hasEmail && normalizedEmail !== normalizedConfirmEmail) {
       setCheckoutFormError("Email addresses do not match.");
+      return;
+    }
+    if (pricingMode !== "FREE" && alreadyOwnedWarning && !confirmAlreadyOwned) {
+      setCheckoutFormError("Please confirm to continue with a repeat purchase.");
       return;
     }
 
@@ -170,7 +219,7 @@ export default function ReleaseDetailPurchaseCard({
         });
 
         const payload = (await response.json().catch(() => null)) as
-          | { ok?: boolean; error?: string }
+          | { ok?: boolean; error?: string; code?: string }
           | null;
 
         if (!response.ok || payload?.ok !== true) {
@@ -197,14 +246,29 @@ export default function ReleaseDetailPurchaseCard({
           releaseId,
           amountCents,
           email: normalizedEmail.length > 0 ? normalizedEmail : undefined,
-          successUrl: `${window.location.origin}/`,
+          confirmAlreadyOwned,
+          successUrl: `${window.location.origin}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
         }),
       });
 
       const payload = (await response.json().catch(() => null)) as
-        | { ok?: boolean; error?: string; checkoutUrl?: string }
+        | { ok?: boolean; error?: string; code?: string; checkoutUrl?: string }
         | null;
+
+      if (
+        response.status === 409 &&
+        payload?.code === ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE &&
+        !confirmAlreadyOwned
+      ) {
+        setAlreadyOwnedWarning(
+          payload.error ??
+            "This email already owns this release. Confirm below to continue anyway.",
+        );
+        setCheckoutFormError(null);
+        setIsSubmitting(false);
+        return;
+      }
 
       if (!response.ok || payload?.ok !== true || typeof payload.checkoutUrl !== "string") {
         setCheckoutFormError(payload?.error ?? "Could not create checkout session.");
@@ -213,6 +277,7 @@ export default function ReleaseDetailPurchaseCard({
       }
 
       window.location.assign(payload.checkoutUrl);
+      return;
     } catch {
       setCheckoutFormError("Network error. Please try again in a moment.");
       setIsSubmitting(false);
@@ -297,6 +362,19 @@ export default function ReleaseDetailPurchaseCard({
         </button>
       </div>
 
+      {mayAlreadyOwnRelease ? (
+        <div className="mt-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-600">
+          You may already own this release. If so, you can use{" "}
+          <a
+            href="/find-my-purchases"
+            className="font-medium text-zinc-800 underline underline-offset-2 hover:text-zinc-900"
+          >
+            Find My Purchases
+          </a>{" "}
+          to reopen your library.
+        </div>
+      ) : null}
+
       {isCheckoutDialogOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/55 p-4"
@@ -357,16 +435,21 @@ export default function ReleaseDetailPurchaseCard({
               {pricingMode === "PWYW" ? (
                 <label className="block">
                   <span className="mb-1.5 block text-base font-semibold text-zinc-800">Amount</span>
-                  <input
-                    type="number"
-                    inputMode="decimal"
-                    min={Math.max(0, (minimumPriceCents ?? 0) / 100)}
-                    step="0.01"
-                    value={pwywAmount}
-                    onChange={(event) => setPwywAmount(event.target.value)}
-                    disabled={isSubmitting}
-                    className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2.5 text-base font-medium text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
-                  />
+                  <div className="relative">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-base font-semibold text-zinc-500">
+                      {pwywCurrencyPrefix}
+                    </span>
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      min={Math.max(0, (minimumPriceCents ?? 0) / 100)}
+                      step="0.01"
+                      value={pwywAmount}
+                      onChange={(event) => setPwywAmount(event.target.value)}
+                      disabled={isSubmitting}
+                      className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base font-medium text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                    />
+                  </div>
                 </label>
               ) : null}
 
@@ -378,7 +461,13 @@ export default function ReleaseDetailPurchaseCard({
                   type="email"
                   autoComplete="email"
                   value={checkoutEmail}
-                  onChange={(event) => setCheckoutEmail(event.target.value)}
+                  onChange={(event) => {
+                    setCheckoutEmail(event.target.value);
+                    if (alreadyOwnedWarning) {
+                      setAlreadyOwnedWarning(null);
+                      setConfirmAlreadyOwned(false);
+                    }
+                  }}
                   disabled={isSubmitting}
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="you@example.com"
@@ -393,12 +482,37 @@ export default function ReleaseDetailPurchaseCard({
                   type="email"
                   autoComplete="email"
                   value={confirmEmail}
-                  onChange={(event) => setConfirmEmail(event.target.value)}
+                  onChange={(event) => {
+                    setConfirmEmail(event.target.value);
+                    if (alreadyOwnedWarning) {
+                      setAlreadyOwnedWarning(null);
+                      setConfirmAlreadyOwned(false);
+                    }
+                  }}
                   disabled={isSubmitting}
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="Re-enter your email"
                 />
               </label>
+
+              {alreadyOwnedWarning ? (
+                <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+                  <p>{alreadyOwnedWarning}</p>
+                  <label className="mt-2 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      checked={confirmAlreadyOwned}
+                      onChange={(event) => {
+                        setConfirmAlreadyOwned(event.target.checked);
+                        setCheckoutFormError(null);
+                      }}
+                      disabled={isSubmitting}
+                      className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-300"
+                    />
+                    <span>I understand and want to continue with a repeat purchase.</span>
+                  </label>
+                </div>
+              ) : null}
 
               {checkoutFormError ? (
                 <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { buyerTheme } from "@/app/(public)/buyer-theme";
@@ -8,6 +9,7 @@ import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
 import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
+import { hasOwnedReleaseHintFromCookieStore } from "@/lib/checkout/owned-release-hint-cookie";
 import { resolveCurrentReleaseSourceAssets } from "@/lib/checkout/release-files";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
@@ -303,6 +305,11 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
   const artistImageUrl = resolveOptionalImageUrl(release.artist.owner?.image);
   const totalDurationMs = release.tracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
+  const cookieStore = await cookies();
+  const hasOwnedReleaseHint = hasOwnedReleaseHintFromCookieStore(
+    cookieStore,
+    release.id,
+  );
 
   return (
     <div className={buyerTheme.page}>
@@ -356,6 +363,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   currency={release.currency}
                   fixedPriceCents={release.fixedPriceCents}
                   minimumPriceCents={release.minimumPriceCents}
+                  initialMayOwnRelease={hasOwnedReleaseHint}
                   hasDownloadableTracks={downloadableSourceAssets.length > 0}
                   hasOnlyLossyDownloads={
                     downloadableSourceAssets.length > 0 && release.isLossyOnly

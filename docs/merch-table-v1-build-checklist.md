@@ -257,8 +257,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Tracklist display with track metadata
 - [x] Pricing UI for `FREE` / `FIXED` / `PWYW` modes
 - [x] Quality disclosure notice when only lossy files available
-- [ ] "You own this — go to your library" indicator with "Buy again" secondary option
-- [ ] Client-side owned-release detection via cookie/localStorage (UX hint only)
+- [x] "You own this — go to your library" indicator with "Buy again" secondary option
+- [x] Client-side owned-release detection via cookie/localStorage (UX hint only)
 - [ ] Set up share functionality
 - [ ] Set accent/background colors to match album artwork
 

@@ -2,6 +2,10 @@ import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE,
+  hasExistingReleaseOwnership,
+} from "@/lib/checkout/ownership-check";
 import { resolveCheckoutAmountCents } from "@/lib/checkout/session-pricing";
 import { decryptSecret } from "@/lib/crypto/secret-box";
 import { prisma } from "@/lib/prisma";
@@ -16,6 +20,7 @@ const createCheckoutSessionSchema = z.object({
   releaseId: z.string().trim().min(1),
   amountCents: z.number().int().nonnegative().optional(),
   email: z.email().max(320).optional(),
+  confirmAlreadyOwned: z.boolean().optional(),
   successUrl: z.string().trim().min(1),
   cancelUrl: z.string().trim().min(1),
 });
@@ -63,6 +68,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const parsed = createCheckoutSessionSchema.parse(payload);
+    const normalizedEmail = parsed.email?.trim().toLowerCase();
 
     const [settings, stripeState] = await Promise.all([
       prisma.storeSettings.findFirst({
@@ -138,6 +144,30 @@ export async function POST(request: Request) {
       );
     }
 
+    if (
+      normalizedEmail &&
+      resolvedAmount.amountCents > 0 &&
+      parsed.confirmAlreadyOwned !== true
+    ) {
+      const alreadyOwned = await hasExistingReleaseOwnership({
+        organizationId: settings.organizationId,
+        releaseId: release.id,
+        email: normalizedEmail,
+      });
+
+      if (alreadyOwned) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE,
+            error:
+              "This email already owns this release. Continue anyway to create a new purchase?",
+          },
+          { status: 409 },
+        );
+      }
+    }
+
     const successUrl = normalizeCheckoutUrl(parsed.successUrl, request);
     if (!successUrl) {
       return NextResponse.json(
@@ -159,7 +189,7 @@ export async function POST(request: Request) {
       mode: "payment",
       success_url: successUrl,
       cancel_url: cancelUrl,
-      customer_email: parsed.email,
+      customer_email: normalizedEmail,
       automatic_tax: { enabled: true },
       line_items: [
         {
