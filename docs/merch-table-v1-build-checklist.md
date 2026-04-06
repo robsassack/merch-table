@@ -96,6 +96,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Release management
 
 - [x] Release CRUD with pricing setup (`FREE`, `FIXED`, `PWYW`)
+- [ ] Add release metadata fields: `Label` and `Release Type`
 - [x] System minimum price floor enforcement (env var, default $0.50)
 - [x] Pricing UI: inline Stripe fee estimate and net payout, updates dynamically
 - [x] Pricing UI: warning when price is below system minimum floor
@@ -258,6 +259,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Quality disclosure notice when only lossy files available
 - [ ] "You own this — go to your library" indicator with "Buy again" secondary option
 - [ ] Client-side owned-release detection via cookie/localStorage (UX hint only)
+- [ ] Set up share functionality
 
 ### Audio player (Howler.js)
 

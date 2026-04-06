@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { buyerTheme } from "@/app/buyer-theme";
+import { markOwnedReleaseInStorage } from "@/app/release/owned-release-storage";
 import {
   type LibraryState,
   type LibrarySuccessPayload,
@@ -159,6 +160,20 @@ export default function LibraryPageClient() {
     }
     return groupDownloadsByRelease(library);
   }, [library]);
+
+  useEffect(() => {
+    if (groupedReleases.length === 0 || typeof window === "undefined") {
+      return;
+    }
+
+    try {
+      for (const release of groupedReleases) {
+        markOwnedReleaseInStorage(window.localStorage, release.id);
+      }
+    } catch {
+      // No-op. Some browser contexts can block localStorage access.
+    }
+  }, [groupedReleases]);
 
   function onTokenSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
