@@ -268,6 +268,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Click new track → stop current → start new; UI updates to reflect active track
 - [ ] Play/pause, progress bar, track title display
 - [ ] Respects browser autoplay restrictions (user gesture required)
+- [ ] Allow a featured track to be played by default
 
 ### Post-purchase confirmation page
 
