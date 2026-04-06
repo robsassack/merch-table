@@ -241,6 +241,8 @@ export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
   return {
     artistId: release.artistId,
     title: release.title,
+    releaseType: release.releaseType,
+    label: release.label,
     slug: release.slug,
     description: release.description ?? "",
     coverImageUrl: release.coverImageUrl ?? "",

@@ -67,6 +67,20 @@ enum DeliveryFormat {
   FLAC
 }
 
+enum ReleaseType {
+  ALBUM
+  EP
+  SINGLE
+  COMPILATION
+  MIXTAPE
+  LIVE_ALBUM
+  SOUNDTRACK_SCORE
+  DEMO
+  BOOTLEG
+  REMIX
+  OTHER
+}
+
 enum StoreStatus {
   SETUP
   PRIVATE
@@ -194,6 +208,8 @@ model Release {
   organizationId    String
   artistId          String
   title             String
+  releaseType       ReleaseType           @default(ALBUM)
+  label             String                @default("Independent")
   slug              String
   description       String?
   coverImageUrl     String?

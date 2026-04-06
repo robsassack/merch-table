@@ -12,6 +12,20 @@ export const updateReleaseSchema = z.object({
   action: z.literal("update"),
   artistId: z.string().trim().min(1),
   title: z.string().trim().min(1).max(160),
+  label: z.string().max(160).nullable().optional(),
+  releaseType: z.enum([
+    "ALBUM",
+    "EP",
+    "SINGLE",
+    "COMPILATION",
+    "MIXTAPE",
+    "LIVE_ALBUM",
+    "SOUNDTRACK_SCORE",
+    "DEMO",
+    "BOOTLEG",
+    "REMIX",
+    "OTHER",
+  ]),
   slug: z.string().trim().max(160).optional(),
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
@@ -122,6 +136,8 @@ export type ReleaseForActionState = {
   id: string;
   artistId: string;
   title: string;
+  label?: string | null;
+  releaseType?: string;
   coverImageUrl: string | null;
   publishedAt: Date | null;
   createdAt: Date;

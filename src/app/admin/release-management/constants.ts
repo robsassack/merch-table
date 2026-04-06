@@ -2,6 +2,7 @@ import type {
   DeliveryFormat,
   PreviewMode,
   PricingMode,
+  ReleaseType,
   ReleaseStatus,
 } from "./types";
 
@@ -24,6 +25,20 @@ export const statusOptions: Array<{ value: ReleaseStatus; label: string }> = [
   { value: "PUBLISHED", label: "Published" },
   { value: "DRAFT", label: "Draft" },
   { value: "ARCHIVED", label: "Archived" },
+];
+
+export const releaseTypeOptions: Array<{ value: ReleaseType; label: string }> = [
+  { value: "ALBUM", label: "Album" },
+  { value: "EP", label: "EP" },
+  { value: "SINGLE", label: "Single" },
+  { value: "COMPILATION", label: "Compilation" },
+  { value: "MIXTAPE", label: "Mixtape" },
+  { value: "LIVE_ALBUM", label: "Live Album" },
+  { value: "SOUNDTRACK_SCORE", label: "Soundtrack / Score" },
+  { value: "DEMO", label: "Demo" },
+  { value: "BOOTLEG", label: "Bootleg" },
+  { value: "REMIX", label: "Remix" },
+  { value: "OTHER", label: "Other" },
 ];
 
 export const previewModeOptions: Array<{ value: PreviewMode; label: string }> = [

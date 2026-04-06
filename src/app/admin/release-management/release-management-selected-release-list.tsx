@@ -2,12 +2,13 @@ import {
   buttonClassName,
   deliveryFormatOptions,
   pricingModeOptions,
+  releaseTypeOptions,
   statusOptions,
 } from "./constants";
 import { ReleaseManagementReleaseFooter } from "./release-management-release-footer";
 import { ReleaseManagementStorefrontPreview } from "./release-management-storefront-preview";
 import { ReleaseManagementTrackManagement } from "./release-management-track-management";
-import type { DeliveryFormat, PricingMode, ReleaseStatus } from "./types";
+import type { DeliveryFormat, PricingMode, ReleaseStatus, ReleaseType } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 import {
   getReleaseUrlPreview,
@@ -129,6 +130,22 @@ export function ReleaseManagementSelectedReleaseList(props: {
                         }))
                       }
                       className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+                    />
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
+                    Label
+                    <input
+                      maxLength={160}
+                      value={draft.label}
+                      onChange={(event) =>
+                        setDraftsById((previous) => ({
+                          ...previous,
+                          [release.id]: { ...draft, label: event.target.value },
+                        }))
+                      }
+                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+                      placeholder="Independent"
                     />
                   </label>
 
@@ -266,6 +283,29 @@ export function ReleaseManagementSelectedReleaseList(props: {
                       className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
                     >
                       {statusOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="flex flex-col gap-1 text-xs text-zinc-500">
+                    Release type
+                    <select
+                      value={draft.releaseType}
+                      onChange={(event) =>
+                        setDraftsById((previous) => ({
+                          ...previous,
+                          [release.id]: {
+                            ...draft,
+                            releaseType: event.target.value as ReleaseType,
+                          },
+                        }))
+                      }
+                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+                    >
+                      {releaseTypeOptions.map((option) => (
                         <option key={option.value} value={option.value}>
                           {option.label}
                         </option>

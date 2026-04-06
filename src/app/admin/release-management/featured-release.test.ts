@@ -16,6 +16,8 @@ function createReleaseRecord(input: {
     id: input.id,
     artistId: "artist-1",
     title: `Release ${input.id}`,
+    releaseType: "ALBUM",
+    label: "Independent",
     slug: `release-${input.id}`,
     description: null,
     coverImageUrl: null,

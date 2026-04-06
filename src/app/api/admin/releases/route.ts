@@ -29,6 +29,22 @@ export const runtime = "nodejs";
 const createReleaseSchema = z.object({
   artistId: z.string().trim().min(1),
   title: z.string().trim().min(1).max(160),
+  label: z.string().max(160).nullable().optional(),
+  releaseType: z
+    .enum([
+      "ALBUM",
+      "EP",
+      "SINGLE",
+      "COMPILATION",
+      "MIXTAPE",
+      "LIVE_ALBUM",
+      "SOUNDTRACK_SCORE",
+      "DEMO",
+      "BOOTLEG",
+      "REMIX",
+      "OTHER",
+    ])
+    .default("ALBUM"),
   slug: z.string().trim().max(160).optional(),
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
@@ -88,6 +104,11 @@ function parseDateInputValue(dateInput: string) {
   }
 
   return parsed;
+}
+
+function resolveReleaseLabel(input: string | null | undefined) {
+  const normalized = normalizeNullableText(input);
+  return normalized ?? "Independent";
 }
 
 export async function GET() {
@@ -280,6 +301,8 @@ export async function POST(request: Request) {
         organizationId: auth.context.organizationId,
         artistId: activeArtist.id,
         title: parsed.title.trim(),
+        label: resolveReleaseLabel(parsed.label),
+        releaseType: parsed.releaseType,
         slug: resolvedSlug,
         description: normalizeNullableText(parsed.description),
         coverImageUrl,

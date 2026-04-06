@@ -42,6 +42,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newArtistId,
     newTitle,
     newSlug,
+    newLabel,
     newDescription,
     newCoverStorageKey,
     newPricingMode,
@@ -50,6 +51,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newDeliveryFormats,
     newAllowFreeCheckout,
     newStatus,
+    newReleaseType,
     newReleaseDate,
     newMarkLossyOnly,
     newConfirmLossyOnly,
@@ -57,9 +59,11 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setNewTrackByReleaseId,
     setNewTitle,
     setNewSlug,
+    setNewLabel,
     setNewDescription,
     setNewAllowFreeCheckout,
     setNewStatus,
+    setNewReleaseType,
     setNewReleaseDate,
     setNewMarkLossyOnly,
     setNewConfirmLossyOnly,
@@ -204,6 +208,8 @@ export function createReleaseActions(input: ReleaseActionsInput) {
         body: JSON.stringify({
           artistId: newArtistId,
           title: newTitle,
+          releaseType: newReleaseType,
+          label: newLabel,
           slug: newSlug.length > 0 ? newSlug : undefined,
           description: newDescription.length > 0 ? newDescription : null,
           coverStorageKey: newCoverStorageKey,
@@ -241,6 +247,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
 
       setNewTitle("");
       setNewSlug("");
+      setNewLabel("Independent");
       setNewDescription("");
       setNewCoverImageUrl("");
       setNewCoverPreviewUrl((previous) => {
@@ -254,6 +261,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
       setNewDeliveryFormats(["MP3", "M4A", "FLAC"]);
       setNewAllowFreeCheckout(false);
       setNewStatus("PUBLISHED");
+      setNewReleaseType("ALBUM");
       setNewReleaseDate(getTodayDateInputValue());
       setNewMarkLossyOnly(false);
       setNewConfirmLossyOnly(false);
@@ -287,6 +295,8 @@ export function createReleaseActions(input: ReleaseActionsInput) {
           action: "update",
           artistId: draft.artistId,
           title: draft.title,
+          releaseType: draft.releaseType,
+          label: draft.label,
           slug: draft.slug.length > 0 ? draft.slug : undefined,
           description: draft.description.length > 0 ? draft.description : null,
           coverStorageKey: draft.coverStorageKey,

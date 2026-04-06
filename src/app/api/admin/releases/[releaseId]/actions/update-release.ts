@@ -22,6 +22,11 @@ import {
 } from "../release-route-types";
 import { errorResponse, parseDateInputValue, purgeStorageObjects } from "../release-route-utils";
 
+function resolveReleaseLabel(input: string | null | undefined) {
+  const normalized = normalizeNullableText(input);
+  return normalized ?? "Independent";
+}
+
 export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSelect>(input: {
   parsed: UpdateReleaseAction;
   release: ReleaseForActionState;
@@ -142,6 +147,8 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
     data: {
       artistId: artist.id,
       title: parsed.title.trim(),
+      label: resolveReleaseLabel(parsed.label),
+      releaseType: parsed.releaseType,
       slug: resolvedSlug,
       description: normalizeNullableText(parsed.description),
       coverImageUrl,

@@ -96,7 +96,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Release management
 
 - [x] Release CRUD with pricing setup (`FREE`, `FIXED`, `PWYW`)
-- [ ] Add release metadata fields: `Label` and `Release Type`
+- [x]] Add release metadata fields: `Label` and `Release Type`
 - [x] System minimum price floor enforcement (env var, default $0.50)
 - [x] Pricing UI: inline Stripe fee estimate and net payout, updates dynamically
 - [x] Pricing UI: warning when price is below system minimum floor

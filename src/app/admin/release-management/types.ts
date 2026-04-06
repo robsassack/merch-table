@@ -2,6 +2,18 @@ import type { ParsedTrackImportFileMetadata } from "@/lib/audio/track-import-bro
 
 export type PricingMode = "FREE" | "FIXED" | "PWYW";
 export type ReleaseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+export type ReleaseType =
+  | "ALBUM"
+  | "EP"
+  | "SINGLE"
+  | "COMPILATION"
+  | "MIXTAPE"
+  | "LIVE_ALBUM"
+  | "SOUNDTRACK_SCORE"
+  | "DEMO"
+  | "BOOTLEG"
+  | "REMIX"
+  | "OTHER";
 export type PreviewMode = "CLIP" | "FULL";
 export type AssetRole = "MASTER" | "PREVIEW" | "DELIVERY";
 export type TranscodeStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
@@ -18,6 +30,8 @@ export type ReleaseRecord = {
   id: string;
   artistId: string;
   title: string;
+  releaseType: ReleaseType;
+  label: string;
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
@@ -223,6 +237,8 @@ export type CoverUploadUrlResponse = {
 export type ReleaseDraft = {
   artistId: string;
   title: string;
+  releaseType: ReleaseType;
+  label: string;
   slug: string;
   description: string;
   coverImageUrl: string;

@@ -3,10 +3,11 @@ import {
   deliveryFormatOptions,
   pricingModeOptions,
   primaryButtonClassName,
+  releaseTypeOptions,
   statusOptions,
 } from "./constants";
 import type { ReleaseManagementController } from "./use-release-management-controller";
-import type { DeliveryFormat, PricingMode, ReleaseStatus } from "./types";
+import type { DeliveryFormat, PricingMode, ReleaseStatus, ReleaseType } from "./types";
 import {
   getReleaseUrlPreview,
   sanitizeUrlInput,
@@ -30,6 +31,8 @@ export function ReleaseManagementCreateForm(props: {
     setNewTitle,
     newSlug,
     setNewSlug,
+    newLabel,
+    setNewLabel,
     newUrlTouched,
     setNewUrlTouched,
     newDescription,
@@ -48,6 +51,8 @@ export function ReleaseManagementCreateForm(props: {
     setNewPricingMode,
     newStatus,
     setNewStatus,
+    newReleaseType,
+    setNewReleaseType,
     newReleaseDate,
     setNewReleaseDate,
     newFixedPrice,
@@ -127,6 +132,17 @@ export function ReleaseManagementCreateForm(props: {
               }}
               className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
               placeholder="Release title"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
+            Label
+            <input
+              maxLength={160}
+              value={newLabel}
+              onChange={(event) => setNewLabel(event.target.value)}
+              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+              placeholder="Independent"
             />
           </label>
 
@@ -251,6 +267,21 @@ export function ReleaseManagementCreateForm(props: {
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-zinc-500">
+            Release type
+            <select
+              value={newReleaseType}
+              onChange={(event) => setNewReleaseType(event.target.value as ReleaseType)}
+              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+            >
+              {releaseTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="flex flex-col gap-1 text-xs text-zinc-500">
             Release date
             <input
               type="date"
@@ -315,6 +346,8 @@ export function ReleaseManagementCreateForm(props: {
               {
                 artistId: newArtistId,
                 title: newTitle,
+                releaseType: newReleaseType,
+                label: newLabel,
                 slug: newSlug,
                 description: newDescription,
                 coverImageUrl: newCoverImageUrl,

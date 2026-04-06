@@ -46,36 +46,6 @@ function resolveInitials(name: string) {
   return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
 }
 
-function formatStorefrontPrice(input: {
-  pricingMode: "FREE" | "FIXED" | "PWYW";
-  currency: string;
-  priceCents: number;
-  fixedPriceCents: number | null;
-  minimumPriceCents: number | null;
-}) {
-  const format = (cents: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: input.currency || "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(cents / 100);
-
-  if (input.pricingMode === "FREE") {
-    return "Free";
-  }
-
-  if (input.pricingMode === "FIXED") {
-    return format(input.fixedPriceCents ?? input.priceCents);
-  }
-
-  const minimum = input.minimumPriceCents ?? 0;
-  if (minimum <= 0) {
-    return "Pay what you want";
-  }
-  return `From ${format(minimum)}`;
-}
-
 function formatReleaseDate(value: Date | null) {
   if (!value) {
     return null;
@@ -96,6 +66,40 @@ function formatReleaseYear(value: Date | null) {
   return new Intl.DateTimeFormat("en-US", {
     year: "numeric",
   }).format(value);
+}
+
+function formatReleaseType(value: string) {
+  const normalized = value.trim();
+  if (normalized.length === 0) {
+    return "Album";
+  }
+
+  switch (normalized) {
+    case "ALBUM":
+      return "Album";
+    case "EP":
+      return "EP";
+    case "SINGLE":
+      return "Single";
+    case "COMPILATION":
+      return "Compilation";
+    case "MIXTAPE":
+      return "Mixtape";
+    case "LIVE_ALBUM":
+      return "Live Album";
+    case "SOUNDTRACK_SCORE":
+      return "Soundtrack / Score";
+    case "DEMO":
+      return "Demo";
+    case "BOOTLEG":
+      return "Bootleg";
+    case "REMIX":
+      return "Remix";
+    case "OTHER":
+      return "Other";
+    default:
+      return "Album";
+  }
 }
 
 function formatTrackDuration(durationMs: number | null) {
@@ -225,6 +229,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     select: {
       id: true,
       title: true,
+      releaseType: true,
+      label: true,
       slug: true,
       description: true,
       coverImageUrl: true,
@@ -291,7 +297,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             </div>
 
             <div className="flex flex-col">
-              <p className={buyerTheme.eyebrow}>Album</p>
+              <p className={buyerTheme.eyebrow}>{formatReleaseType(release.releaseType)}</p>
               <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">
                 {release.title}
               </h1>
@@ -430,18 +436,12 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-3">
-                  <dt className="text-zinc-500">Price</dt>
+                  <dt className="text-zinc-500">Label</dt>
                   <dd
                     className="font-medium text-zinc-900"
                     style={{ fontFamily: spaceMonoFontFamily }}
                   >
-                    {formatStorefrontPrice({
-                      pricingMode: release.pricingMode,
-                      currency: release.currency,
-                      priceCents: release.priceCents,
-                      fixedPriceCents: release.fixedPriceCents,
-                      minimumPriceCents: release.minimumPriceCents,
-                    })}
+                    {release.label}
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-3">

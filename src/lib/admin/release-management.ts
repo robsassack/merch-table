@@ -4,6 +4,7 @@ import type {
   AssetRole,
   DeliveryFormat,
   PreviewMode,
+  ReleaseType,
   TranscodeJobKind,
   TranscodeStatus,
 } from "@/generated/prisma/enums";
@@ -15,6 +16,8 @@ const adminReleaseSelectSharedBase = {
   id: true,
   artistId: true,
   title: true,
+  releaseType: true,
+  label: true,
   slug: true,
   description: true,
   coverImageUrl: true,
@@ -94,6 +97,8 @@ export type AdminReleaseRecord = {
   id: string;
   artistId: string;
   title: string;
+  releaseType: ReleaseType;
+  label: string;
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
@@ -236,6 +241,14 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
     id: release.id,
     artistId: release.artistId,
     title: release.title,
+    releaseType:
+      "releaseType" in release && typeof release.releaseType === "string"
+        ? release.releaseType
+        : "ALBUM",
+    label:
+      "label" in release && typeof release.label === "string" && release.label.trim().length > 0
+        ? release.label
+        : "Independent",
     slug: release.slug,
     description: release.description,
     coverImageUrl: release.coverImageUrl,

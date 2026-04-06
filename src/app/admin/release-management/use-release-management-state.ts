@@ -14,6 +14,7 @@ import type {
   NewTrackDraft,
   PricingMode,
   ReleaseDraft,
+  ReleaseType,
   TrackDeleteDialogState,
   ReleasePreviewDraft,
   ReleaseRecord,
@@ -59,6 +60,7 @@ export function useReleaseManagementState() {
   const [newArtistId, setNewArtistId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
+  const [newLabel, setNewLabel] = useState("Independent");
   const [newDescription, setNewDescription] = useState("");
   const [newCoverImageUrl, setNewCoverImageUrl] = useState("");
   const [newCoverPreviewUrl, setNewCoverPreviewUrl] = useState<string | null>(null);
@@ -76,6 +78,7 @@ export function useReleaseManagementState() {
   ]);
   const [newAllowFreeCheckout, setNewAllowFreeCheckout] = useState(false);
   const [newStatus, setNewStatus] = useState<ReleaseStatus>("PUBLISHED");
+  const [newReleaseType, setNewReleaseType] = useState<ReleaseType>("ALBUM");
   const [newReleaseDate, setNewReleaseDate] = useState(getTodayDateInputValue());
   const [newMarkLossyOnly, setNewMarkLossyOnly] = useState(false);
   const [newConfirmLossyOnly, setNewConfirmLossyOnly] = useState(false);
@@ -244,6 +247,8 @@ export function useReleaseManagementState() {
     setNewTitle,
     newSlug,
     setNewSlug,
+    newLabel,
+    setNewLabel,
     newDescription,
     setNewDescription,
     newCoverImageUrl,
@@ -265,6 +270,8 @@ export function useReleaseManagementState() {
     setNewAllowFreeCheckout,
     newStatus,
     setNewStatus,
+    newReleaseType,
+    setNewReleaseType,
     newReleaseDate,
     setNewReleaseDate,
     newMarkLossyOnly,
