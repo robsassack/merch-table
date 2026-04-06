@@ -7,6 +7,8 @@ import ArtistBio from "@/app/(public)/release/artist-bio";
 import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
+import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
+import { resolveCurrentReleaseSourceAssets } from "@/lib/checkout/release-files";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
@@ -116,6 +118,16 @@ function formatTotalDuration(durationMs: number) {
     return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function sortDownloadFormats(formats: Array<"mp3" | "m4a" | "flac">) {
+  const priority: Record<"mp3" | "m4a" | "flac", number> = {
+    flac: 0,
+    m4a: 1,
+    mp3: 2,
+  };
+
+  return [...formats].sort((a, b) => priority[a] - priority[b]);
 }
 
 const spaceMonoFontFamily = 'var(--font-space-mono), "Space Mono", monospace';
@@ -269,6 +281,26 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     notFound();
   }
 
+  const downloadableSourceAssets = await resolveCurrentReleaseSourceAssets({
+    db: prisma,
+    releaseId: release.id,
+    organizationId: settings.organizationId,
+  });
+  const availableDownloadFormats = sortDownloadFormats(
+    Array.from(
+      new Set(
+        downloadableSourceAssets
+          .map((asset) =>
+            resolveReleaseFileFormat({
+              fileName: asset.storageKey,
+              mimeType: asset.mimeType,
+            }),
+          )
+          .filter((value): value is "mp3" | "m4a" | "flac" => value !== null),
+      ),
+    ),
+  );
+
   const artistImageUrl = resolveOptionalImageUrl(release.artist.owner?.image);
   const totalDurationMs = release.tracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
 
@@ -324,6 +356,10 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                   currency={release.currency}
                   fixedPriceCents={release.fixedPriceCents}
                   minimumPriceCents={release.minimumPriceCents}
+                  hasDownloadableTracks={downloadableSourceAssets.length > 0}
+                  hasOnlyLossyDownloads={
+                    downloadableSourceAssets.length > 0 && release.isLossyOnly
+                  }
                 />
               </div>
             </div>
@@ -416,7 +452,9 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                     className="text-right font-medium text-zinc-900"
                     style={{ fontFamily: spaceMonoFontFamily }}
                   >
-                    {release.deliveryFormats.join(", ")}
+                    {availableDownloadFormats.length > 0
+                      ? availableDownloadFormats.map((format) => format.toUpperCase()).join(", ")
+                      : "None"}
                   </dd>
                 </div>
               </dl>

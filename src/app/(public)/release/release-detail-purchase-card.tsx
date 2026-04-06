@@ -10,6 +10,8 @@ type ReleaseDetailPurchaseCardProps = {
   currency: string;
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
+  hasDownloadableTracks: boolean;
+  hasOnlyLossyDownloads: boolean;
 };
 
 type ToastState = {
@@ -53,6 +55,8 @@ export default function ReleaseDetailPurchaseCard({
   currency,
   fixedPriceCents,
   minimumPriceCents,
+  hasDownloadableTracks,
+  hasOnlyLossyDownloads,
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-600";
@@ -339,6 +343,17 @@ export default function ReleaseDetailPurchaseCard({
             </div>
 
             <div className="space-y-3">
+              {!hasDownloadableTracks ? (
+                <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+                  No tracks are currently available for download.
+                </div>
+              ) : null}
+              {hasDownloadableTracks && hasOnlyLossyDownloads ? (
+                <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  Only lossy downloads are currently available for this release.
+                </div>
+              ) : null}
+
               {pricingMode === "PWYW" ? (
                 <label className="block">
                   <span className="mb-1.5 block text-base font-semibold text-zinc-800">Amount</span>
