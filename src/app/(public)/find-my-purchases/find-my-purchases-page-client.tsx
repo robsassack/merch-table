@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { buyerTheme } from "@/app/buyer-theme";
+import { buyerTheme } from "@/app/(public)/buyer-theme";
 
 type RequestState = "idle" | "submitting";
 type ToastState = {

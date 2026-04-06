@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { buyerTheme, resolveBrandGlyph } from "@/app/buyer-theme";
+import { buyerTheme, resolveBrandGlyph } from "@/app/(public)/buyer-theme";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 

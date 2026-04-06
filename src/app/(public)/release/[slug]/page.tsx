@@ -2,12 +2,12 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { buyerTheme } from "@/app/buyer-theme";
-import ArtistBio from "@/app/release/artist-bio";
-import ReleaseDescription from "@/app/release/release-description";
-import ReleaseDetailPurchaseCard from "@/app/release/release-detail-purchase-card";
-import ReleaseTrackList from "@/app/release/release-track-list";
-import StorefrontHeader from "@/app/storefront-header";
+import { buyerTheme } from "@/app/(public)/buyer-theme";
+import ArtistBio from "@/app/(public)/release/artist-bio";
+import ReleaseDescription from "@/app/(public)/release/release-description";
+import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
+import ReleaseTrackList from "@/app/(public)/release/release-track-list";
+import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 

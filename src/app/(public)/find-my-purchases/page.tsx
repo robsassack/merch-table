@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
-import { buyerTheme } from "@/app/buyer-theme";
-import FindMyPurchasesPageClient from "@/app/find-my-purchases/find-my-purchases-page-client";
-import StorefrontHeader from "@/app/storefront-header";
+import { buyerTheme } from "@/app/(public)/buyer-theme";
+import FindMyPurchasesPageClient from "@/app/(public)/find-my-purchases/find-my-purchases-page-client";
+import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 

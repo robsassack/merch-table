@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
-import { buyerTheme } from "@/app/buyer-theme";
-import StorefrontHeader from "@/app/storefront-header";
+import { buyerTheme } from "@/app/(public)/buyer-theme";
+import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 

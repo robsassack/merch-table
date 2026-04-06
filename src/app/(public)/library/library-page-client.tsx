@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
-import { buyerTheme } from "@/app/buyer-theme";
-import { markOwnedReleaseInStorage } from "@/app/release/owned-release-storage";
+import { buyerTheme } from "@/app/(public)/buyer-theme";
+import { markOwnedReleaseInStorage } from "@/app/(public)/release/owned-release-storage";
 import {
   type LibraryState,
   type LibrarySuccessPayload,
