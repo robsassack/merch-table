@@ -1,9 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { isReleaseOwnedInStorage } from "@/app/(public)/release/owned-release-storage";
-
-type PricingMode = "FREE" | "FIXED" | "PWYW";
+import {
+  formatMoney,
+  resolveBuyLabel,
+  resolveCurrencyPrefix,
+  resolveMayAlreadyOwnRelease,
+} from "@/app/(public)/release/release-detail-purchase-card-utils";
+import type { PricingMode } from "@/app/(public)/release/release-detail-purchase-card-utils";
 
 type ReleaseDetailPurchaseCardProps = {
   releaseId: string;
@@ -23,49 +27,6 @@ type ToastState = {
 
 const ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE =
   "ALREADY_OWNED_CONFIRMATION_REQUIRED";
-
-function formatMoney(currency: string, cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency || "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
-}
-
-function resolveCurrencyPrefix(currency: string) {
-  const normalizedCurrency = currency || "USD";
-  const parts = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: normalizedCurrency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).formatToParts(0);
-
-  const currencyPart = parts.find((part) => part.type === "currency")?.value?.trim();
-  return currencyPart && currencyPart.length > 0 ? currencyPart : normalizedCurrency;
-}
-
-function resolveBuyLabel(input: {
-  pricingMode: PricingMode;
-  currency: string;
-  fixedPriceCents: number | null;
-  minimumPriceCents: number | null;
-}) {
-  if (input.pricingMode === "FREE") {
-    return "Get for Free";
-  }
-
-  if (input.pricingMode === "FIXED") {
-    return `Buy ${formatMoney(input.currency, input.fixedPriceCents ?? 0)}`;
-  }
-
-  const minimum = input.minimumPriceCents ?? 0;
-  if (minimum <= 0) {
-    return "Pay What You Want";
-  }
-  return `Buy from ${formatMoney(input.currency, minimum)}`;
-}
 
 export default function ReleaseDetailPurchaseCard({
   releaseId,
@@ -89,8 +50,13 @@ export default function ReleaseDetailPurchaseCard({
   const [checkoutFormError, setCheckoutFormError] = useState<string | null>(null);
   const [alreadyOwnedWarning, setAlreadyOwnedWarning] = useState<string | null>(null);
   const [confirmAlreadyOwned, setConfirmAlreadyOwned] = useState(false);
-  const [mayAlreadyOwnRelease, setMayAlreadyOwnRelease] = useState(
-    initialMayOwnRelease,
+  const mayAlreadyOwnRelease = useMemo(
+    () =>
+      resolveMayAlreadyOwnRelease({
+        initialMayOwnRelease,
+        releaseId,
+      }),
+    [initialMayOwnRelease, releaseId],
   );
 
   const buyLabel = useMemo(
@@ -125,23 +91,6 @@ export default function ReleaseDetailPurchaseCard({
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [isCheckoutDialogOpen, isSubmitting]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    try {
-      setMayAlreadyOwnRelease((currentValue) => {
-        if (currentValue) {
-          return true;
-        }
-        return isReleaseOwnedInStorage(window.localStorage, releaseId);
-      });
-    } catch {
-      // No-op. Some browser contexts can block localStorage access.
-    }
-  }, [releaseId]);
 
   function openCheckoutDialog() {
     if (isSubmitting) {
