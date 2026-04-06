@@ -6,6 +6,7 @@ import { buyerTheme } from "@/app/buyer-theme";
 import ArtistBio from "@/app/release/artist-bio";
 import ReleaseDescription from "@/app/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/release/release-detail-purchase-card";
+import ReleaseTrackList from "@/app/release/release-track-list";
 import StorefrontHeader from "@/app/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
@@ -100,17 +101,6 @@ function formatReleaseType(value: string) {
     default:
       return "Album";
   }
-}
-
-function formatTrackDuration(durationMs: number | null) {
-  if (!durationMs || durationMs <= 0) {
-    return "0:00";
-  }
-
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
 }
 
 function formatTotalDuration(durationMs: number) {
@@ -263,6 +253,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           trackNumber: true,
           durationMs: true,
           artistOverride: true,
+          lyrics: true,
+          credits: true,
         },
       },
       _count: {
@@ -350,33 +342,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             {release.tracks.length === 0 ? (
               <div className={`${buyerTheme.statusNeutral} mt-4`}>No tracks published yet.</div>
             ) : (
-              <ol className="mt-4 divide-y divide-zinc-200">
-                {release.tracks.map((track) => (
-                  <li
-                    key={track.id}
-                    className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 py-3"
-                  >
-                    <span
-                      className="text-sm tabular-nums text-zinc-500"
-                      style={{ fontFamily: spaceMonoFontFamily }}
-                    >
-                      {String(track.trackNumber).padStart(2, "0")}
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium text-zinc-900">{track.title}</p>
-                      {track.artistOverride ? (
-                        <p className="text-xs text-zinc-500">{track.artistOverride}</p>
-                      ) : null}
-                    </div>
-                    <span
-                      className="text-sm tabular-nums text-zinc-600"
-                      style={{ fontFamily: spaceMonoFontFamily }}
-                    >
-                      {formatTrackDuration(track.durationMs)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <ReleaseTrackList tracks={release.tracks} />
             )}
           </article>
 

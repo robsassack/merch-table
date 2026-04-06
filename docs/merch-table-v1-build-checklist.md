@@ -254,8 +254,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Release detail page
 
-- [ ] Tracklist display with track metadata
-- [ ] Pricing UI for `FREE` / `FIXED` / `PWYW` modes
+- [x] Tracklist display with track metadata
+- [x] Pricing UI for `FREE` / `FIXED` / `PWYW` modes
 - [ ] Quality disclosure notice when only lossy files available
 - [ ] "You own this — go to your library" indicator with "Buy again" secondary option
 - [ ] Client-side owned-release detection via cookie/localStorage (UX hint only)
