@@ -39,7 +39,7 @@ export default function ReleaseDetailPurchaseCard({
   hasOnlyLossyDownloads,
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionButtonClass =
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-600";
+    "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
@@ -282,7 +282,7 @@ export default function ReleaseDetailPurchaseCard({
           type="button"
           disabled={isSubmitting}
           onClick={openCheckoutDialog}
-          className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-900`}
+          className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900`}
         >
           {isSubmitting ? "Working..." : buyLabel}
         </button>
@@ -396,7 +396,7 @@ export default function ReleaseDetailPurchaseCard({
                       value={pwywAmount}
                       onChange={(event) => setPwywAmount(event.target.value)}
                       disabled={isSubmitting}
-                      className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base font-medium text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                      className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base font-medium text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
                     />
                   </div>
                 </label>
@@ -418,7 +418,7 @@ export default function ReleaseDetailPurchaseCard({
                     }
                   }}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="you@example.com"
                 />
               </label>
@@ -439,7 +439,7 @@ export default function ReleaseDetailPurchaseCard({
                     }
                   }}
                   disabled={isSubmitting}
-                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-zinc-100"
+                  className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="Re-enter your email"
                 />
               </label>
@@ -483,7 +483,7 @@ export default function ReleaseDetailPurchaseCard({
                 type="button"
                 onClick={() => void onCheckoutSubmit()}
                 disabled={isSubmitting}
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:bg-emerald-300 disabled:text-emerald-900"
+                className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--release-accent)] px-4 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900"
               >
                 {isSubmitting
                   ? "Working..."
@@ -501,7 +501,7 @@ export default function ReleaseDetailPurchaseCard({
           className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
             toast.kind === "error"
               ? "border-amber-300 bg-amber-50 text-amber-900"
-              : "border-emerald-300 bg-emerald-50 text-emerald-900"
+              : "border-[var(--release-accent-soft)] bg-[var(--release-bg-start)] text-zinc-900"
           }`}
         >
           {toast.message}

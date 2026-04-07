@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import ArtistBio from "@/app/(public)/release/artist-bio";
+import ReleaseArtworkTheme from "@/app/(public)/release/release-artwork-theme";
 import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
@@ -305,6 +306,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
 
   const artistImageUrl = resolveOptionalImageUrl(release.artist.owner?.image);
   const totalDurationMs = release.tracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
+  const hasArtwork = resolveOptionalImageUrl(release.coverImageUrl) !== null;
+  const releaseCoverSrc = resolveCoverSrc(release.coverImageUrl);
   const cookieStore = await cookies();
   const hasOwnedReleaseHint = hasOwnedReleaseHintFromCookieStore(
     cookieStore,
@@ -312,7 +315,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   );
 
   return (
-    <div className={buyerTheme.page}>
+    <ReleaseArtworkTheme coverSrc={releaseCoverSrc} hasArtwork={hasArtwork}>
       <StorefrontHeader />
 
       <main className="mx-auto mb-12 w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -321,7 +324,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             <div className="mx-auto aspect-square w-full max-w-[26rem] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 lg:mx-0">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={resolveCoverSrc(release.coverImageUrl)}
+                src={releaseCoverSrc}
                 alt={`${release.title} cover`}
                 className="h-full w-full object-cover"
               />
@@ -336,7 +339,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-zinc-700">
                 <Link
                   href={`/artists/${release.artist.slug}`}
-                  className="font-medium text-zinc-900 transition hover:text-emerald-700"
+                  className="font-medium text-zinc-900 transition hover:text-[var(--release-accent-hover)]"
                 >
                   {release.artist.name}
                 </Link>
@@ -425,7 +428,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 <div className="mt-4">
                   <Link
                     href={`/artists/${release.artist.slug}`}
-                    className="inline-flex items-center rounded-xl border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-700 transition hover:border-zinc-400 hover:bg-zinc-100"
+                    className="inline-flex items-center rounded-xl border border-zinc-300 px-3 py-1.5 text-sm font-semibold text-zinc-700 transition hover:border-[var(--release-accent)] hover:bg-[var(--release-bg-start)]"
                   >
                     View Artist
                   </Link>
@@ -476,7 +479,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               Need help with this release? Contact{" "}
               <a
                 href={`mailto:${settings.contactEmail}`}
-                className="font-medium text-zinc-900 underline underline-offset-2 hover:text-emerald-700"
+                className="font-medium text-zinc-900 underline underline-offset-2 hover:text-[var(--release-accent-hover)]"
               >
                 {settings.contactEmail}
               </a>
@@ -485,6 +488,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           </section>
         ) : null}
       </main>
-    </div>
+    </ReleaseArtworkTheme>
   );
 }

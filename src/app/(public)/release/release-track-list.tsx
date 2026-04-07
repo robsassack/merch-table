@@ -91,7 +91,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                 <button
                   type="button"
                   onClick={() => setSelectedTrackId(track.id)}
-                  className="text-left transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70 focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  className="text-left transition hover:text-[var(--release-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                   aria-haspopup="dialog"
                 >
                   <p className="text-sm font-medium text-zinc-900 underline decoration-dotted underline-offset-4">
@@ -140,7 +140,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
               <button
                 type="button"
                 onClick={() => setSelectedTrackId(null)}
-                className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/70"
+                className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)]"
                 aria-label="Close track details dialog"
               >
                 <svg
