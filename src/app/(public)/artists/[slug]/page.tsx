@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
+import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
 const DEFAULT_COVER_SRC = "/default-artwork.png";
 
@@ -81,9 +82,62 @@ function formatReleaseDate(value: Date | null) {
 }
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Artist",
-};
+
+export async function generateMetadata({
+  params,
+}: ArtistDetailPageProps): Promise<Metadata> {
+  const resolvedParams = await params;
+  const slug = resolvedParams.slug?.trim();
+  if (!slug) {
+    return { title: { absolute: "Artist" } };
+  }
+
+  const settings = await prisma.storeSettings.findFirst({
+    select: {
+      organizationId: true,
+      storeName: true,
+      brandName: true,
+      organization: {
+        select: { name: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const brandLabel = resolveStorefrontBrandLabel({
+    storeName: settings?.storeName ?? null,
+    brandName: settings?.brandName ?? null,
+    organizationName: settings?.organization?.name ?? null,
+  });
+
+  const artist =
+    settings?.organizationId
+      ? await prisma.artist.findFirst({
+          where: {
+            organizationId: settings.organizationId,
+            slug,
+            deletedAt: null,
+          },
+          select: {
+            name: true,
+          },
+        })
+      : null;
+
+  if (!artist) {
+    return {
+      title: {
+        absolute: `Artist | ${brandLabel}`,
+      },
+    };
+  }
+
+  return {
+    title: {
+      absolute: `${artist.name} | ${brandLabel}`,
+    },
+  };
+}
 
 type ArtistDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -130,7 +184,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
           deletedAt: null,
           publishedAt: { not: null },
         },
-        orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+        orderBy: [{ releaseDate: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
         select: {
           id: true,
           title: true,

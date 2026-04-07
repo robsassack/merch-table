@@ -92,7 +92,7 @@ export default async function ArtistsPage() {
               deletedAt: null,
               publishedAt: { not: null },
             },
-            orderBy: [{ publishedAt: "desc" }, { createdAt: "desc" }],
+            orderBy: [{ releaseDate: "desc" }, { publishedAt: "desc" }, { createdAt: "desc" }],
             take: 3,
             select: {
               id: true,
