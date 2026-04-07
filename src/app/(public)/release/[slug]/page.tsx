@@ -6,13 +6,10 @@ import { notFound } from "next/navigation";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import ArtistBio from "@/app/(public)/release/artist-bio";
 import ReleaseArtworkTheme from "@/app/(public)/release/release-artwork-theme";
-import {
-  ReleaseAudioPlayerProvider,
-  type ReleaseAudioTrack,
-} from "@/app/(public)/release/release-audio-player";
+import { type ReleaseAudioTrack } from "@/app/(public)/release/release-audio-player";
+import ReleaseAudioPlayerConfigurator from "@/app/(public)/release/release-audio-player-configurator";
 import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
-import ReleaseFloatingPlayer from "@/app/(public)/release/release-floating-player";
 import ReleaseArtworkPlayToggle from "@/app/(public)/release/release-artwork-play-toggle";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
 import { resolveStorefrontPreviewAsset } from "@/lib/audio/preview-source";
@@ -128,6 +125,25 @@ function formatTotalDuration(durationMs: number) {
     return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
   }
   return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+function resolvePreviewTrackId(
+  tracks: ReleaseAudioTrack[],
+  featuredTrackId: string | null,
+) {
+  const playableTracks = tracks.filter((track) => track.isPlayablePreview);
+  if (playableTracks.length === 0) {
+    return null;
+  }
+
+  if (featuredTrackId) {
+    const featuredTrack = playableTracks.find((track) => track.id === featuredTrackId);
+    if (featuredTrack) {
+      return featuredTrack.id;
+    }
+  }
+
+  return playableTracks[0]?.id ?? null;
 }
 
 function sortDownloadFormats(formats: Array<"mp3" | "m4a" | "flac">) {
@@ -355,6 +371,13 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     previewFormat: track.previewFormat,
     previewUrl: `/api/release/tracks/${encodeURIComponent(track.id)}/preview`,
   }));
+  const releasePreviewTrackId = resolvePreviewTrackId(
+    releasePlayerTracks,
+    release.featuredTrackId,
+  );
+  const releasePlayablePreviewTrackIds = releasePlayerTracks
+    .filter((track) => track.isPlayablePreview)
+    .map((track) => track.id);
   const artistImageUrl = resolveOptionalImageUrl(release.artist.owner?.image);
   const totalDurationMs = releaseTracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
   const hasArtwork = resolveOptionalImageUrl(release.coverImageUrl) !== null;
@@ -370,13 +393,21 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
       <StorefrontHeader />
 
       <main className="mx-auto mb-12 w-full max-w-6xl px-4 pt-6 pb-36 sm:px-6 sm:pt-8 sm:pb-40">
-        <ReleaseAudioPlayerProvider
+        <ReleaseAudioPlayerConfigurator
           tracks={releasePlayerTracks}
           featuredTrackId={release.featuredTrackId}
-        >
-          <section className="sm:px-1">
+          coverSrc={releaseCoverSrc}
+          fallbackArtistName={release.artist.name}
+        />
+
+        <section className="sm:px-1">
             <div className="grid gap-5 lg:grid-cols-[minmax(220px,380px)_1fr]">
-              <ReleaseArtworkPlayToggle coverSrc={releaseCoverSrc} releaseTitle={release.title} />
+              <ReleaseArtworkPlayToggle
+                coverSrc={releaseCoverSrc}
+                releaseTitle={release.title}
+                previewTrackId={releasePreviewTrackId}
+                playablePreviewTrackIds={releasePlayablePreviewTrackIds}
+              />
 
               <div className="flex flex-col">
                 <p
@@ -415,6 +446,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 <div className="mt-5">
                   <ReleaseDetailPurchaseCard
                     releaseId={release.id}
+                    previewTrackId={releasePreviewTrackId}
+                    playablePreviewTrackIds={releasePlayablePreviewTrackIds}
                     pricingMode={release.pricingMode}
                     currency={release.currency}
                     fixedPriceCents={release.fixedPriceCents}
@@ -525,8 +558,6 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               </article>
             </div>
           </section>
-          <ReleaseFloatingPlayer coverSrc={releaseCoverSrc} fallbackArtistName={release.artist.name} />
-        </ReleaseAudioPlayerProvider>
 
         {settings.contactEmail ? (
           <section className="mt-8">

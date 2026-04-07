@@ -17,11 +17,6 @@ function formatClockTime(seconds: number) {
   return `${minutes}:${String(remainder).padStart(2, "0")}`;
 }
 
-type ReleaseFloatingPlayerProps = {
-  coverSrc: string;
-  fallbackArtistName: string;
-};
-
 type AutoScrollTextProps = {
   text: string;
   className: string;
@@ -180,12 +175,11 @@ function AutoScrollText({
   );
 }
 
-export default function ReleaseFloatingPlayer({
-  coverSrc,
-  fallbackArtistName,
-}: ReleaseFloatingPlayerProps) {
+export default function ReleaseFloatingPlayer() {
   const {
     tracks,
+    releaseCoverSrc,
+    releaseFallbackArtistName,
     activeTrackId,
     activeTrack,
     hasPlayableTracks,
@@ -385,7 +379,7 @@ export default function ReleaseFloatingPlayer({
           <div className="flex min-w-0 items-center gap-3 md:w-[16rem] lg:w-[18rem]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={coverSrc}
+              src={releaseCoverSrc ?? "/default-artwork.png"}
               alt=""
               className="h-14 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover"
             />
@@ -395,7 +389,7 @@ export default function ReleaseFloatingPlayer({
                 className="text-[1.05rem] font-semibold text-zinc-900"
               />
               <AutoScrollText
-                text={activeTrack?.artistName ?? fallbackArtistName}
+                text={activeTrack?.artistName ?? releaseFallbackArtistName ?? "Unknown artist"}
                 className="text-zinc-600"
                 speedPxPerSecond={20}
               />

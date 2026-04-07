@@ -22,10 +22,19 @@ export type ReleaseAudioTrack = {
   isPlayablePreview: boolean;
 };
 
+export type ReleaseAudioPlayerConfig = {
+  tracks: ReleaseAudioTrack[];
+  featuredTrackId: string | null;
+  coverSrc: string;
+  fallbackArtistName: string;
+};
+
 type ReleaseAudioPlayerContextValue = {
   tracks: ReleaseAudioTrack[];
   hasPlayableTracks: boolean;
   hasPlaybackStarted: boolean;
+  releaseCoverSrc: string | null;
+  releaseFallbackArtistName: string | null;
   activeTrackId: string | null;
   activeTrack: ReleaseAudioTrack | null;
   isPlaying: boolean;
@@ -37,11 +46,10 @@ type ReleaseAudioPlayerContextValue = {
   seekToFraction: (value: number) => void;
   beginVisualPlaybackHold: () => void;
   endVisualPlaybackHold: () => void;
+  configureReleasePlayback: (config: ReleaseAudioPlayerConfig) => void;
 };
 
 type ReleaseAudioPlayerProviderProps = {
-  tracks: ReleaseAudioTrack[];
-  featuredTrackId: string | null;
   children: React.ReactNode;
 };
 
@@ -101,19 +109,25 @@ function normalizeHowlerFormat(value: string | null) {
   return null;
 }
 
-export function ReleaseAudioPlayerProvider({
-  tracks,
-  featuredTrackId,
-  children,
-}: ReleaseAudioPlayerProviderProps) {
+export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProviderProps) {
+  const [catalogTracks, setCatalogTracks] = useState<ReleaseAudioTrack[]>([]);
+  const [queueTracks, setQueueTracks] = useState<ReleaseAudioTrack[]>([]);
+  const [queueFeaturedTrackId, setQueueFeaturedTrackId] = useState<string | null>(null);
+  const [releaseCoverSrc, setReleaseCoverSrc] = useState<string | null>(null);
+  const [releaseFallbackArtistName, setReleaseFallbackArtistName] = useState<string | null>(null);
+  const trackConfigByTrackIdRef = useRef<Map<string, ReleaseAudioPlayerConfig>>(new Map());
+
   const playableTracks = useMemo(
-    () => tracks.filter((track) => track.isPlayablePreview),
-    [tracks],
+    () => queueTracks.filter((track) => track.isPlayablePreview),
+    [queueTracks],
   );
-  const trackById = useMemo(() => new Map(tracks.map((track) => [track.id, track])), [tracks]);
+  const trackById = useMemo(
+    () => new Map(catalogTracks.map((track) => [track.id, track])),
+    [catalogTracks],
+  );
   const defaultTrackId = useMemo(
-    () => resolveDefaultTrackId(tracks, featuredTrackId),
-    [featuredTrackId, tracks],
+    () => resolveDefaultTrackId(queueTracks, queueFeaturedTrackId),
+    [queueFeaturedTrackId, queueTracks],
   );
   const hasPlayableTracks = defaultTrackId !== null;
 
@@ -196,6 +210,22 @@ export function ReleaseAudioPlayerProvider({
       const requestedTrack = trackById.get(trackId);
       if (!requestedTrack || !requestedTrack.isPlayablePreview) {
         return;
+      }
+
+      const owningConfig = trackConfigByTrackIdRef.current.get(requestedTrack.id) ?? null;
+      let playbackQueue = playableTracks;
+      if (owningConfig) {
+        playbackQueue = owningConfig.tracks.filter((track) => track.isPlayablePreview);
+        const isQueueDifferent =
+          owningConfig.tracks.length !== queueTracks.length ||
+          owningConfig.tracks.some((track, index) => queueTracks[index]?.id !== track.id);
+
+        if (isQueueDifferent) {
+          setQueueTracks(owningConfig.tracks);
+          setQueueFeaturedTrackId(owningConfig.featuredTrackId);
+        }
+        setReleaseCoverSrc(owningConfig.coverSrc);
+        setReleaseFallbackArtistName(owningConfig.fallbackArtistName);
       }
 
       const currentHowl = howlRef.current;
@@ -306,11 +336,11 @@ export function ReleaseAudioPlayerProvider({
             return;
           }
 
-          const finishedTrackIndex = playableTracks.findIndex(
+          const finishedTrackIndex = playbackQueue.findIndex(
             (track) => track.id === requestedTrack.id,
           );
           const nextPlayableTrack =
-            finishedTrackIndex >= 0 ? playableTracks[finishedTrackIndex + 1] ?? null : null;
+            finishedTrackIndex >= 0 ? playbackQueue[finishedTrackIndex + 1] ?? null : null;
           if (nextPlayableTrack) {
             playTrackRef.current(nextPlayableTrack.id);
             return;
@@ -350,6 +380,7 @@ export function ReleaseAudioPlayerProvider({
       runProgressLoop,
       resolvedActiveTrackId,
       playableTracks,
+      queueTracks,
       stopAndUnloadHowl,
       stopProgressLoop,
       trackById,
@@ -406,6 +437,46 @@ export function ReleaseAudioPlayerProvider({
     setVisualPlaybackHoldCount((current) => (current > 0 ? current - 1 : 0));
   }, []);
 
+  const configureReleasePlayback = useCallback(
+    (config: ReleaseAudioPlayerConfig) => {
+      for (const track of config.tracks) {
+        trackConfigByTrackIdRef.current.set(track.id, config);
+      }
+
+      setCatalogTracks((current) => {
+        const nextById = new Map(current.map((track) => [track.id, track]));
+        for (const track of config.tracks) {
+          nextById.set(track.id, track);
+        }
+
+        return Array.from(nextById.values());
+      });
+
+      if (hasPlaybackStarted) {
+        return;
+      }
+
+      const nextDefaultTrackId = resolveDefaultTrackId(config.tracks, config.featuredTrackId);
+      setQueueTracks(config.tracks);
+      setQueueFeaturedTrackId(config.featuredTrackId);
+      setReleaseCoverSrc(config.coverSrc);
+      setReleaseFallbackArtistName(config.fallbackArtistName);
+      setActiveTrackId((current) => {
+        if (!current) {
+          return nextDefaultTrackId;
+        }
+
+        const currentTrack = config.tracks.find((track) => track.id === current);
+        if (currentTrack?.isPlayablePreview) {
+          return current;
+        }
+
+        return nextDefaultTrackId;
+      });
+    },
+    [hasPlaybackStarted],
+  );
+
   const isPlaybackVisuallyActive = isPlaying || visualPlaybackHoldCount > 0;
 
   useEffect(() => {
@@ -435,9 +506,11 @@ export function ReleaseAudioPlayerProvider({
 
   const contextValue = useMemo<ReleaseAudioPlayerContextValue>(
     () => ({
-      tracks,
+      tracks: queueTracks,
       hasPlayableTracks,
       hasPlaybackStarted,
+      releaseCoverSrc,
+      releaseFallbackArtistName,
       activeTrackId: resolvedActiveTrackId,
       activeTrack,
       isPlaying,
@@ -449,11 +522,13 @@ export function ReleaseAudioPlayerProvider({
       seekToFraction,
       beginVisualPlaybackHold,
       endVisualPlaybackHold,
+      configureReleasePlayback,
     }),
     [
       activeTrack,
       resolvedActiveTrackId,
       beginVisualPlaybackHold,
+      configureReleasePlayback,
       currentTimeSeconds,
       durationSeconds,
       endVisualPlaybackHold,
@@ -461,10 +536,12 @@ export function ReleaseAudioPlayerProvider({
       hasPlaybackStarted,
       isPlaying,
       isPlaybackVisuallyActive,
+      releaseCoverSrc,
+      releaseFallbackArtistName,
       playTrack,
       seekToFraction,
       toggleActiveTrackPlayback,
-      tracks,
+      queueTracks,
     ],
   );
 

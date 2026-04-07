@@ -12,6 +12,8 @@ import type { PricingMode } from "@/app/(public)/release/release-detail-purchase
 
 type ReleaseDetailPurchaseCardProps = {
   releaseId: string;
+  previewTrackId: string | null;
+  playablePreviewTrackIds: string[];
   pricingMode: PricingMode;
   currency: string;
   fixedPriceCents: number | null;
@@ -31,6 +33,8 @@ const ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE =
 
 export default function ReleaseDetailPurchaseCard({
   releaseId,
+  previewTrackId,
+  playablePreviewTrackIds,
   pricingMode,
   currency,
   fixedPriceCents,
@@ -41,7 +45,7 @@ export default function ReleaseDetailPurchaseCard({
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
-  const { hasPlayableTracks, isPlaybackVisuallyActive, toggleActiveTrackPlayback } =
+  const { activeTrackId, isPlaybackVisuallyActive, playTrack } =
     useReleaseAudioPlayer();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -79,9 +83,13 @@ export default function ReleaseDetailPurchaseCard({
   );
 
   const pwywCurrencyPrefix = useMemo(() => resolveCurrencyPrefix(currency), [currency]);
-  const playbackButtonLabel = !hasPlayableTracks
+  const hasPreviewTrack = previewTrackId !== null;
+  const isCurrentReleaseTrackActive = Boolean(
+    activeTrackId && playablePreviewTrackIds.includes(activeTrackId),
+  );
+  const playbackButtonLabel = !hasPreviewTrack
     ? "No Preview"
-    : isPlaybackVisuallyActive
+    : isCurrentReleaseTrackActive && isPlaybackVisuallyActive
       ? "Pause"
       : "Play";
 
@@ -274,9 +282,22 @@ export default function ReleaseDetailPurchaseCard({
       <div className="flex flex-wrap items-center gap-2.5">
         <button
           type="button"
-          disabled={!hasPlayableTracks}
+          disabled={!hasPreviewTrack}
           className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900`}
-          onClick={toggleActiveTrackPlayback}
+          onClick={() => {
+            if (!hasPreviewTrack) {
+              return;
+            }
+
+            if (activeTrackId && playablePreviewTrackIds.includes(activeTrackId)) {
+              playTrack(activeTrackId);
+              return;
+            }
+
+            if (previewTrackId) {
+              playTrack(previewTrackId);
+            }
+          }}
         >
           <svg
             aria-hidden="true"
@@ -288,7 +309,7 @@ export default function ReleaseDetailPurchaseCard({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            {isPlaybackVisuallyActive ? (
+            {isCurrentReleaseTrackActive && isPlaybackVisuallyActive ? (
               <path d="M9 6v12M15 6v12" />
             ) : (
               <path d="M8 6.5v11l9-5.5-9-5.5Z" />

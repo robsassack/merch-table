@@ -32,6 +32,17 @@ type ReleasePalette = {
   bgEnd: string;
 };
 
+const RELEASE_THEME_VARIABLE_ENTRIES: Array<[`--release-${string}`, keyof ReleasePalette]> = [
+  ["--release-accent", "accent"],
+  ["--release-accent-hover", "accentHover"],
+  ["--release-accent-soft", "accentSoft"],
+  ["--release-accent-contrast", "accentContrast"],
+  ["--release-accent-text", "accentText"],
+  ["--release-bg-start", "bgStart"],
+  ["--release-bg-mid", "bgMid"],
+  ["--release-bg-end", "bgEnd"],
+];
+
 const DEFAULT_PALETTE: ReleasePalette = {
   accent: "rgb(51 65 85)",
   accentHover: "rgb(30 41 59)",
@@ -424,6 +435,28 @@ export default function ReleaseArtworkTheme({
   }, [coverSrc, hasArtwork]);
 
   const activePalette = hasArtwork ? palette : BRAND_FALLBACK_PALETTE;
+
+  useEffect(() => {
+    const rootStyle = document.documentElement.style;
+    const previousValues = new Map<string, string>();
+
+    for (const [variableName, paletteKey] of RELEASE_THEME_VARIABLE_ENTRIES) {
+      previousValues.set(variableName, rootStyle.getPropertyValue(variableName));
+      rootStyle.setProperty(variableName, activePalette[paletteKey]);
+    }
+
+    return () => {
+      for (const [variableName] of RELEASE_THEME_VARIABLE_ENTRIES) {
+        const previousValue = previousValues.get(variableName);
+        if (previousValue && previousValue.trim().length > 0) {
+          rootStyle.setProperty(variableName, previousValue);
+          continue;
+        }
+
+        rootStyle.removeProperty(variableName);
+      }
+    };
+  }, [activePalette]);
 
   const style = useMemo(
     () =>
