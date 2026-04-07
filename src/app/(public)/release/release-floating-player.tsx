@@ -204,6 +204,8 @@ export default function ReleaseFloatingPlayer() {
   });
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubPercent, setScrubPercent] = useState(0);
+  const [playerHeight, setPlayerHeight] = useState(0);
+  const playerWrapperRef = useRef<HTMLDivElement | null>(null);
   const isScrubbingRef = useRef(false);
   const scrubPercentRef = useRef(0);
   const resumeAfterScrubRef = useRef(false);
@@ -361,184 +363,229 @@ export default function ReleaseFloatingPlayer() {
     };
   }, [endVisualPlaybackHold]);
 
+  useEffect(() => {
+    if (!hasPlayableTracks) {
+      setPlayerHeight(0);
+      return;
+    }
+
+    const wrapperElement = playerWrapperRef.current;
+    if (!wrapperElement) {
+      setPlayerHeight(0);
+      return;
+    }
+
+    const updateHeight = () => {
+      const nextHeight = wrapperElement.getBoundingClientRect().height;
+      setPlayerHeight(nextHeight > 0 ? Math.ceil(nextHeight) : 0);
+    };
+
+    updateHeight();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", updateHeight);
+      return () => {
+        window.removeEventListener("resize", updateHeight);
+      };
+    }
+
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(wrapperElement);
+    return () => {
+      observer.disconnect();
+    };
+  }, [hasPlayableTracks]);
+
   if (!hasPlayableTracks) {
     return null;
   }
 
+  const reservedBottomSpacePx = hasPlaybackStarted ? playerHeight : 0;
+
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4">
+    <>
       <div
-        aria-hidden={!hasPlaybackStarted}
-        className={`mx-auto w-full max-w-6xl rounded-2xl border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-2xl backdrop-blur transition-all duration-300 ease-out sm:px-4 sm:py-3 ${
-          hasPlaybackStarted
-            ? "pointer-events-auto translate-y-0 opacity-100"
-            : "pointer-events-none translate-y-6 opacity-0"
-        }`}
+        aria-hidden="true"
+        className="pointer-events-none transition-[height] duration-300 ease-out"
+        style={{ height: `${reservedBottomSpacePx}px` }}
+      />
+      <div
+        ref={playerWrapperRef}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:px-4 sm:pb-4"
       >
-        <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-5">
-          <div className="flex min-w-0 items-center gap-3 md:w-[16rem] lg:w-[18rem]">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={releaseCoverSrc ?? "/default-artwork.png"}
-              alt=""
-              className="h-14 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover"
-            />
-            <div className="min-w-0">
-              <AutoScrollText
-                text={activeTrack?.title ?? "No preview track selected"}
-                className="text-[1.05rem] font-semibold text-zinc-900"
+        <div
+          aria-hidden={!hasPlaybackStarted}
+          className={`mx-auto w-full max-w-6xl rounded-2xl border border-zinc-200 bg-white/95 px-3 py-2.5 shadow-2xl backdrop-blur transition-all duration-300 ease-out sm:px-4 sm:py-3 ${
+            hasPlaybackStarted
+              ? "pointer-events-auto translate-y-0 opacity-100"
+              : "pointer-events-none translate-y-6 opacity-0"
+          }`}
+        >
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-5">
+            <div className="flex min-w-0 items-center gap-3 md:w-[16rem] lg:w-[18rem]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={releaseCoverSrc ?? "/default-artwork.png"}
+                alt=""
+                className="h-14 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover"
               />
-              <AutoScrollText
-                text={activeTrack?.artistName ?? releaseFallbackArtistName ?? "Unknown artist"}
-                className="text-zinc-600"
-                speedPxPerSecond={20}
-              />
-            </div>
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center justify-center gap-4">
-              <button
-                type="button"
-                onClick={onPreviousTrack}
-                disabled={!hasPreviousTrack}
-                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Previous track"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-[1.35rem] w-[1.35rem]"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M6.5 6v12M17.5 6 9.5 12l8 6V6Z" />
-                </svg>
-              </button>
-
-              <button
-                type="button"
-                onClick={toggleActiveTrackPlayback}
-                className="inline-flex h-[2.8rem] w-[2.8rem] cursor-pointer items-center justify-center rounded-full bg-[var(--release-accent)] text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]"
-                aria-label={playbackButtonLabel}
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className={`h-7 w-7 ${isPlaybackVisuallyActive ? "" : "translate-x-[0.5px]"}`}
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.85"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  {isPlaybackVisuallyActive ? (
-                    <path d="M9 6v12M15 6v12" />
-                  ) : (
-                    <path d="M8 6.5v11l9-5.5-9-5.5Z" />
-                  )}
-                </svg>
-              </button>
-
-              <button
-                type="button"
-                onClick={onNextTrack}
-                disabled={!hasNextTrack}
-                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
-                aria-label="Next track"
-              >
-                <svg
-                  aria-hidden="true"
-                  viewBox="0 0 24 24"
-                  className="h-[1.35rem] w-[1.35rem]"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M17.5 6v12M6.5 6l8 6-8 6V6Z" />
-                </svg>
-              </button>
+              <div className="min-w-0">
+                <AutoScrollText
+                  text={activeTrack?.title ?? "No preview track selected"}
+                  className="text-[1.05rem] font-semibold text-zinc-900"
+                />
+                <AutoScrollText
+                  text={activeTrack?.artistName ?? releaseFallbackArtistName ?? "Unknown artist"}
+                  className="text-zinc-600"
+                  speedPxPerSecond={20}
+                />
+              </div>
             </div>
 
-            <div className="mt-1.5 flex items-center gap-2 text-[0.92rem] text-zinc-500">
-              <span className="w-10 text-right tabular-nums tracking-tight">
-                {formatClockTime(displayedCurrentTimeSeconds)}
-              </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={onPreviousTrack}
+                  disabled={!hasPreviousTrack}
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Previous track"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-[1.35rem] w-[1.35rem]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M6.5 6v12M17.5 6 9.5 12l8 6V6Z" />
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={toggleActiveTrackPlayback}
+                  className="inline-flex h-[2.8rem] w-[2.8rem] cursor-pointer items-center justify-center rounded-full bg-[var(--release-accent)] text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]"
+                  aria-label={playbackButtonLabel}
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className={`h-7 w-7 ${isPlaybackVisuallyActive ? "" : "translate-x-[0.5px]"}`}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.85"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    {isPlaybackVisuallyActive ? (
+                      <path d="M9 6v12M15 6v12" />
+                    ) : (
+                      <path d="M8 6.5v11l9-5.5-9-5.5Z" />
+                    )}
+                  </svg>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onNextTrack}
+                  disabled={!hasNextTrack}
+                  className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                  aria-label="Next track"
+                >
+                  <svg
+                    aria-hidden="true"
+                    viewBox="0 0 24 24"
+                    className="h-[1.35rem] w-[1.35rem]"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M17.5 6v12M6.5 6l8 6-8 6V6Z" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="mt-1.5 flex items-center gap-2 text-[0.92rem] text-zinc-500">
+                <span className="w-10 text-right tabular-nums tracking-tight">
+                  {formatClockTime(displayedCurrentTimeSeconds)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={displayedProgressPercent}
+                  style={progressRangeStyle}
+                  onInput={(event) => {
+                    onProgressInput(Number((event.target as HTMLInputElement).value));
+                  }}
+                  onChange={(event) => {
+                    onProgressInput(Number(event.target.value));
+                  }}
+                  onPointerDown={onScrubStart}
+                  onPointerUp={onScrubEnd}
+                  onPointerCancel={onScrubEnd}
+                  onBlur={onScrubEnd}
+                  disabled={resolvedDurationSeconds <= 0}
+                  className="release-player-range h-1.5 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
+                  aria-label="Preview playback progress"
+                />
+                <span className="w-10 text-left tabular-nums tracking-tight">
+                  {formatClockTime(resolvedDurationSeconds)}
+                </span>
+              </div>
+            </div>
+
+            <div className="hidden items-center justify-center gap-2 md:flex md:w-[16rem] lg:w-[18rem]">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-6 w-6 shrink-0 stroke-zinc-600"
+                fill="none"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 14h3l4 3V7l-4 3H4v4Z" />
+                {volumeIconLevel === "mute" ? null : volumeIconLevel === "low" ? (
+                  <path d="M15 10.5a3 3 0 0 1 0 3" />
+                ) : volumeIconLevel === "medium" ? (
+                  <>
+                    <path d="M15 10.5a3 3 0 0 1 0 3" />
+                    <path d="M17.5 9a5.5 5.5 0 0 1 0 6" />
+                  </>
+                ) : (
+                  <>
+                    <path d="M15 10.5a3 3 0 0 1 0 3" />
+                    <path d="M17.5 9a5.5 5.5 0 0 1 0 6" />
+                    <path d="M20 7.5a7.5 7.5 0 0 1 0 9" />
+                  </>
+                )}
+              </svg>
               <input
                 type="range"
                 min={0}
                 max={100}
-                value={displayedProgressPercent}
-                style={progressRangeStyle}
-                onInput={(event) => {
-                  onProgressInput(Number((event.target as HTMLInputElement).value));
-                }}
+                value={volumePercent}
+                style={volumeRangeStyle}
                 onChange={(event) => {
-                  onProgressInput(Number(event.target.value));
+                  const nextVolume = Number(event.target.value);
+                  if (!Number.isFinite(nextVolume)) {
+                    return;
+                  }
+                  const clamped = Math.max(0, Math.min(100, nextVolume));
+                  setVolumePercent(clamped);
+                  Howler.volume(clamped / 100);
                 }}
-                onPointerDown={onScrubStart}
-                onPointerUp={onScrubEnd}
-                onPointerCancel={onScrubEnd}
-                onBlur={onScrubEnd}
-                disabled={resolvedDurationSeconds <= 0}
-                className="release-player-range h-1.5 w-full cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                aria-label="Preview playback progress"
+                className="release-player-range hidden h-1.5 w-28 cursor-pointer sm:w-32 md:block"
+                aria-label="Player volume"
               />
-              <span className="w-10 text-left tabular-nums tracking-tight">
-                {formatClockTime(resolvedDurationSeconds)}
-              </span>
             </div>
-          </div>
-
-          <div className="hidden items-center justify-center gap-2 md:flex md:w-[16rem] lg:w-[18rem]">
-            <svg
-              aria-hidden="true"
-              viewBox="0 0 24 24"
-              className="h-6 w-6 shrink-0 stroke-zinc-600"
-              fill="none"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            >
-              <path d="M4 14h3l4 3V7l-4 3H4v4Z" />
-              {volumeIconLevel === "mute" ? null : volumeIconLevel === "low" ? (
-                <path d="M15 10.5a3 3 0 0 1 0 3" />
-              ) : volumeIconLevel === "medium" ? (
-                <>
-                  <path d="M15 10.5a3 3 0 0 1 0 3" />
-                  <path d="M17.5 9a5.5 5.5 0 0 1 0 6" />
-                </>
-              ) : (
-                <>
-                  <path d="M15 10.5a3 3 0 0 1 0 3" />
-                  <path d="M17.5 9a5.5 5.5 0 0 1 0 6" />
-                  <path d="M20 7.5a7.5 7.5 0 0 1 0 9" />
-                </>
-              )}
-            </svg>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={volumePercent}
-              style={volumeRangeStyle}
-              onChange={(event) => {
-                const nextVolume = Number(event.target.value);
-                if (!Number.isFinite(nextVolume)) {
-                  return;
-                }
-                const clamped = Math.max(0, Math.min(100, nextVolume));
-                setVolumePercent(clamped);
-                Howler.volume(clamped / 100);
-              }}
-              className="release-player-range hidden h-1.5 w-28 cursor-pointer sm:w-32 md:block"
-              aria-label="Player volume"
-            />
           </div>
         </div>
       </div>
@@ -603,6 +650,6 @@ export default function ReleaseFloatingPlayer() {
           will-change: transform;
         }
       `}</style>
-    </div>
+    </>
   );
 }
