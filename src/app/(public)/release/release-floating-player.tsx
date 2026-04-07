@@ -402,7 +402,7 @@ export default function ReleaseFloatingPlayer() {
                 type="button"
                 onClick={onPreviousTrack}
                 disabled={!hasPreviousTrack}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Previous track"
               >
                 <svg
@@ -447,7 +447,7 @@ export default function ReleaseFloatingPlayer() {
                 type="button"
                 onClick={onNextTrack}
                 disabled={!hasNextTrack}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Next track"
               >
                 <svg
