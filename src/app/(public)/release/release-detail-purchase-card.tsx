@@ -132,11 +132,6 @@ export default function ReleaseDetailPurchaseCard({
     const normalizedConfirmEmail = confirmEmail.trim().toLowerCase();
     const hasEmail = normalizedEmail.length > 0;
 
-    if (pricingMode === "FREE" && !hasEmail) {
-      setCheckoutFormError("Email is required for the free library link.");
-      return;
-    }
-
     if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setCheckoutFormError("Enter a valid email address.");
       return;
@@ -146,11 +141,6 @@ export default function ReleaseDetailPurchaseCard({
       setCheckoutFormError("Email addresses do not match.");
       return;
     }
-    if (pricingMode !== "FREE" && alreadyOwnedWarning && !confirmAlreadyOwned) {
-      setCheckoutFormError("Please confirm to continue with a repeat purchase.");
-      return;
-    }
-
     let amountCents: number | undefined = undefined;
     if (pricingMode === "PWYW") {
       const minimum = minimumPriceCents ?? 0;
@@ -166,12 +156,24 @@ export default function ReleaseDetailPurchaseCard({
         return;
       }
     }
+    const shouldUseFreeCheckout =
+      pricingMode === "FREE" || (pricingMode === "PWYW" && amountCents === 0);
+
+    if (shouldUseFreeCheckout && !hasEmail) {
+      setCheckoutFormError("Email is required for the free library link.");
+      return;
+    }
+
+    if (!shouldUseFreeCheckout && alreadyOwnedWarning && !confirmAlreadyOwned) {
+      setCheckoutFormError("Please confirm to continue with a repeat purchase.");
+      return;
+    }
 
     setIsSubmitting(true);
     setToast(null);
     setCheckoutFormError(null);
     try {
-      if (pricingMode === "FREE") {
+      if (shouldUseFreeCheckout) {
         const response = await fetch("/api/checkout/free", {
           method: "POST",
           headers: {

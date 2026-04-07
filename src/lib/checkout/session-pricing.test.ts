@@ -43,7 +43,7 @@ describe("checkout session pricing", () => {
     assert.equal(result.error, "PWYW amount must be at least 200 cents.");
   });
 
-  it("rejects PWYW amount below system floor", () => {
+  it("rejects PWYW amounts between zero and floor when release minimum is zero", () => {
     const result = resolveCheckoutAmountCents({
       pricingMode: "PWYW",
       floorCents: 50,
@@ -54,7 +54,36 @@ describe("checkout session pricing", () => {
     });
 
     assert.equal(result.ok, false);
-    assert.equal(result.error, "PWYW amount must be at least 50 cents.");
+    assert.equal(
+      result.error,
+      "For PWYW, enter 0 cents for a free checkout or at least 50 cents for Stripe checkout.",
+    );
+  });
+
+  it("allows a zero-dollar PWYW checkout when release minimum is zero", () => {
+    const result = resolveCheckoutAmountCents({
+      pricingMode: "PWYW",
+      floorCents: 50,
+      priceCents: 0,
+      fixedPriceCents: null,
+      minimumPriceCents: 0,
+      pwywAmountCents: 0,
+    });
+
+    assert.deepEqual(result, { ok: true, amountCents: 0 });
+  });
+
+  it("allows PWYW amounts at or above floor when release minimum is zero", () => {
+    const result = resolveCheckoutAmountCents({
+      pricingMode: "PWYW",
+      floorCents: 50,
+      priceCents: 0,
+      fixedPriceCents: null,
+      minimumPriceCents: 0,
+      pwywAmountCents: 50,
+    });
+
+    assert.deepEqual(result, { ok: true, amountCents: 50 });
   });
 
   it("defaults PWYW amount to release minimum when omitted", () => {

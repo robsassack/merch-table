@@ -89,7 +89,18 @@ export function resolveCheckoutAmountCents(
     };
   }
 
-  if (selectedAmount < input.floorCents) {
+  if (
+    configuredMinimum === 0 &&
+    selectedAmount > 0 &&
+    selectedAmount < input.floorCents
+  ) {
+    return {
+      ok: false,
+      error: `For PWYW, enter 0 cents for a free checkout or at least ${input.floorCents} cents for Stripe checkout.`,
+    };
+  }
+
+  if (configuredMinimum !== 0 && selectedAmount < input.floorCents) {
     return {
       ok: false,
       error: `PWYW amount must be at least ${input.floorCents} cents.`,

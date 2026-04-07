@@ -108,7 +108,10 @@ export async function POST(request: Request) {
         organizationId: settings.organizationId,
         status: "PUBLISHED",
         deletedAt: null,
-        pricingMode: "FREE",
+        OR: [
+          { pricingMode: "FREE" },
+          { pricingMode: "PWYW", minimumPriceCents: 0 },
+        ],
       },
       select: {
         id: true,
