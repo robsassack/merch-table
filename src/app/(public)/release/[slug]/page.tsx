@@ -12,6 +12,17 @@ import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
 import ReleaseArtworkPlayToggle from "@/app/(public)/release/release-artwork-play-toggle";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
+import {
+  formatReleaseDate,
+  formatReleaseType,
+  formatReleaseYear,
+  formatTotalDuration,
+  resolveCoverSrc,
+  resolveInitials,
+  resolveOptionalImageUrl,
+  resolvePreviewTrackId,
+  sortDownloadFormats,
+} from "@/app/(public)/release/release-detail-page-utils";
 import { resolveStorefrontPreviewAsset } from "@/lib/audio/preview-source";
 import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
 import { hasOwnedReleaseHintFromCookieStore } from "@/lib/checkout/owned-release-hint-cookie";
@@ -20,141 +31,9 @@ import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
-const DEFAULT_COVER_SRC = "/default-artwork.png";
-
 type ReleaseDetailPageProps = {
   params: Promise<{ slug: string }>;
 };
-
-function resolveCoverSrc(coverImageUrl: string | null) {
-  if (!coverImageUrl) {
-    return DEFAULT_COVER_SRC;
-  }
-  return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
-}
-
-function resolveOptionalImageUrl(value: string | null | undefined) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
-
-function resolveInitials(name: string) {
-  const parts = name
-    .trim()
-    .split(/\s+/)
-    .filter((part) => part.length > 0)
-    .slice(0, 2);
-
-  if (parts.length === 0) {
-    return "A";
-  }
-
-  return parts.map((part) => part[0]?.toUpperCase() ?? "").join("");
-}
-
-function formatReleaseDate(value: Date | null) {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  }).format(value);
-}
-
-function formatReleaseYear(value: Date | null) {
-  if (!value) {
-    return null;
-  }
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-  }).format(value);
-}
-
-function formatReleaseType(value: string) {
-  const normalized = value.trim();
-  if (normalized.length === 0) {
-    return "Album";
-  }
-
-  switch (normalized) {
-    case "ALBUM":
-      return "Album";
-    case "EP":
-      return "EP";
-    case "SINGLE":
-      return "Single";
-    case "COMPILATION":
-      return "Compilation";
-    case "MIXTAPE":
-      return "Mixtape";
-    case "LIVE_ALBUM":
-      return "Live Album";
-    case "SOUNDTRACK_SCORE":
-      return "Soundtrack / Score";
-    case "DEMO":
-      return "Demo";
-    case "BOOTLEG":
-      return "Bootleg";
-    case "REMIX":
-      return "Remix";
-    case "OTHER":
-      return "Other";
-    default:
-      return "Album";
-  }
-}
-
-function formatTotalDuration(durationMs: number) {
-  if (durationMs <= 0) {
-    return "0:00";
-  }
-
-  const totalSeconds = Math.floor(durationMs / 1000);
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-  }
-  return `${minutes}:${String(seconds).padStart(2, "0")}`;
-}
-
-function resolvePreviewTrackId(
-  tracks: ReleaseAudioTrack[],
-  featuredTrackId: string | null,
-) {
-  const playableTracks = tracks.filter((track) => track.isPlayablePreview);
-  if (playableTracks.length === 0) {
-    return null;
-  }
-
-  if (featuredTrackId) {
-    const featuredTrack = playableTracks.find((track) => track.id === featuredTrackId);
-    if (featuredTrack) {
-      return featuredTrack.id;
-    }
-  }
-
-  return playableTracks[0]?.id ?? null;
-}
-
-function sortDownloadFormats(formats: Array<"mp3" | "m4a" | "flac">) {
-  const priority: Record<"mp3" | "m4a" | "flac", number> = {
-    flac: 0,
-    m4a: 1,
-    mp3: 2,
-  };
-
-  return [...formats].sort((a, b) => priority[a] - priority[b]);
-}
 
 const spaceMonoFontFamily = 'var(--font-space-mono), "Space Mono", monospace';
 
