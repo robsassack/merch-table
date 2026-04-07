@@ -148,7 +148,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                       setSelectedTrackId(track.id);
                     }}
                     onKeyDown={(event) => event.stopPropagation()}
-                    className="min-w-0 w-fit justify-self-start text-left transition hover:text-[var(--release-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    className="min-w-0 w-fit cursor-pointer justify-self-start text-left transition hover:text-[var(--release-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                     aria-haspopup="dialog"
                   >
                     <p className="translate-y-px text-sm font-medium text-zinc-900 underline decoration-dotted underline-offset-4">
@@ -208,7 +208,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
               <button
                 type="button"
                 onClick={() => setSelectedTrackId(null)}
-                className="rounded-md p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)]"
+                className="cursor-pointer rounded-md p-1 text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)]"
                 aria-label="Close track details dialog"
               >
                 <svg

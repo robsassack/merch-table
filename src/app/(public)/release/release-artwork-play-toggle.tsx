@@ -44,7 +44,7 @@ export default function ReleaseArtworkPlayToggle({
         }
       }}
       aria-label={artworkAriaLabel}
-      className="group relative mx-auto aspect-square w-full max-w-[26rem] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white lg:mx-0 disabled:cursor-default"
+      className="group relative mx-auto aspect-square w-full max-w-[26rem] cursor-pointer overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white lg:mx-0 disabled:cursor-default"
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img

@@ -44,7 +44,7 @@ export default function ReleaseDetailPurchaseCard({
   hasOnlyLossyDownloads,
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionButtonClass =
-    "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
+    "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
   const { activeTrackId, isPlaybackVisuallyActive, playTrack } =
     useReleaseAudioPlayer();
 
@@ -332,7 +332,7 @@ export default function ReleaseDetailPurchaseCard({
           onClick={() => void onShareClick()}
           aria-label="Share release"
           title="Share"
-          className="inline-flex items-center justify-center rounded-xl p-2 text-zinc-700 transition hover:bg-zinc-100"
+          className="inline-flex cursor-pointer items-center justify-center rounded-xl p-2 text-zinc-700 transition hover:bg-zinc-100"
         >
           <svg
             aria-hidden="true"
@@ -393,7 +393,7 @@ export default function ReleaseDetailPurchaseCard({
                 onClick={() => setIsCheckoutDialogOpen(false)}
                 disabled={isSubmitting}
                 aria-label="Close checkout dialog"
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 <svg
                   aria-hidden="true"
@@ -515,7 +515,7 @@ export default function ReleaseDetailPurchaseCard({
                 type="button"
                 onClick={() => setIsCheckoutDialogOpen(false)}
                 disabled={isSubmitting}
-                className="inline-flex h-9 items-center justify-center rounded-xl border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="inline-flex h-9 cursor-pointer items-center justify-center rounded-xl border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Cancel
               </button>
@@ -523,7 +523,7 @@ export default function ReleaseDetailPurchaseCard({
                 type="button"
                 onClick={() => void onCheckoutSubmit()}
                 disabled={isSubmitting}
-                className="inline-flex h-9 items-center justify-center rounded-xl bg-[var(--release-accent)] px-4 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900"
+                className="inline-flex h-9 cursor-pointer items-center justify-center rounded-xl bg-[var(--release-accent)] px-4 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)] disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900"
               >
                 {isSubmitting
                   ? "Working..."

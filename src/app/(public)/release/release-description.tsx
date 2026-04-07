@@ -29,7 +29,7 @@ export default function ReleaseDescription({ description }: { description: strin
         <button
           type="button"
           onClick={() => setExpanded((current) => !current)}
-          className="mt-2 text-sm font-medium text-zinc-900 underline underline-offset-2 hover:text-[var(--release-accent-hover)]"
+          className="mt-2 cursor-pointer text-sm font-medium text-zinc-900 underline underline-offset-2 hover:text-[var(--release-accent-hover)]"
         >
           {expanded ? "Show less" : "Show more"}
         </button>

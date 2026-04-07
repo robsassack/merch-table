@@ -422,7 +422,7 @@ export default function ReleaseFloatingPlayer() {
               <button
                 type="button"
                 onClick={toggleActiveTrackPlayback}
-                className="inline-flex h-[2.8rem] w-[2.8rem] items-center justify-center rounded-full bg-[var(--release-accent)] text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]"
+                className="inline-flex h-[2.8rem] w-[2.8rem] cursor-pointer items-center justify-center rounded-full bg-[var(--release-accent)] text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]"
                 aria-label={playbackButtonLabel}
               >
                 <svg
