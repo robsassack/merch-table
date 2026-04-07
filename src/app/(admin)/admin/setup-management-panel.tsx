@@ -47,6 +47,7 @@ function ContactEmailForm() {
   const [savingStatus, setSavingStatus] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const contactErrorId = "admin-store-settings-error";
   const initialLoad = useRef(true);
 
   useEffect(() => {
@@ -147,13 +148,20 @@ function ContactEmailForm() {
       </p>
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-red-800/70 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+        <div
+          id={contactErrorId}
+          role="alert"
+          className="mt-4 rounded-lg border border-red-800/70 bg-red-950/40 px-3 py-2 text-sm text-red-200"
+        >
           {error}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="mt-4 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200"
+        >
           {notice}
         </div>
       ) : null}
@@ -198,6 +206,8 @@ function ContactEmailForm() {
             placeholder="you@example.com"
             required
             className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? contactErrorId : undefined}
           />
         </label>
         <div>
@@ -230,6 +240,7 @@ export function SetupManagementPanel() {
   const [saving, setSaving] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [webhookSecretRevealed, setWebhookSecretRevealed] = useState(false);
+  const stripeErrorId = "admin-stripe-settings-error";
 
   const applyState = useCallback((state: StripeSettingsState) => {
     setHasSecretKey(state.hasSecretKey);
@@ -368,13 +379,20 @@ export function SetupManagementPanel() {
       </p>
 
       {error ? (
-        <div className="mt-4 rounded-lg border border-red-800/70 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+        <div
+          id={stripeErrorId}
+          role="alert"
+          className="mt-4 rounded-lg border border-red-800/70 bg-red-950/40 px-3 py-2 text-sm text-red-200"
+        >
           {error}
         </div>
       ) : null}
 
       {notice ? (
-        <div className="mt-4 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+        <div
+          role="status"
+          className="mt-4 rounded-lg border border-emerald-800/70 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200"
+        >
           {notice}
         </div>
       ) : null}
@@ -447,6 +465,8 @@ export function SetupManagementPanel() {
             onChange={(event) => setStripeSecretKey(event.target.value)}
             placeholder={hasSecretKey ? "Leave blank to keep saved key" : "sk_live_..."}
             className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? stripeErrorId : undefined}
           />
         </label>
         <p className="text-xs text-zinc-500">
@@ -464,6 +484,8 @@ export function SetupManagementPanel() {
             onChange={(event) => setStripeWebhookSecret(event.target.value)}
             placeholder="whsec_..."
             className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? stripeErrorId : undefined}
           />
         </label>
 

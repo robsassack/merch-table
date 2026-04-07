@@ -31,12 +31,22 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const currentYear = new Date().getFullYear();
+
   return (
     <html lang="en">
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${spaceMono.variable} antialiased`}
       >
+        <a href="#main-content" className="skip-link">
+          Skip to main content
+        </a>
         {children}
+        <footer className="border-t border-zinc-200/70 bg-white/60 px-4 py-4 text-sm text-zinc-700">
+          <div className="mx-auto w-full max-w-6xl">
+            Merch Table © {currentYear}
+          </div>
+        </footer>
       </body>
     </html>
   );

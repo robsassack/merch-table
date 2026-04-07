@@ -246,6 +246,19 @@ export default function ReleaseFloatingPlayer() {
         : volumePercent <= 66
           ? "medium"
           : "high";
+  const playbackAnnouncement = useMemo(() => {
+    if (!hasPlayableTracks) {
+      return "No playable previews are available.";
+    }
+
+    if (!hasPlaybackStarted || !activeTrack) {
+      return "Audio player ready.";
+    }
+
+    return `${isPlaybackVisuallyActive ? "Playing" : "Paused"} preview: ${activeTrack.title} by ${
+      activeTrack.artistName
+    }.`;
+  }, [activeTrack, hasPlayableTracks, hasPlaybackStarted, isPlaybackVisuallyActive]);
 
   function onPreviousTrack() {
     if (!hasPreviousTrack) {
@@ -365,13 +378,11 @@ export default function ReleaseFloatingPlayer() {
 
   useEffect(() => {
     if (!hasPlayableTracks) {
-      setPlayerHeight(0);
       return;
     }
 
     const wrapperElement = playerWrapperRef.current;
     if (!wrapperElement) {
-      setPlayerHeight(0);
       return;
     }
 
@@ -404,6 +415,9 @@ export default function ReleaseFloatingPlayer() {
 
   return (
     <>
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {playbackAnnouncement}
+      </p>
       <div
         aria-hidden="true"
         className="pointer-events-none transition-[height] duration-300 ease-out"

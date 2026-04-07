@@ -200,7 +200,12 @@ export default async function Home() {
     <div className={buyerTheme.page}>
       <StorefrontHeader activePage="home" />
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8"
+      >
+        <h1 className="sr-only">Storefront releases</h1>
         {featured ? (
           <section className="rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_64px_-44px_rgba(15,23,42,0.35)] sm:p-6">
             <div className="grid items-center gap-5 md:grid-cols-[minmax(240px,340px)_1fr]">

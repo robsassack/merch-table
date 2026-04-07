@@ -85,7 +85,7 @@ export default function FindMyPurchasesPageClient({
   }
 
   return (
-    <main>
+    <main id="main-content" tabIndex={-1}>
       {toast ? (
         <div className="pointer-events-none fixed inset-x-0 top-3 z-50 flex justify-center px-3">
           <div

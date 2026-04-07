@@ -69,6 +69,7 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
   const [isTesting, setIsTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const formErrorId = "setup-step-two-error";
   const selectedPreset =
     providerPreset === "custom"
       ? null
@@ -284,6 +285,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={providerPreset}
           onChange={(event) => onProviderChange(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         >
           <option value="custom">Custom SMTP</option>
           {SMTP_PRESETS.map((preset) => (
@@ -311,6 +314,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={smtpHost}
           onChange={(event) => setSmtpHost(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -324,6 +329,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={smtpPort}
           onChange={(event) => setSmtpPort(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -347,6 +354,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={smtpUsername}
           onChange={(event) => setSmtpUsername(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -358,6 +367,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           onChange={(event) => setSmtpPassword(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
           placeholder={hasPassword ? "Leave blank to keep saved password" : ""}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
       <p className="text-xs text-zinc-500">{passwordHint}</p>
@@ -370,6 +381,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={smtpFromEmail}
           onChange={(event) => setSmtpFromEmail(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -381,6 +394,8 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
           value={smtpTestRecipient}
           onChange={(event) => setSmtpTestRecipient(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -441,7 +456,11 @@ export function StepTwoForm({ initialValues }: StepTwoFormProps) {
       )}
 
       {notice ? <p className="text-sm text-green-700">{notice}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p id={formErrorId} role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
       {lastTestError && !error ? (
         <p className="text-sm text-red-700">Last test failed: {lastTestError}</p>
       ) : null}

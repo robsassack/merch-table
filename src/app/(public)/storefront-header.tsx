@@ -56,13 +56,15 @@ export default async function StorefrontHeader({
   const brandGlyph = resolveBrandGlyph(brandLabel);
   const organizationLogoUrl = resolveOptionalImageUrl(settings?.organization?.owner?.image);
   const showArtists = artistCount > 1;
+  const activeNavLinkClassName =
+    "rounded-md px-1.5 py-0.5 font-semibold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700";
 
   return (
     <header className={buyerTheme.header}>
       <div className={buyerTheme.headerInner}>
         <Link
           href="/"
-          className="flex items-center gap-3 transition-opacity hover:opacity-80"
+          className="flex items-center gap-3 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
           aria-current={activePage === "home" ? "page" : undefined}
         >
           {organizationLogoUrl ? (
@@ -85,7 +87,7 @@ export default async function StorefrontHeader({
               href="/artists"
               className={
                 activePage === "artists"
-                  ? "font-semibold text-zinc-900"
+                  ? activeNavLinkClassName
                   : buyerTheme.navLink
               }
               aria-current={activePage === "artists" ? "page" : undefined}
@@ -97,7 +99,7 @@ export default async function StorefrontHeader({
             href="/find-my-purchases"
             className={
               activePage === "find-my-purchases"
-                ? "font-semibold text-zinc-900"
+                ? activeNavLinkClassName
                 : buyerTheme.navLink
             }
             aria-current={

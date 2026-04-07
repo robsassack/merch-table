@@ -84,6 +84,9 @@ export default function ReleaseDetailPurchaseCard({
 
   const pwywCurrencyPrefix = useMemo(() => resolveCurrencyPrefix(currency), [currency]);
   const hasPreviewTrack = previewTrackId !== null;
+  const checkoutErrorId = "checkout-form-error";
+  const alreadyOwnedWarningId = "checkout-owned-warning";
+  const checkoutEmailHintId = "checkout-email-hint";
   const isCurrentReleaseTrackActive = Boolean(
     activeTrackId && playablePreviewTrackIds.includes(activeTrackId),
   );
@@ -431,6 +434,7 @@ export default function ReleaseDetailPurchaseCard({
                       {pwywCurrencyPrefix}
                     </span>
                     <input
+                      id="checkout-amount"
                       type="number"
                       inputMode="decimal"
                       min={Math.max(0, (minimumPriceCents ?? 0) / 100)}
@@ -439,6 +443,8 @@ export default function ReleaseDetailPurchaseCard({
                       onChange={(event) => setPwywAmount(event.target.value)}
                       disabled={isSubmitting}
                       className="w-full rounded-xl border border-zinc-300 bg-white py-2.5 pl-9 pr-3 text-base font-medium text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
+                      aria-invalid={Boolean(checkoutFormError)}
+                      aria-describedby={checkoutFormError ? checkoutErrorId : undefined}
                     />
                   </div>
                 </label>
@@ -449,6 +455,7 @@ export default function ReleaseDetailPurchaseCard({
                   Email {pricingMode === "FREE" ? "" : "(optional)"}
                 </span>
                 <input
+                  id="checkout-email"
                   type="email"
                   autoComplete="email"
                   value={checkoutEmail}
@@ -462,14 +469,24 @@ export default function ReleaseDetailPurchaseCard({
                   disabled={isSubmitting}
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="you@example.com"
+                  aria-invalid={Boolean(checkoutFormError)}
+                  aria-describedby={
+                    checkoutFormError
+                      ? `${checkoutEmailHintId} ${checkoutErrorId}`
+                      : checkoutEmailHintId
+                  }
                 />
               </label>
+              <p id={checkoutEmailHintId} className="text-xs text-zinc-600">
+                Use the email tied to your buyer library.
+              </p>
 
               <label className="block">
                 <span className="mb-1.5 block text-sm font-medium text-zinc-700">
                   Confirm Email
                 </span>
                 <input
+                  id="checkout-confirm-email"
                   type="email"
                   autoComplete="email"
                   value={confirmEmail}
@@ -483,11 +500,17 @@ export default function ReleaseDetailPurchaseCard({
                   disabled={isSubmitting}
                   className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
                   placeholder="Re-enter your email"
+                  aria-invalid={Boolean(checkoutFormError)}
+                  aria-describedby={checkoutFormError ? checkoutErrorId : undefined}
                 />
               </label>
 
               {alreadyOwnedWarning ? (
-                <div className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+                <div
+                  id={alreadyOwnedWarningId}
+                  role="alert"
+                  className="rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900"
+                >
                   <p>{alreadyOwnedWarning}</p>
                   <label className="mt-2 flex items-start gap-2">
                     <input
@@ -499,6 +522,7 @@ export default function ReleaseDetailPurchaseCard({
                       }}
                       disabled={isSubmitting}
                       className="mt-0.5 h-4 w-4 rounded border-red-300 text-red-600 focus:ring-red-300"
+                      aria-describedby={alreadyOwnedWarningId}
                     />
                     <span>I understand and want to continue with a repeat purchase.</span>
                   </label>
@@ -506,7 +530,11 @@ export default function ReleaseDetailPurchaseCard({
               ) : null}
 
               {checkoutFormError ? (
-                <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <div
+                  id={checkoutErrorId}
+                  role="alert"
+                  className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+                >
                   {checkoutFormError}
                 </div>
               ) : null}

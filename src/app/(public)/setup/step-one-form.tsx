@@ -31,6 +31,7 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const formErrorId = "setup-step-one-error";
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -78,6 +79,8 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
           value={orgName}
           onChange={(event) => setOrgName(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -90,6 +93,8 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
           value={storeName}
           onChange={(event) => setStoreName(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -102,6 +107,8 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
           value={contactEmail}
           onChange={(event) => setContactEmail(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -112,6 +119,8 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
           value={currency}
           onChange={(event) => setCurrency(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         >
           {SUPPORTED_CURRENCIES.map((supportedCurrency) => (
             <option key={supportedCurrency.code} value={supportedCurrency.code}>
@@ -135,7 +144,11 @@ export function StepOneForm({ initialValues }: StepOneFormProps) {
       {saved ? (
         <p className="text-sm text-green-700">Step 1 saved.</p>
       ) : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p id={formErrorId} role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
     </form>
   );
 }

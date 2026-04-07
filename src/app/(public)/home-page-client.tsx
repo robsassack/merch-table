@@ -54,6 +54,8 @@ export default function HomePageClient() {
 
   return (
     <main
+      id="main-content"
+      tabIndex={-1}
       className={`min-h-screen px-4 py-10 sm:px-6 sm:py-16 ${
         isDark
           ? "bg-[radial-gradient(circle_at_20%_20%,#1f2a44,transparent_35%),radial-gradient(circle_at_80%_0%,#1d3d36,transparent_30%),linear-gradient(180deg,#0b1220_0%,#0d141d_100%)] text-zinc-100"

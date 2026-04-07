@@ -71,6 +71,7 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
+  const formErrorId = "setup-step-three-error";
 
   const saveSettings = async () => {
     const response = await fetch("/api/setup/step-3", {
@@ -240,6 +241,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
               onChange={(event) => setStorageEndpoint(event.target.value)}
               placeholder="https://s3.us-east-1.amazonaws.com"
               className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? formErrorId : undefined}
             />
           </label>
 
@@ -251,6 +254,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
               onChange={(event) => setStorageRegion(event.target.value)}
               placeholder="us-east-1"
               className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? formErrorId : undefined}
             />
           </label>
 
@@ -261,6 +266,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
               value={storageBucket}
               onChange={(event) => setStorageBucket(event.target.value)}
               className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? formErrorId : undefined}
             />
           </label>
 
@@ -271,6 +278,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
               value={storageAccessKeyId}
               onChange={(event) => setStorageAccessKeyId(event.target.value)}
               className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? formErrorId : undefined}
             />
           </label>
 
@@ -284,6 +293,8 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
                 hasSecretAccessKey ? "Leave blank to keep saved secret" : ""
               }
               className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? formErrorId : undefined}
             />
           </label>
           <p className="text-xs text-zinc-500">
@@ -363,7 +374,11 @@ export function StepThreeForm({ initialValues }: StepThreeFormProps) {
       ) : null}
 
       {notice ? <p className="text-sm text-green-700">{notice}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p id={formErrorId} role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
       {lastError && !error ? (
         <p className="text-sm text-red-700">Last validation failed: {lastError}</p>
       ) : null}

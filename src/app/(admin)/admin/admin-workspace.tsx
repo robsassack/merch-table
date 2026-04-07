@@ -57,7 +57,10 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
           </div>
         </div>
 
-        <div className="flex w-full rounded-xl border border-slate-700 bg-slate-900/70 p-1 sm:inline-flex sm:w-auto">
+        <nav
+          aria-label="Admin sections"
+          className="flex w-full rounded-xl border border-slate-700 bg-slate-900/70 p-1 sm:inline-flex sm:w-auto"
+        >
           <Link
             href="/admin/artists"
             aria-current={activeTab === "artists" ? "page" : undefined}
@@ -91,7 +94,7 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
           >
             Setup
           </Link>
-        </div>
+        </nav>
       </div>
 
       <div className="mt-4">

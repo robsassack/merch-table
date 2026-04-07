@@ -39,6 +39,7 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isContinuing, setIsContinuing] = useState(false);
+  const formErrorId = "setup-step-four-error";
 
   const saveSettings = async () => {
     const response = await fetch("/api/setup/step-4", {
@@ -207,6 +208,8 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
           onChange={(event) => setStripeSecretKey(event.target.value)}
           placeholder={hasSecretKey ? "Leave blank to keep saved key" : "sk_live_..."}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
       <p className="text-xs text-zinc-500">
@@ -223,6 +226,8 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
           onChange={(event) => setStripeWebhookSecret(event.target.value)}
           placeholder="whsec_..."
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -280,7 +285,11 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
       )}
 
       {notice ? <p className="text-sm text-green-700">{notice}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p id={formErrorId} role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
       {lastError && !error ? (
         <p className="text-sm text-red-700">Last verification failed: {lastError}</p>
       ) : null}

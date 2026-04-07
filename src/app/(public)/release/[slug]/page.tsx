@@ -392,7 +392,11 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     <ReleaseArtworkTheme coverSrc={releaseCoverSrc} hasArtwork={hasArtwork}>
       <StorefrontHeader />
 
-      <main className="mx-auto mb-12 w-full max-w-6xl px-4 pt-6 pb-10 sm:px-6 sm:pt-8 sm:pb-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto mb-12 w-full max-w-6xl px-4 pt-6 pb-10 sm:px-6 sm:pt-8 sm:pb-12"
+      >
         <ReleaseAudioPlayerConfigurator
           tracks={releasePlayerTracks}
           featuredTrackId={release.featuredTrackId}

@@ -282,16 +282,16 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: WCAG 2.1 AA compliance across storefront and admin.
 
-- [ ] Semantic HTML: proper heading hierarchy, landmark regions (`nav`, `main`, `footer`)
-- [ ] Skip-to-content link on all pages
-- [ ] All form inputs have associated `<label>` elements
-- [ ] Validation errors surfaced with `aria-describedby`
-- [ ] Full keyboard navigation: all interactive elements reachable and operable
-- [ ] Visible focus indicators on all focusable elements
-- [ ] Audio player: keyboard-accessible play/pause and track selection with ARIA labels
-- [ ] Player state changes announced via `aria-live` region
-- [ ] Color contrast meets AA (4.5:1 normal text, 3:1 large text) on all pages
-- [ ] Run automated accessibility audit (axe-core or equivalent); fix all critical/serious violations
+- [x] Semantic HTML: proper heading hierarchy, landmark regions (`nav`, `main`, `footer`)
+- [x] Skip-to-content link on all pages
+- [x] All form inputs have associated `<label>` elements
+- [x] Validation errors surfaced with `aria-describedby`
+- [x] Full keyboard navigation: all interactive elements reachable and operable
+- [x] Visible focus indicators on all focusable elements
+- [x] Audio player: keyboard-accessible play/pause and track selection with ARIA labels
+- [x] Player state changes announced via `aria-live` region
+- [x] Color contrast meets AA (4.5:1 normal text, 3:1 large text) on all pages
+- [x] Run automated accessibility audit (axe-core or equivalent); fix all critical/serious violations
 
 ---
 

@@ -55,6 +55,7 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
   const [isSending, setIsSending] = useState(false);
   const [bootstrapToken, setBootstrapToken] = useState("");
   const [isUsingFallback, setIsUsingFallback] = useState(false);
+  const formErrorId = "setup-step-five-error";
 
   const saveAdminEmail = async () => {
     const response = await fetch("/api/setup/step-5", {
@@ -185,6 +186,8 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
           onChange={(event) => setAdminEmail(event.target.value)}
           className="rounded border border-zinc-300 bg-white px-3 py-2 text-zinc-900 outline-none focus:border-zinc-500"
           placeholder="admin@yourstore.com"
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? formErrorId : undefined}
         />
       </label>
 
@@ -233,7 +236,11 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
       )}
 
       {notice ? <p className="text-sm text-green-700">{notice}</p> : null}
-      {error ? <p className="text-sm text-red-700">{error}</p> : null}
+      {error ? (
+        <p id={formErrorId} role="alert" className="text-sm text-red-700">
+          {error}
+        </p>
+      ) : null}
       {magicLinkLastError && !error ? (
         <p className="text-sm text-red-700">Last send failed: {magicLinkLastError}</p>
       ) : null}
@@ -250,6 +257,8 @@ export function StepFiveForm({ initialValues }: StepFiveFormProps) {
             onChange={(event) => setBootstrapToken(event.target.value)}
             placeholder="Paste bootstrap token from server logs"
             className="w-full rounded border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none focus:border-zinc-500"
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? formErrorId : undefined}
           />
           <button
             type="button"

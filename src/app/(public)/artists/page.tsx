@@ -108,7 +108,11 @@ export default async function ArtistsPage() {
     <div className={buyerTheme.page}>
       <StorefrontHeader activePage="artists" />
 
-      <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12"
+      >
         <section className="rounded-2xl border border-zinc-200 bg-white/80 p-5 shadow-[0_24px_64px_-44px_rgba(15,23,42,0.35)] backdrop-blur sm:p-6">
           <p className={buyerTheme.eyebrow}>Artists</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">

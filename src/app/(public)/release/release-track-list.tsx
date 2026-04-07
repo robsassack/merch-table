@@ -90,48 +90,53 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                   : "border-transparent"
               } ${
                 canPlayTrack
-                  ? "cursor-pointer hover:border-zinc-200 hover:bg-[var(--release-bg-start)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  ? "cursor-pointer hover:border-zinc-200 hover:bg-[var(--release-bg-start)]/45"
                   : ""
               }`}
               onClick={() => {
-                if (canPlayTrack) {
-                  playTrack(track.id);
-                }
-              }}
-              onKeyDown={(event) => {
                 if (!canPlayTrack) {
                   return;
                 }
-
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  playTrack(track.id);
-                }
+                playTrack(track.id);
               }}
-              role={canPlayTrack ? "button" : undefined}
-              tabIndex={canPlayTrack ? 0 : undefined}
-              aria-label={canPlayTrack ? `Play preview: ${track.title}` : undefined}
             >
               <div className="grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3">
-                {isActiveTrack ? (
-                  <span className="inline-flex h-5 w-5 items-center justify-center text-[var(--release-accent)]">
-                    <svg
-                      aria-hidden="true"
-                      viewBox="0 0 24 24"
-                      className={`h-5 w-5 ${isPlaybackVisuallyActive ? "-translate-x-[0.5px]" : ""}`}
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.9"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      {isPlaybackVisuallyActive ? (
-                        <path d="M9 6v12M15 6v12" />
-                      ) : (
-                        <path d="M8 6.5v11l9-5.5-9-5.5Z" />
-                      )}
-                    </svg>
-                  </span>
+                {canPlayTrack ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      playTrack(track.id);
+                    }}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-[var(--release-accent)] transition hover:bg-[var(--release-bg-start)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    aria-label={`${isActiveTrack && isPlaybackVisuallyActive ? "Pause" : "Play"} preview: ${track.title}`}
+                  >
+                    {isActiveTrack ? (
+                      <svg
+                        aria-hidden="true"
+                        viewBox="0 0 24 24"
+                        className={`h-5 w-5 ${isPlaybackVisuallyActive ? "-translate-x-[0.5px]" : ""}`}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.9"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        {isPlaybackVisuallyActive ? (
+                          <path d="M9 6v12M15 6v12" />
+                        ) : (
+                          <path d="M8 6.5v11l9-5.5-9-5.5Z" />
+                        )}
+                      </svg>
+                    ) : (
+                      <span
+                        className="text-sm tabular-nums text-zinc-500"
+                        style={{ fontFamily: spaceMonoFontFamily }}
+                      >
+                        {String(track.trackNumber).padStart(2, "0")}
+                      </span>
+                    )}
+                  </button>
                 ) : (
                   <span
                     className="text-sm tabular-nums text-zinc-500"
@@ -152,6 +157,20 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                     aria-haspopup="dialog"
                   >
                     <p className="translate-y-px text-sm font-medium text-zinc-900 underline decoration-dotted underline-offset-4">
+                      {track.title}
+                    </p>
+                  </button>
+                ) : canPlayTrack ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      playTrack(track.id);
+                    }}
+                    className="min-w-0 w-fit cursor-pointer justify-self-start text-left transition hover:text-[var(--release-accent-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                    aria-label={`Play preview: ${track.title}`}
+                  >
+                    <p className="translate-y-px text-sm font-medium text-zinc-900">
                       {track.title}
                     </p>
                   </button>

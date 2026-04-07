@@ -146,7 +146,11 @@ export default async function PurchaseCompletePage({
     <div className={buyerTheme.page}>
       <StorefrontHeader />
 
-      <main className="mx-auto mb-12 flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12">
+      <main
+        id="main-content"
+        tabIndex={-1}
+        className="mx-auto mb-12 flex w-full max-w-6xl flex-col gap-6 px-4 py-8 sm:px-6 sm:py-12"
+      >
         <section className={`${buyerTheme.panel} w-full max-w-3xl self-center text-center`}>
           <p className={buyerTheme.eyebrow}>Purchase Complete</p>
           <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">

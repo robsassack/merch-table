@@ -83,6 +83,8 @@ export default function LibraryPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [library, setLibrary] = useState<LibrarySuccessPayload | null>(null);
   const [mixedZipPrompt, setMixedZipPrompt] = useState<MixedZipPromptState | null>(null);
+  const tokenHelpTextId = "library-token-help";
+  const tokenErrorTextId = "library-token-error";
 
   useEffect(() => {
     const applyTokenFromUrl = () => {
@@ -188,7 +190,7 @@ export default function LibraryPageClient() {
   }
 
   return (
-    <main>
+    <main id="main-content" tabIndex={-1}>
       {mixedZipPrompt ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/60 px-4">
           <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-5 shadow-2xl">
@@ -244,6 +246,9 @@ export default function LibraryPageClient() {
           </p>
 
           <form onSubmit={onTokenSubmit} className="mt-6 flex flex-col gap-2 sm:flex-row">
+            <label htmlFor="library-token" className="sr-only">
+              Library token
+            </label>
             <input
               id="library-token"
               name="token"
@@ -252,6 +257,12 @@ export default function LibraryPageClient() {
               onChange={(event) => setTokenInput(event.target.value)}
               placeholder="Paste token from your library email"
               className={buyerTheme.input}
+              aria-invalid={state === "error"}
+              aria-describedby={
+                state === "error"
+                  ? `${tokenHelpTextId} ${tokenErrorTextId}`
+                  : tokenHelpTextId
+              }
             />
             <button
               type="submit"
@@ -260,6 +271,9 @@ export default function LibraryPageClient() {
               Open Library
             </button>
           </form>
+          <p id={tokenHelpTextId} className="mt-2 text-xs text-zinc-600">
+            Tokens are included in buyer library emails.
+          </p>
         </div>
 
         {state === "idle" ? (
@@ -279,7 +293,11 @@ export default function LibraryPageClient() {
         ) : null}
 
         {state === "error" ? (
-          <div className={`${buyerTheme.statusError} w-full`}>
+          <div
+            id={tokenErrorTextId}
+            role="alert"
+            className={`${buyerTheme.statusError} w-full`}
+          >
             {errorMessage ?? "Could not load library."}
           </div>
         ) : null}

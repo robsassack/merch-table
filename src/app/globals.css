@@ -22,6 +22,41 @@ body {
   min-height: 100vh;
 }
 
+.skip-link {
+  position: fixed;
+  top: 0.75rem;
+  left: 0.75rem;
+  z-index: 1000;
+  transform: translateY(-180%);
+  border-radius: 0.625rem;
+  border: 1px solid #0f766e;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  box-shadow: 0 10px 26px -18px rgba(15, 23, 42, 0.75);
+  transition: transform 0.18s ease-out;
+}
+
+.skip-link:focus-visible {
+  transform: translateY(0);
+}
+
+:where(
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary,
+    [tabindex]:not([tabindex="-1"])
+  ):focus-visible {
+  outline: 2px solid #0f766e !important;
+  outline-offset: 2px;
+}
+
 code {
   font-family: var(--font-geist-mono), "JetBrains Mono", monospace;
 }
