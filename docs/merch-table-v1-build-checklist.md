@@ -273,8 +273,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Post-purchase confirmation page
 
-- [ ] Shown after Stripe redirect or free checkout
-- [ ] Links to buyer library
+- [x] Shown after Stripe redirect or free checkout
+- [x] Links to buyer library
 
 ---
 

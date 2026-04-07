@@ -80,6 +80,21 @@ describe("resolveStorefrontPreviewAsset", () => {
     assert.equal(result?.id, "preview-track");
   });
 
+  it("falls back to master when CLIP mode has no preview yet", () => {
+    const result = resolveStorefrontPreviewAsset({
+      previewMode: "CLIP",
+      assets: [
+        makeAsset({
+          id: "master-track",
+          assetRole: "MASTER",
+          updatedAt: "2026-04-06T12:00:00.000Z",
+        }),
+      ],
+    });
+
+    assert.equal(result?.id, "master-track");
+  });
+
   it("returns null when no playable source exists", () => {
     const result = resolveStorefrontPreviewAsset({
       previewMode: "CLIP",

@@ -28,5 +28,5 @@ export function resolveStorefrontPreviewAsset(input: {
     return masterAsset ?? previewAsset;
   }
 
-  return previewAsset;
+  return previewAsset ?? masterAsset;
 }

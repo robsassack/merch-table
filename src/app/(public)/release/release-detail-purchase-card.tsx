@@ -29,17 +29,6 @@ type ToastState = {
 const ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE =
   "ALREADY_OWNED_CONFIRMATION_REQUIRED";
 
-function formatClockTime(seconds: number) {
-  if (!Number.isFinite(seconds) || seconds <= 0) {
-    return "0:00";
-  }
-
-  const safeSeconds = Math.floor(seconds);
-  const minutes = Math.floor(safeSeconds / 60);
-  const remainder = safeSeconds % 60;
-  return `${minutes}:${String(remainder).padStart(2, "0")}`;
-}
-
 export default function ReleaseDetailPurchaseCard({
   releaseId,
   pricingMode,
@@ -52,15 +41,8 @@ export default function ReleaseDetailPurchaseCard({
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionButtonClass =
     "inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
-  const {
-    activeTrack,
-    hasPlayableTracks,
-    isPlaying,
-    currentTimeSeconds,
-    durationSeconds,
-    toggleActiveTrackPlayback,
-    seekToFraction,
-  } = useReleaseAudioPlayer();
+  const { hasPlayableTracks, isPlaybackVisuallyActive, toggleActiveTrackPlayback } =
+    useReleaseAudioPlayer();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
@@ -97,15 +79,11 @@ export default function ReleaseDetailPurchaseCard({
   );
 
   const pwywCurrencyPrefix = useMemo(() => resolveCurrencyPrefix(currency), [currency]);
-  const fallbackDurationSeconds =
-    activeTrack?.durationMs && activeTrack.durationMs > 0 ? activeTrack.durationMs / 1000 : 0;
-  const resolvedDurationSeconds =
-    durationSeconds > 0 ? durationSeconds : fallbackDurationSeconds;
-  const progressPercent =
-    resolvedDurationSeconds > 0
-      ? Math.min(100, Math.max(0, (currentTimeSeconds / resolvedDurationSeconds) * 100))
-      : 0;
-  const playbackButtonLabel = !hasPlayableTracks ? "No Preview" : isPlaying ? "Pause" : "Play";
+  const playbackButtonLabel = !hasPlayableTracks
+    ? "No Preview"
+    : isPlaybackVisuallyActive
+      ? "Pause"
+      : "Play";
 
   useEffect(() => {
     if (!isCheckoutDialogOpen) {
@@ -310,7 +288,11 @@ export default function ReleaseDetailPurchaseCard({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            {isPlaying ? <path d="M9 6v12M15 6v12" /> : <path d="M8 6.5v11l9-5.5-9-5.5Z" />}
+            {isPlaybackVisuallyActive ? (
+              <path d="M9 6v12M15 6v12" />
+            ) : (
+              <path d="M8 6.5v11l9-5.5-9-5.5Z" />
+            )}
           </svg>
           {playbackButtonLabel}
         </button>
@@ -346,32 +328,6 @@ export default function ReleaseDetailPurchaseCard({
             <path d="M8 11l7.6-4.3M8 13l7.6 4.3" />
           </svg>
         </button>
-      </div>
-
-      <div className="mt-3 rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
-        <p className="text-sm font-medium text-zinc-900">
-          {activeTrack ? activeTrack.title : "No preview track is ready yet"}
-        </p>
-        <div className="mt-2 flex items-center gap-2 text-xs text-zinc-600">
-          <span className="w-10 text-right tabular-nums">{formatClockTime(currentTimeSeconds)}</span>
-          <input
-            type="range"
-            min={0}
-            max={100}
-            value={progressPercent}
-            onChange={(event) => {
-              const nextPercent = Number(event.target.value);
-              if (!Number.isFinite(nextPercent)) {
-                return;
-              }
-              seekToFraction(nextPercent / 100);
-            }}
-            disabled={!hasPlayableTracks || resolvedDurationSeconds <= 0}
-            className="h-1.5 w-full cursor-pointer accent-[var(--release-accent)] disabled:cursor-not-allowed disabled:opacity-50"
-            aria-label="Preview playback progress"
-          />
-          <span className="w-10 text-left tabular-nums">{formatClockTime(resolvedDurationSeconds)}</span>
-        </div>
       </div>
 
       {mayAlreadyOwnRelease ? (

@@ -14,6 +14,7 @@ import { Howl } from "howler";
 export type ReleaseAudioTrack = {
   id: string;
   title: string;
+  artistName: string;
   trackNumber: number;
   durationMs: number | null;
   previewUrl: string;
@@ -24,14 +25,18 @@ export type ReleaseAudioTrack = {
 type ReleaseAudioPlayerContextValue = {
   tracks: ReleaseAudioTrack[];
   hasPlayableTracks: boolean;
+  hasPlaybackStarted: boolean;
   activeTrackId: string | null;
   activeTrack: ReleaseAudioTrack | null;
   isPlaying: boolean;
+  isPlaybackVisuallyActive: boolean;
   currentTimeSeconds: number;
   durationSeconds: number;
   playTrack: (trackId: string) => void;
   toggleActiveTrackPlayback: () => void;
   seekToFraction: (value: number) => void;
+  beginVisualPlaybackHold: () => void;
+  endVisualPlaybackHold: () => void;
 };
 
 type ReleaseAudioPlayerProviderProps = {
@@ -58,8 +63,8 @@ function resolveDefaultTrackId(tracks: ReleaseAudioTrack[], featuredTrackId: str
   return playableTracks[0]?.id ?? null;
 }
 
-function resolveHowlSeekSeconds(sound: Howl) {
-  const seekValue = sound.seek();
+function resolveHowlSeekSeconds(sound: Howl, soundId: number | null) {
+  const seekValue = soundId !== null ? sound.seek(soundId) : sound.seek();
   return typeof seekValue === "number" && Number.isFinite(seekValue) ? seekValue : 0;
 }
 
@@ -101,6 +106,10 @@ export function ReleaseAudioPlayerProvider({
   featuredTrackId,
   children,
 }: ReleaseAudioPlayerProviderProps) {
+  const playableTracks = useMemo(
+    () => tracks.filter((track) => track.isPlayablePreview),
+    [tracks],
+  );
   const trackById = useMemo(() => new Map(tracks.map((track) => [track.id, track])), [tracks]);
   const defaultTrackId = useMemo(
     () => resolveDefaultTrackId(tracks, featuredTrackId),
@@ -110,12 +119,16 @@ export function ReleaseAudioPlayerProvider({
 
   const [activeTrackId, setActiveTrackId] = useState<string | null>(defaultTrackId);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [hasPlaybackStarted, setHasPlaybackStarted] = useState(false);
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
+  const [visualPlaybackHoldCount, setVisualPlaybackHoldCount] = useState(0);
 
   const howlRef = useRef<Howl | null>(null);
+  const activeHowlSoundIdRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playbackSessionRef = useRef(0);
+  const playTrackRef = useRef<(trackId: string) => void>(() => {});
 
   const stopProgressLoop = useCallback(() => {
     if (animationFrameRef.current !== null) {
@@ -126,6 +139,7 @@ export function ReleaseAudioPlayerProvider({
 
   const stopAndUnloadHowl = useCallback(() => {
     stopProgressLoop();
+    activeHowlSoundIdRef.current = null;
     if (!howlRef.current) {
       return;
     }
@@ -157,7 +171,7 @@ export function ReleaseAudioPlayerProvider({
     const nextDuration = sound.duration();
     const safeDuration = Number.isFinite(nextDuration) ? nextDuration : 0;
     setDurationSeconds(safeDuration > 0 ? safeDuration : 0);
-    setCurrentTimeSeconds(resolveHowlSeekSeconds(sound));
+    setCurrentTimeSeconds(resolveHowlSeekSeconds(sound, activeHowlSoundIdRef.current));
   }, []);
 
   const runProgressLoop = useCallback(() => {
@@ -165,7 +179,7 @@ export function ReleaseAudioPlayerProvider({
 
     const tick = () => {
       const sound = howlRef.current;
-      if (!sound || !sound.playing()) {
+      if (!sound) {
         animationFrameRef.current = null;
         return;
       }
@@ -186,12 +200,24 @@ export function ReleaseAudioPlayerProvider({
 
       const currentHowl = howlRef.current;
       if (currentHowl && resolvedActiveTrackId === requestedTrack.id) {
-        if (currentHowl.playing()) {
-          currentHowl.pause();
+        const activeSoundId = activeHowlSoundIdRef.current;
+        const isActiveSoundPlaying =
+          activeSoundId !== null ? currentHowl.playing(activeSoundId) : currentHowl.playing();
+
+        if (isActiveSoundPlaying) {
+          if (activeSoundId !== null) {
+            currentHowl.pause(activeSoundId);
+          } else {
+            currentHowl.pause();
+          }
           return;
         }
 
-        currentHowl.play();
+        const resumedSoundId =
+          activeSoundId !== null ? currentHowl.play(activeSoundId) : currentHowl.play();
+        if (typeof resumedSoundId === "number" && Number.isFinite(resumedSoundId)) {
+          activeHowlSoundIdRef.current = resumedSoundId;
+        }
         return;
       }
 
@@ -221,36 +247,78 @@ export function ReleaseAudioPlayerProvider({
           }
           updateProgressFromHowl();
         },
-        onplay: () => {
+        onplay: (soundId) => {
           if (playbackSessionRef.current !== playbackSession) {
             return;
           }
+          if (typeof soundId === "number" && Number.isFinite(soundId)) {
+            activeHowlSoundIdRef.current = soundId;
+          }
+          setHasPlaybackStarted(true);
           setIsPlaying(true);
           updateProgressFromHowl();
           runProgressLoop();
         },
-        onpause: () => {
+        onpause: (soundId) => {
           if (playbackSessionRef.current !== playbackSession) {
+            return;
+          }
+          if (
+            typeof soundId === "number" &&
+            Number.isFinite(soundId) &&
+            activeHowlSoundIdRef.current !== null &&
+            soundId !== activeHowlSoundIdRef.current
+          ) {
             return;
           }
           setIsPlaying(false);
           stopProgressLoop();
           updateProgressFromHowl();
         },
-        onstop: () => {
+        onstop: (soundId) => {
           if (playbackSessionRef.current !== playbackSession) {
             return;
           }
+          if (
+            typeof soundId === "number" &&
+            Number.isFinite(soundId) &&
+            activeHowlSoundIdRef.current !== null &&
+            soundId !== activeHowlSoundIdRef.current
+          ) {
+            return;
+          }
+          activeHowlSoundIdRef.current = null;
           setIsPlaying(false);
           stopProgressLoop();
           setCurrentTimeSeconds(0);
           updateProgressFromHowl();
         },
-        onend: () => {
+        onend: (soundId) => {
           if (playbackSessionRef.current !== playbackSession) {
             return;
           }
+          if (
+            typeof soundId === "number" &&
+            Number.isFinite(soundId) &&
+            activeHowlSoundIdRef.current !== null &&
+            soundId !== activeHowlSoundIdRef.current
+          ) {
+            return;
+          }
+
+          const finishedTrackIndex = playableTracks.findIndex(
+            (track) => track.id === requestedTrack.id,
+          );
+          const nextPlayableTrack =
+            finishedTrackIndex >= 0 ? playableTracks[finishedTrackIndex + 1] ?? null : null;
+          if (nextPlayableTrack) {
+            playTrackRef.current(nextPlayableTrack.id);
+            return;
+          }
+
+          activeHowlSoundIdRef.current = null;
           setIsPlaying(false);
+          setHasPlaybackStarted(false);
           stopProgressLoop();
           updateProgressFromHowl();
         },
@@ -273,17 +341,25 @@ export function ReleaseAudioPlayerProvider({
       });
 
       howlRef.current = sound;
-      sound.play();
+      const startedSoundId = sound.play();
+      if (typeof startedSoundId === "number" && Number.isFinite(startedSoundId)) {
+        activeHowlSoundIdRef.current = startedSoundId;
+      }
     },
     [
       runProgressLoop,
       resolvedActiveTrackId,
+      playableTracks,
       stopAndUnloadHowl,
       stopProgressLoop,
       trackById,
       updateProgressFromHowl,
     ],
   );
+
+  useEffect(() => {
+    playTrackRef.current = playTrack;
+  }, [playTrack]);
 
   const toggleActiveTrackPlayback = useCallback(() => {
     if (resolvedActiveTrackId) {
@@ -312,10 +388,25 @@ export function ReleaseAudioPlayerProvider({
     }
 
     const nextTime = soundDuration * clampedValue;
-    sound.seek(nextTime);
+    const activeSoundId = activeHowlSoundIdRef.current;
+    if (activeSoundId !== null) {
+      sound.seek(nextTime, activeSoundId);
+    } else {
+      sound.seek(nextTime);
+    }
     setCurrentTimeSeconds(nextTime);
     setDurationSeconds(soundDuration);
   }, []);
+
+  const beginVisualPlaybackHold = useCallback(() => {
+    setVisualPlaybackHoldCount((current) => current + 1);
+  }, []);
+
+  const endVisualPlaybackHold = useCallback(() => {
+    setVisualPlaybackHoldCount((current) => (current > 0 ? current - 1 : 0));
+  }, []);
+
+  const isPlaybackVisuallyActive = isPlaying || visualPlaybackHoldCount > 0;
 
   useEffect(() => {
     if (!activeTrackId) {
@@ -346,22 +437,30 @@ export function ReleaseAudioPlayerProvider({
     () => ({
       tracks,
       hasPlayableTracks,
+      hasPlaybackStarted,
       activeTrackId: resolvedActiveTrackId,
       activeTrack,
       isPlaying,
+      isPlaybackVisuallyActive,
       currentTimeSeconds,
       durationSeconds,
       playTrack,
       toggleActiveTrackPlayback,
       seekToFraction,
+      beginVisualPlaybackHold,
+      endVisualPlaybackHold,
     }),
     [
       activeTrack,
       resolvedActiveTrackId,
+      beginVisualPlaybackHold,
       currentTimeSeconds,
       durationSeconds,
+      endVisualPlaybackHold,
       hasPlayableTracks,
+      hasPlaybackStarted,
       isPlaying,
+      isPlaybackVisuallyActive,
       playTrack,
       seekToFraction,
       toggleActiveTrackPlayback,

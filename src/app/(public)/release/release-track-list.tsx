@@ -41,7 +41,7 @@ function formatTrackDuration(durationMs: number | null) {
 }
 
 export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
-  const { activeTrackId, isPlaying, playTrack } = useReleaseAudioPlayer();
+  const { activeTrackId, isPlaybackVisuallyActive, playTrack } = useReleaseAudioPlayer();
   const tracksWithMetadata = useMemo(
     () =>
       tracks.map((track) => ({
@@ -75,7 +75,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
 
   return (
     <>
-      <ol className="mt-4 divide-y divide-zinc-200">
+      <ol className="mt-4 space-y-1">
         {tracksWithMetadata.map((track) => {
           const hasMetadata = Boolean(track.normalizedLyrics || track.normalizedCredits);
           const isActiveTrack = activeTrackId === track.id;
@@ -84,11 +84,13 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
           return (
             <li
               key={track.id}
-              className={`px-3 py-3 transition-colors ${
-                isActiveTrack ? "bg-[var(--release-bg-start)]/70" : ""
+              className={`rounded-xl border px-3 py-3 transition-colors ${
+                isActiveTrack
+                  ? "border-[var(--release-accent-soft)] bg-[var(--release-bg-start)]/70"
+                  : "border-transparent"
               } ${
                 canPlayTrack
-                  ? "cursor-pointer hover:bg-[var(--release-bg-start)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
+                  ? "cursor-pointer hover:border-zinc-200 hover:bg-[var(--release-bg-start)]/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white"
                   : ""
               }`}
               onClick={() => {
@@ -116,14 +118,18 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                     <svg
                       aria-hidden="true"
                       viewBox="0 0 24 24"
-                      className={`h-5 w-5 ${isPlaying ? "-translate-x-[0.5px]" : ""}`}
+                      className={`h-5 w-5 ${isPlaybackVisuallyActive ? "-translate-x-[0.5px]" : ""}`}
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="1.9"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     >
-                      {isPlaying ? <path d="M9 6v12M15 6v12" /> : <path d="M8 6.5v11l9-5.5-9-5.5Z" />}
+                      {isPlaybackVisuallyActive ? (
+                        <path d="M9 6v12M15 6v12" />
+                      ) : (
+                        <path d="M8 6.5v11l9-5.5-9-5.5Z" />
+                      )}
                     </svg>
                   </span>
                 ) : (

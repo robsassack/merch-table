@@ -12,6 +12,8 @@ import {
 } from "@/app/(public)/release/release-audio-player";
 import ReleaseDescription from "@/app/(public)/release/release-description";
 import ReleaseDetailPurchaseCard from "@/app/(public)/release/release-detail-purchase-card";
+import ReleaseFloatingPlayer from "@/app/(public)/release/release-floating-player";
+import ReleaseArtworkPlayToggle from "@/app/(public)/release/release-artwork-play-toggle";
 import ReleaseTrackList from "@/app/(public)/release/release-track-list";
 import { resolveStorefrontPreviewAsset } from "@/lib/audio/preview-source";
 import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
@@ -333,6 +335,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     return {
       id: track.id,
       title: track.title,
+      artistName: track.artistOverride?.trim() ? track.artistOverride : release.artist.name,
       trackNumber: track.trackNumber,
       durationMs: track.durationMs,
       previewFormat: previewAsset?.format ?? null,
@@ -345,6 +348,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const releasePlayerTracks: ReleaseAudioTrack[] = releaseTracks.map((track) => ({
     id: track.id,
     title: track.title,
+    artistName: track.artistName,
     trackNumber: track.trackNumber,
     durationMs: track.durationMs,
     isPlayablePreview: track.isPlayablePreview,
@@ -365,21 +369,14 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     <ReleaseArtworkTheme coverSrc={releaseCoverSrc} hasArtwork={hasArtwork}>
       <StorefrontHeader />
 
-      <main className="mx-auto mb-12 w-full max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto mb-12 w-full max-w-6xl px-4 pt-6 pb-36 sm:px-6 sm:pt-8 sm:pb-40">
         <ReleaseAudioPlayerProvider
           tracks={releasePlayerTracks}
           featuredTrackId={release.featuredTrackId}
         >
           <section className="sm:px-1">
             <div className="grid gap-5 lg:grid-cols-[minmax(220px,380px)_1fr]">
-              <div className="mx-auto aspect-square w-full max-w-[26rem] overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 lg:mx-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={releaseCoverSrc}
-                  alt={`${release.title} cover`}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              <ReleaseArtworkPlayToggle coverSrc={releaseCoverSrc} releaseTitle={release.title} />
 
               <div className="flex flex-col">
                 <p
@@ -528,6 +525,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
               </article>
             </div>
           </section>
+          <ReleaseFloatingPlayer coverSrc={releaseCoverSrc} fallbackArtistName={release.artist.name} />
         </ReleaseAudioPlayerProvider>
 
         {settings.contactEmail ? (
