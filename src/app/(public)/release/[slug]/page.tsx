@@ -331,7 +331,12 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
             </div>
 
             <div className="flex flex-col">
-              <p className={buyerTheme.eyebrow}>{formatReleaseType(release.releaseType)}</p>
+              <p
+                className="text-[11px] font-semibold uppercase tracking-[0.22em]"
+                style={{ color: "var(--release-accent-text)" }}
+              >
+                {formatReleaseType(release.releaseType)}
+              </p>
               <h1 className="mt-2 text-4xl font-semibold tracking-tight sm:text-5xl">
                 {release.title}
               </h1>

@@ -26,6 +26,7 @@ type ReleasePalette = {
   accentHover: string;
   accentSoft: string;
   accentContrast: string;
+  accentText: string;
   bgStart: string;
   bgMid: string;
   bgEnd: string;
@@ -36,6 +37,7 @@ const DEFAULT_PALETTE: ReleasePalette = {
   accentHover: "rgb(30 41 59)",
   accentSoft: "rgb(203 213 225)",
   accentContrast: "rgb(255 255 255)",
+  accentText: "rgb(30 41 59)",
   bgStart: "rgb(232 238 247)",
   bgMid: "rgb(226 236 255)",
   bgEnd: "rgb(245 248 252)",
@@ -46,6 +48,7 @@ const BRAND_FALLBACK_PALETTE: ReleasePalette = {
   accentHover: "rgb(5 150 105)",
   accentSoft: "rgb(110 231 183)",
   accentContrast: "rgb(255 255 255)",
+  accentText: "rgb(5 150 105)",
   bgStart: "rgb(221 245 234)",
   bgMid: "rgb(226 236 255)",
   bgEnd: "rgb(248 251 250)",
@@ -145,6 +148,48 @@ function resolveTextContrast(color: RgbColor): string {
   return luminance > 0.55 ? "rgb(17 24 39)" : "rgb(255 255 255)";
 }
 
+function resolveRelativeLuminance(color: RgbColor): number {
+  const toLinear = (channel: number) => {
+    const normalized = clamp(channel / 255, 0, 1);
+    if (normalized <= 0.03928) {
+      return normalized / 12.92;
+    }
+    return ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+
+  const red = toLinear(color.r);
+  const green = toLinear(color.g);
+  const blue = toLinear(color.b);
+  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+}
+
+function resolveContrastRatio(foreground: RgbColor, background: RgbColor): number {
+  const fg = resolveRelativeLuminance(foreground);
+  const bg = resolveRelativeLuminance(background);
+  const lighter = Math.max(fg, bg);
+  const darker = Math.min(fg, bg);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function ensureMinimumTextContrast(
+  foreground: RgbColor,
+  background: RgbColor,
+  minimumContrastRatio = 4.5,
+): RgbColor {
+  if (resolveContrastRatio(foreground, background) >= minimumContrastRatio) {
+    return foreground;
+  }
+
+  for (let step = 1; step <= 10; step += 1) {
+    const candidate = mixColor(foreground, { r: 0, g: 0, b: 0 }, step * 0.1);
+    if (resolveContrastRatio(candidate, background) >= minimumContrastRatio) {
+      return candidate;
+    }
+  }
+
+  return mixColor(foreground, { r: 0, g: 0, b: 0 }, 1);
+}
+
 function normalizeAccentColor(candidate: RgbColor) {
   const hsl = rgbToHsl(candidate);
   return hslToRgb({
@@ -217,12 +262,14 @@ function extractPaletteFromImage(image: HTMLImageElement): ReleasePalette {
     const bgStart = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.78);
     const bgMid = mixColor(averageColor, { r: 255, g: 255, b: 255 }, 0.84);
     const bgEnd = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.93);
+    const accentText = ensureMinimumTextContrast(accentHover, bgEnd);
 
     return {
       accent: rgbToCss(accent),
       accentHover: rgbToCss(accentHover),
       accentSoft: rgbToCss(accentSoft),
       accentContrast: resolveTextContrast(accent),
+      accentText: rgbToCss(accentText),
       bgStart: rgbToCss(bgStart),
       bgMid: rgbToCss(bgMid),
       bgEnd: rgbToCss(bgEnd),
@@ -243,6 +290,7 @@ function isPalette(value: unknown): value is ReleasePalette {
     typeof candidate.accentHover === "string" &&
     typeof candidate.accentSoft === "string" &&
     typeof candidate.accentContrast === "string" &&
+    typeof candidate.accentText === "string" &&
     typeof candidate.bgStart === "string" &&
     typeof candidate.bgMid === "string" &&
     typeof candidate.bgEnd === "string"
@@ -297,6 +345,7 @@ function isSamePalette(a: ReleasePalette, b: ReleasePalette) {
     a.accentHover === b.accentHover &&
     a.accentSoft === b.accentSoft &&
     a.accentContrast === b.accentContrast &&
+    a.accentText === b.accentText &&
     a.bgStart === b.bgStart &&
     a.bgMid === b.bgMid &&
     a.bgEnd === b.bgEnd
@@ -383,6 +432,7 @@ export default function ReleaseArtworkTheme({
         "--release-accent-hover": activePalette.accentHover,
         "--release-accent-soft": activePalette.accentSoft,
         "--release-accent-contrast": activePalette.accentContrast,
+        "--release-accent-text": activePalette.accentText,
         "--release-bg-start": activePalette.bgStart,
         "--release-bg-mid": activePalette.bgMid,
         "--release-bg-end": activePalette.bgEnd,
