@@ -22,6 +22,17 @@ export function syncReleaseDraftState(
         continue;
       }
 
+      if (
+        previousDraft.featuredTrackId &&
+        !release.tracks.some((track) => track.id === previousDraft.featuredTrackId)
+      ) {
+        next[release.id] = {
+          ...previousDraft,
+          featuredTrackId: null,
+        };
+        continue;
+      }
+
       if (!previousDraft.markLossyOnly && release.isLossyOnly) {
         next[release.id] = {
           ...previousDraft,

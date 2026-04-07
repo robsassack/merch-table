@@ -240,6 +240,7 @@ export function getReleaseUrlPreview(title: string, slug: string) {
 export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
   return {
     artistId: release.artistId,
+    featuredTrackId: release.featuredTrackId,
     title: release.title,
     releaseType: release.releaseType,
     label: release.label,

@@ -11,6 +11,7 @@ import {
 export const updateReleaseSchema = z.object({
   action: z.literal("update"),
   artistId: z.string().trim().min(1),
+  featuredTrackId: z.string().trim().min(1).max(191).nullable().optional(),
   title: z.string().trim().min(1).max(160),
   label: z.string().max(160).nullable().optional(),
   releaseType: z.enum([
@@ -135,6 +136,7 @@ export type ReleaseTrackState = {
 export type ReleaseForActionState = {
   id: string;
   artistId: string;
+  featuredTrackId?: string | null;
   title: string;
   label?: string | null;
   releaseType?: string;

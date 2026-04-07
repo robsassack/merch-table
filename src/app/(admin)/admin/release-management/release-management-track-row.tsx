@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { buttonClassName, dangerButtonClassName } from "./constants";
 import { ReleaseManagementTrackRowDetails } from "./release-management-track-row-details";
-import type { ReleaseRecord, TrackAssetRecord, TrackRecord } from "./types";
+import type { ReleaseDraft, ReleaseRecord, TrackAssetRecord, TrackRecord } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 import {
   formatTrackDuration,
@@ -37,6 +37,7 @@ function normalizeDeliveryAssetFormat(format: string) {
 type ReleaseManagementTrackRowProps = {
   controller: ReleaseManagementController;
   release: ReleaseRecord;
+  draft: ReleaseDraft;
   track: TrackRecord;
   isPending: boolean;
   importTrackPending: boolean;
@@ -55,6 +56,7 @@ export function ReleaseManagementTrackRow(props: ReleaseManagementTrackRowProps)
   const {
     controller,
     release,
+    draft,
     track,
     isPending,
     importTrackPending,
@@ -76,6 +78,7 @@ export function ReleaseManagementTrackRow(props: ReleaseManagementTrackRowProps)
   const trackActionPending = trackPending || trackRequeuePending;
   const trackUploadProgress = controller.trackUploadProgressById[track.id] ?? 0;
   const trackUploadRole = controller.trackUploadRoleById[track.id] ?? "MASTER";
+  const isFeaturedTrack = draft.featuredTrackId === track.id;
 
   const previewStatus = getTrackPreviewStatus(track);
   const deliveryStatus = getTrackDeliveryStatus(track, release.deliveryFormats);
@@ -271,6 +274,41 @@ export function ReleaseManagementTrackRow(props: ReleaseManagementTrackRowProps)
             }}
           >
             ↓
+          </button>
+          <button
+            type="button"
+            className={`inline-flex min-h-9 items-center justify-center rounded-lg border px-2.5 py-1 text-lg leading-none transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              isFeaturedTrack
+                ? "border-amber-400/80 bg-amber-400/20 text-amber-200 hover:bg-amber-400/30"
+                : "border-slate-600 bg-slate-800/60 text-zinc-300 hover:bg-slate-700 hover:text-zinc-100"
+            }`}
+            aria-label={
+              isFeaturedTrack
+                ? `Unset ${track.title} as featured track`
+                : `Set ${track.title} as featured track`
+            }
+            title={
+              isFeaturedTrack
+                ? "Unset featured track"
+                : "Set as featured track"
+            }
+            disabled={disabled}
+            onClick={() => {
+              controller.setDraftsById((previous) => ({
+                ...previous,
+                [release.id]: {
+                  ...draft,
+                  featuredTrackId: isFeaturedTrack ? null : track.id,
+                },
+              }));
+            }}
+          >
+            <span aria-hidden="true" className="text-[1.25rem]">
+              {isFeaturedTrack ? "★" : "☆"}
+            </span>
+            <span className="sr-only">
+              {isFeaturedTrack ? "Unset featured track" : "Set featured track"}
+            </span>
           </button>
           <button
             type="button"

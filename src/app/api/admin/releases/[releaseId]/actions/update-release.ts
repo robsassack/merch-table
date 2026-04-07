@@ -102,6 +102,14 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
     parsed.slug && parsed.slug.length > 0 ? parsed.slug : parsed.title,
     "release",
   );
+  const featuredTrackId = normalizeNullableText(parsed.featuredTrackId);
+
+  if (
+    featuredTrackId &&
+    !release.tracks.some((track) => track.id === featuredTrackId)
+  ) {
+    return errorResponse("Featured track must belong to this release.", 400);
+  }
 
   const slugConflict = await prisma.release.findFirst({
     where: {
@@ -146,6 +154,7 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
     // release.deliveryFormats yet.
     data: {
       artistId: artist.id,
+      featuredTrackId,
       title: parsed.title.trim(),
       label: resolveReleaseLabel(parsed.label),
       releaseType: parsed.releaseType,

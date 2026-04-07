@@ -15,6 +15,7 @@ const DEFAULT_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
 const adminReleaseSelectSharedBase = {
   id: true,
   artistId: true,
+  featuredTrackId: true,
   title: true,
   releaseType: true,
   label: true,
@@ -96,6 +97,7 @@ export type AdminReleaseAnyRow =
 export type AdminReleaseRecord = {
   id: string;
   artistId: string;
+  featuredTrackId: string | null;
   title: string;
   releaseType: ReleaseType;
   label: string;
@@ -240,6 +242,10 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
   return {
     id: release.id,
     artistId: release.artistId,
+    featuredTrackId:
+      "featuredTrackId" in release && typeof release.featuredTrackId === "string"
+        ? release.featuredTrackId
+        : null,
     title: release.title,
     releaseType:
       "releaseType" in release && typeof release.releaseType === "string"

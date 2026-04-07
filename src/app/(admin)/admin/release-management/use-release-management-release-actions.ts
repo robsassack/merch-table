@@ -294,6 +294,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
         body: JSON.stringify({
           action: "update",
           artistId: draft.artistId,
+          featuredTrackId: draft.featuredTrackId,
           title: draft.title,
           releaseType: draft.releaseType,
           label: draft.label,

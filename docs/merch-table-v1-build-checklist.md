@@ -264,12 +264,12 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Audio player (Howler.js)
 
-- [ ] Single persistent player instance on release page
-- [ ] Per-track preview playback (clip or full based on `previewMode`)
-- [ ] Click new track → stop current → start new; UI updates to reflect active track
-- [ ] Play/pause, progress bar, track title display
-- [ ] Respects browser autoplay restrictions (user gesture required)
-- [ ] Allow a featured track to be played by default
+- [x] Single persistent player instance on release page
+- [x] Per-track preview playback (clip or full based on `previewMode`)
+- [x] Click new track → stop current → start new; UI updates to reflect active track
+- [x] Play/pause, progress bar, track title display
+- [x] Respects browser autoplay restrictions (user gesture required)
+- [x] Allow a featured track to be played by default
 
 ### Post-purchase confirmation page
 

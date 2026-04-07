@@ -29,6 +29,7 @@ export type ArtistOption = {
 export type ReleaseRecord = {
   id: string;
   artistId: string;
+  featuredTrackId: string | null;
   title: string;
   releaseType: ReleaseType;
   label: string;
@@ -236,6 +237,7 @@ export type CoverUploadUrlResponse = {
 
 export type ReleaseDraft = {
   artistId: string;
+  featuredTrackId: string | null;
   title: string;
   releaseType: ReleaseType;
   label: string;

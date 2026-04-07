@@ -15,6 +15,7 @@ function createReleaseRecord(input: {
   return {
     id: input.id,
     artistId: "artist-1",
+    featuredTrackId: null,
     title: `Release ${input.id}`,
     releaseType: "ALBUM",
     label: "Independent",

@@ -345,6 +345,7 @@ export function ReleaseManagementCreateForm(props: {
             {renderPricingDetails(
               {
                 artistId: newArtistId,
+                featuredTrackId: null,
                 title: newTitle,
                 releaseType: newReleaseType,
                 label: newLabel,

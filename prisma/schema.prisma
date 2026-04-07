@@ -207,6 +207,7 @@ model Release {
   id                String                @id @default(cuid())
   organizationId    String
   artistId          String
+  featuredTrackId   String?
   title             String
   releaseType       ReleaseType           @default(ALBUM)
   label             String                @default("Independent")
@@ -226,6 +227,7 @@ model Release {
   deletedAt         DateTime?
   organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   artist            Artist                @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  featuredTrack     ReleaseTrack?         @relation("ReleaseFeaturedTrack", fields: [featuredTrackId], references: [id], onDelete: SetNull)
   tracks            ReleaseTrack[]
   files             ReleaseFile[]
   orderItems        OrderItem[]
@@ -235,6 +237,7 @@ model Release {
 
   @@unique([organizationId, slug])
   @@index([artistId, status])
+  @@index([featuredTrackId])
 }
 
 model StoreSettings {
@@ -275,6 +278,7 @@ model ReleaseTrack {
   previewMode    PreviewMode    @default(CLIP)
   previewSeconds Int?
   release        Release        @relation(fields: [releaseId], references: [id], onDelete: Cascade)
+  featuredOnReleases Release[]  @relation("ReleaseFeaturedTrack")
   assets         TrackAsset[]
   transcodeJobs  TranscodeJob[]
   createdAt      DateTime       @default(now())

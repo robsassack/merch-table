@@ -211,6 +211,7 @@ export function ReleaseManagementTrackManagement(props: {
                       <ReleaseManagementTrackList
                         controller={props.controller}
                         release={release}
+                        draft={props.draft}
                         isPending={isPending}
                         importTrackPending={importTrackPending}
                         previewApplyPending={previewApplyPending}

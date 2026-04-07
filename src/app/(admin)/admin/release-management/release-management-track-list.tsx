@@ -1,13 +1,14 @@
 import { useState } from "react";
 
 import { ReleaseManagementTrackRow } from "./release-management-track-row";
-import type { ReleaseRecord } from "./types";
+import type { ReleaseDraft, ReleaseRecord } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 import { sortTracks } from "./utils";
 
 export function ReleaseManagementTrackList(props: {
   controller: ReleaseManagementController;
   release: ReleaseRecord;
+  draft: ReleaseDraft;
   isPending: boolean;
   importTrackPending: boolean;
   previewApplyPending: boolean;
@@ -31,6 +32,7 @@ export function ReleaseManagementTrackList(props: {
     draggingTrackIdForRelease,
     dragOverTrackIdForRelease,
     controller,
+    draft,
   } = props;
 
   const visibleTracks = sortTracks(release.tracks).filter(
@@ -63,6 +65,7 @@ export function ReleaseManagementTrackList(props: {
             key={track.id}
             controller={controller}
             release={release}
+            draft={draft}
             track={track}
             isPending={isPending}
             importTrackPending={importTrackPending}
