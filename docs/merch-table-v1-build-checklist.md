@@ -250,14 +250,14 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Global storefront footer
 
-- [x] Show "Contact" link for the store owner using configured contact email (e.g., `mailto:` from `StoreSettings.contactEmail`) on public storefront pages
+- [x] Show "Contact" link for the store owner using configured contact email (e.g., `mailto:` from `StoreSettings.contactEmail`) on key buyer-facing public pages (`/release/[slug]` and `/find-my-purchases`)
 
 ### Release detail page
 
 - [x] Tracklist display with track metadata
 - [x] Pricing UI for `FREE` / `FIXED` / `PWYW` modes
 - [x] Quality disclosure notice when only lossy files available
-- [x] "You own this — go to your library" indicator with "Buy again" secondary option
+- [x] Owned-release UX hint (cookie/localStorage-backed) with a clear path to recover library access (`Find My Purchases`) and explicit repeat-purchase confirmation for already-owned emails
 - [x] Client-side owned-release detection via cookie/localStorage (UX hint only)
 - [x] Set up share functionality
 - [x] Set accent/background colors to match album artwork
@@ -273,7 +273,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Post-purchase confirmation page
 
-- [x] Shown after Stripe redirect or free checkout
+- [x] Shown after Stripe redirect; free checkout uses inline success confirmation messaging
 - [x] Links to buyer library
 
 ---
