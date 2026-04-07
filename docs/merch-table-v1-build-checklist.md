@@ -259,7 +259,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Quality disclosure notice when only lossy files available
 - [x] "You own this — go to your library" indicator with "Buy again" secondary option
 - [x] Client-side owned-release detection via cookie/localStorage (UX hint only)
-- [ ] Set up share functionality
+- [x] Set up share functionality
 - [x] Set accent/background colors to match album artwork
 
 ### Audio player (Howler.js)

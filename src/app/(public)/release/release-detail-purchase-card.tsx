@@ -247,7 +247,13 @@ export default function ReleaseDetailPurchaseCard({
         kind: "success",
         message: "Link copied to clipboard.",
       });
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof DOMException &&
+        (error.name === "AbortError" || error.name === "NotAllowedError")
+      ) {
+        return;
+      }
       setToast({
         kind: "error",
         message: "Could not share this release.",
