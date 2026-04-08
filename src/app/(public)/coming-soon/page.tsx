@@ -1,11 +1,47 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Store Is Private",
-};
+import { prisma } from "@/lib/prisma";
+import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
-export default function ComingSoonPage() {
+export const dynamic = "force-dynamic";
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await prisma.storeSettings.findFirst({
+    select: {
+      storeName: true,
+      brandName: true,
+      organization: {
+        select: { name: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const brandLabel = resolveStorefrontBrandLabel({
+    storeName: settings?.storeName ?? null,
+    brandName: settings?.brandName ?? null,
+    organizationName: settings?.organization?.name ?? null,
+  });
+
+  return {
+    title: {
+      absolute: `Store Is Private | ${brandLabel}`,
+    },
+  };
+}
+
+export default async function ComingSoonPage() {
+  const settings = await prisma.storeSettings.findFirst({
+    select: { storeStatus: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  if (settings?.storeStatus === "PUBLIC") {
+    redirect("/");
+  }
+
   return (
     <main
       id="main-content"

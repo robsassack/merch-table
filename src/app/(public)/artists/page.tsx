@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
+import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
 function resolveOptionalImageUrl(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -56,9 +57,31 @@ function ArtistAvatar({
 }
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = {
-  title: "Artists",
-};
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await prisma.storeSettings.findFirst({
+    select: {
+      storeName: true,
+      brandName: true,
+      organization: {
+        select: { name: true },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const brandLabel = resolveStorefrontBrandLabel({
+    storeName: settings?.storeName ?? null,
+    brandName: settings?.brandName ?? null,
+    organizationName: settings?.organization?.name ?? null,
+  });
+
+  return {
+    title: {
+      absolute: `Artists | ${brandLabel}`,
+    },
+  };
+}
 
 export default async function ArtistsPage() {
   const settings = await prisma.storeSettings.findFirst({

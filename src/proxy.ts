@@ -95,6 +95,10 @@ export async function proxy(request: NextRequest) {
     }
   }
 
+  if (setup.storeStatus === "PUBLIC" && isMaintenancePath) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   if (isAdminPath && !isAdminAuthPath) {
     const authenticated = await isAdminAuthenticated(request);
     if (!authenticated) {
