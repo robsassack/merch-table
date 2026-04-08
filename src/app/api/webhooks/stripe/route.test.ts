@@ -82,6 +82,7 @@ describe("POST /api/webhooks/stripe", () => {
               return { count: 1 };
             },
             updateMany: async () => ({ count: 1 }),
+            deleteMany: async () => ({ count: 0 }),
           },
           trackAsset: {
             findMany: async () => [

@@ -100,6 +100,7 @@ describe("POST /api/checkout/free", () => {
               return { count: 1 };
             },
             updateMany: async () => ({ count: 1 }),
+            deleteMany: async () => ({ count: 0 }),
           },
           trackAsset: {
             findMany: async () => [
@@ -217,6 +218,7 @@ describe("POST /api/checkout/free", () => {
               return { count: 1 };
             },
             updateMany: async () => ({ count: 1 }),
+            deleteMany: async () => ({ count: 0 }),
           },
           trackAsset: {
             findMany: async () => [
@@ -344,6 +346,7 @@ describe("POST /api/checkout/free", () => {
               return { count: 1 };
             },
             updateMany: async () => ({ count: 1 }),
+            deleteMany: async () => ({ count: 0 }),
           },
           trackAsset: {
             findMany: async () => [

@@ -72,6 +72,26 @@ async function fetchLibraryEntitlements(customerId: string) {
   });
 }
 
+type LibraryEntitlement = Awaited<ReturnType<typeof fetchLibraryEntitlements>>[number];
+
+function dedupeLatestEntitlementsByReleaseFile(
+  entitlements: LibraryEntitlement[],
+) {
+  const seenReleaseFileIds = new Set<string>();
+  const deduped: LibraryEntitlement[] = [];
+
+  for (const entitlement of entitlements) {
+    if (seenReleaseFileIds.has(entitlement.releaseFileId)) {
+      continue;
+    }
+
+    seenReleaseFileIds.add(entitlement.releaseFileId);
+    deduped.push(entitlement);
+  }
+
+  return deduped;
+}
+
 async function syncMissingReleaseFileEntitlements(input: {
   customerId: string;
   existingEntitlements: Array<{ releaseId: string; releaseFileId: string }>;
@@ -230,10 +250,11 @@ export async function GET(_request: Request, context: RouteContext) {
   if (addedMissingEntitlements) {
     entitlements = await fetchLibraryEntitlements(libraryToken.customerId);
   }
+  const uniqueEntitlements = dedupeLatestEntitlementsByReleaseFile(entitlements);
 
   const availableDownloadFormatsByReleaseId: Record<string, Array<"mp3" | "m4a" | "flac">> =
     {};
-  for (const entitlement of entitlements) {
+  for (const entitlement of uniqueEntitlements) {
     const releaseId = entitlement.release.id;
     const format = resolveReleaseFileFormat({
       fileName: entitlement.releaseFile.fileName,
@@ -258,7 +279,7 @@ export async function GET(_request: Request, context: RouteContext) {
         accessCount: updatedToken.accessCount,
       },
       availableDownloadFormatsByReleaseId,
-      downloads: entitlements.map((entitlement) => ({
+      downloads: uniqueEntitlements.map((entitlement) => ({
         entitlementToken: entitlement.token,
         releaseFileId: entitlement.releaseFileId,
         downloadPath: `/api/download/${encodeURIComponent(entitlement.token)}/${encodeURIComponent(entitlement.releaseFileId)}`,
@@ -294,7 +315,7 @@ export async function GET(_request: Request, context: RouteContext) {
   );
 
   const ownedReleaseHintCookie = createOwnedReleaseHintCookieValue(
-    entitlements.map((entitlement) => entitlement.release.id),
+    uniqueEntitlements.map((entitlement) => entitlement.release.id),
   );
   if (ownedReleaseHintCookie) {
     response.cookies.set({

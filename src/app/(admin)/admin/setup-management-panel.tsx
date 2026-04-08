@@ -41,6 +41,7 @@ const secondaryButtonClassName =
 
 function ContactEmailForm() {
   const router = useRouter();
+  const [isHydrated, setIsHydrated] = useState(false);
   const [contactEmail, setContactEmail] = useState("");
   const [storeStatus, setStoreStatus] = useState<StoreStatus>("SETUP");
   const [saving, setSaving] = useState(false);
@@ -49,6 +50,10 @@ function ContactEmailForm() {
   const [notice, setNotice] = useState<string | null>(null);
   const contactErrorId = "admin-store-settings-error";
   const initialLoad = useRef(true);
+
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
 
   useEffect(() => {
     if (!initialLoad.current) return;
@@ -139,6 +144,20 @@ function ContactEmailForm() {
       : storeStatus === "PRIVATE"
         ? "border-amber-800/70 bg-amber-950/60 text-amber-300"
         : "border-slate-700 bg-slate-900/70 text-zinc-300";
+
+  if (!isHydrated) {
+    return (
+      <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">
+        <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Store Settings</h2>
+        <p className="mt-1 text-sm text-zinc-400">
+          Manage storefront visibility and buyer contact details.
+        </p>
+        <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/80 p-4">
+          <p className="text-sm text-zinc-400">Loading store settings...</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="mt-8 rounded-2xl border border-slate-700/90 bg-slate-950/50 p-5 sm:p-6">

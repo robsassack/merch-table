@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import {
   formatMoney,
   resolveBuyLabel,
   resolveCurrencyPrefix,
-  resolveMayAlreadyOwnRelease,
 } from "@/app/(public)/release/release-detail-purchase-card-utils";
 import { useReleaseAudioPlayer } from "@/app/(public)/release/release-audio-player";
+import { isReleaseOwnedInStorage } from "@/app/(public)/release/owned-release-storage";
 import ReleaseCheckoutDialog from "@/app/(public)/release/release-checkout-dialog";
 import type { PricingMode } from "@/app/(public)/release/release-detail-purchase-card-utils";
 
@@ -31,6 +31,7 @@ type ToastState = {
 
 const ALREADY_OWNED_CONFIRMATION_REQUIRED_CODE =
   "ALREADY_OWNED_CONFIRMATION_REQUIRED";
+const subscribeNoop = () => () => {};
 
 export default function ReleaseDetailPurchaseCard({
   releaseId,
@@ -58,14 +59,18 @@ export default function ReleaseDetailPurchaseCard({
   const [checkoutFormError, setCheckoutFormError] = useState<string | null>(null);
   const [alreadyOwnedWarning, setAlreadyOwnedWarning] = useState<string | null>(null);
   const [confirmAlreadyOwned, setConfirmAlreadyOwned] = useState(false);
-  const mayAlreadyOwnRelease = useMemo(
-    () =>
-      resolveMayAlreadyOwnRelease({
-        initialMayOwnRelease,
-        releaseId,
-      }),
-    [initialMayOwnRelease, releaseId],
+  const storageMayOwnRelease = useSyncExternalStore(
+    subscribeNoop,
+    () => {
+      try {
+        return isReleaseOwnedInStorage(window.localStorage, releaseId);
+      } catch {
+        return false;
+      }
+    },
+    () => false,
   );
+  const mayAlreadyOwnRelease = initialMayOwnRelease || storageMayOwnRelease;
 
   const buyLabel = useMemo(
     () =>

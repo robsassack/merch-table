@@ -209,11 +209,25 @@ export async function ensureReleaseFilesForCheckout(
     });
   }
 
+  const sourceStorageKeys = sourceAssets.map((asset) => asset.storageKey);
+  await tx.releaseFile.deleteMany({
+    where: {
+      releaseId: input.releaseId,
+      storageKey: {
+        notIn: sourceStorageKeys,
+      },
+      release: {
+        organizationId: input.organizationId,
+        deletedAt: null,
+      },
+    },
+  });
+
   return tx.releaseFile.findMany({
     where: {
       releaseId: input.releaseId,
       storageKey: {
-        in: sourceAssets.map((asset) => asset.storageKey),
+        in: sourceStorageKeys,
       },
       release: {
         organizationId: input.organizationId,

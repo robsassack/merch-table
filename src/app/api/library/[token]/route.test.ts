@@ -5,12 +5,100 @@ import { OWNED_RELEASE_HINT_COOKIE_NAME } from "@/lib/checkout/owned-release-hin
 
 type AnyRecord = Record<string, unknown>;
 
+const TEST_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+const ROUTE_URL = "http://localhost:3000/api/library/lib-token";
+
 function patchMethod(target: AnyRecord, name: string, replacement: unknown) {
   const original = target[name];
   target[name] = replacement;
   return () => {
     target[name] = original;
   };
+}
+
+function useTestDatabase() {
+  process.env.DATABASE_URL ??= TEST_DATABASE_URL;
+}
+
+function makeBuyerLibraryToken(overrides?: {
+  id?: string;
+  customerId?: string;
+  revokedAt?: Date | null;
+  expiresAt?: Date | null;
+}) {
+  return {
+    id: overrides?.id ?? "lib-token-1",
+    customerId: overrides?.customerId ?? "customer-1",
+    revokedAt: overrides?.revokedAt ?? null,
+    expiresAt: overrides?.expiresAt ?? null,
+  };
+}
+
+function makeBuyerLibraryTokenUpdate(overrides?: {
+  lastUsedAt?: Date;
+  accessCount?: number;
+  expiresAt?: Date | null;
+}) {
+  return {
+    lastUsedAt: overrides?.lastUsedAt ?? new Date("2026-04-04T12:00:00.000Z"),
+    accessCount: overrides?.accessCount ?? 1,
+    expiresAt: overrides?.expiresAt ?? null,
+  };
+}
+
+function makeEntitlement(overrides?: {
+  token?: string;
+  createdAt?: Date;
+  releaseFileId?: string;
+  fileName?: string;
+  sizeBytes?: number;
+  mimeType?: string;
+  releaseId?: string;
+  releaseTitle?: string;
+  releaseSlug?: string;
+  coverImageUrl?: string | null;
+  artistName?: string;
+  orderId?: string;
+  orderNumber?: string;
+  paidAt?: Date;
+  orderCreatedAt?: Date;
+}) {
+  return {
+    token: overrides?.token ?? "ent-1",
+    createdAt: overrides?.createdAt ?? new Date("2026-04-04T10:00:00.000Z"),
+    releaseFileId: overrides?.releaseFileId ?? "file-1",
+    releaseFile: {
+      id: overrides?.releaseFileId ?? "file-1",
+      fileName: overrides?.fileName ?? "01 - Track One.flac",
+      sizeBytes: overrides?.sizeBytes ?? 123456,
+      mimeType: overrides?.mimeType ?? "audio/flac",
+    },
+    release: {
+      id: overrides?.releaseId ?? "release-1",
+      title: overrides?.releaseTitle ?? "Release One",
+      slug: overrides?.releaseSlug ?? "release-one",
+      coverImageUrl: overrides?.coverImageUrl ?? null,
+      artist: {
+        name: overrides?.artistName ?? "Artist One",
+      },
+    },
+    orderItem: {
+      order: {
+        id: overrides?.orderId ?? "order-1",
+        orderNumber: overrides?.orderNumber ?? "ORDER-1",
+        paidAt: overrides?.paidAt ?? new Date("2026-04-03T12:00:00.000Z"),
+        createdAt:
+          overrides?.orderCreatedAt ?? new Date("2026-04-03T12:00:00.000Z"),
+      },
+    },
+  };
+}
+
+async function loadLibrary(token = "lib-token") {
+  const { GET } = await import("@/app/api/library/[token]/route");
+  return GET(new Request(ROUTE_URL), {
+    params: Promise.resolve({ token }),
+  });
 }
 
 describe("GET /api/library/:token", () => {
@@ -26,20 +114,14 @@ describe("GET /api/library/:token", () => {
 
   it("returns downloads and updates access tracking for a valid token", async () => {
     process.env.AUTH_SECRET = "test-secret";
-    process.env.DATABASE_URL ??=
-      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    useTestDatabase();
     const { prisma } = await import("@/lib/prisma");
 
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "findUnique",
-        async () => ({
-          id: "lib-token-1",
-          customerId: "customer-1",
-          revokedAt: null,
-          expiresAt: null,
-        }),
+        async () => makeBuyerLibraryToken({ id: "lib-token-1" }),
       ),
     );
 
@@ -50,11 +132,7 @@ describe("GET /api/library/:token", () => {
         "update",
         async (input: AnyRecord) => {
           buyerLibraryTokenUpdateInput = input;
-          return {
-            lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
-            accessCount: 3,
-            expiresAt: null,
-          };
+          return makeBuyerLibraryTokenUpdate({ accessCount: 3 });
         },
       ),
     );
@@ -63,47 +141,14 @@ describe("GET /api/library/:token", () => {
       patchMethod(
         prisma.downloadEntitlement as unknown as AnyRecord,
         "findMany",
-        async () => [
-          {
-            token: "ent-1",
-            createdAt: new Date("2026-04-04T10:00:00.000Z"),
-            releaseFileId: "file-1",
-            releaseFile: {
-              id: "file-1",
-              fileName: "01 - Track One.flac",
-              sizeBytes: 123456,
-              mimeType: "audio/flac",
-            },
-            release: {
-              id: "release-1",
-              title: "Release One",
-              slug: "release-one",
-              coverImageUrl: null,
-              artist: {
-                name: "Artist One",
-              },
-            },
-            orderItem: {
-              order: {
-                id: "order-1",
-                orderNumber: "ORDER-1",
-                paidAt: new Date("2026-04-03T12:00:00.000Z"),
-                createdAt: new Date("2026-04-03T12:00:00.000Z"),
-              },
-            },
-          },
-        ],
+        async () => [makeEntitlement()],
       ),
     );
     restore.push(
       patchMethod(prisma.orderItem as unknown as AnyRecord, "findMany", async () => []),
     );
 
-    const { GET } = await import("@/app/api/library/[token]/route");
-
-    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
-      params: Promise.resolve({ token: "lib-token" }),
-    });
+    const response = await loadLibrary();
 
     assert.equal(response.status, 200);
     assert.equal(
@@ -139,32 +184,84 @@ describe("GET /api/library/:token", () => {
     assert.ok(((updateInput.data as AnyRecord)?.lastUsedAt as unknown) instanceof Date);
   });
 
-  it("adds missing entitlements for newly added release files before returning library downloads", async () => {
-    process.env.DATABASE_URL ??=
-      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+  it("deduplicates repeat entitlements for the same release file", async () => {
+    useTestDatabase();
     const { prisma } = await import("@/lib/prisma");
 
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "findUnique",
-        async () => ({
-          id: "lib-token-3",
-          customerId: "customer-1",
-          revokedAt: null,
-          expiresAt: null,
-        }),
+        async () => makeBuyerLibraryToken({ id: "lib-token-dupe" }),
       ),
     );
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "update",
-        async () => ({
-          lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
-          accessCount: 4,
-          expiresAt: null,
-        }),
+        async () => makeBuyerLibraryTokenUpdate({ accessCount: 10 }),
+      ),
+    );
+
+    restore.push(
+      patchMethod(
+        prisma.downloadEntitlement as unknown as AnyRecord,
+        "findMany",
+        async () => [
+          makeEntitlement({
+            token: "ent-new",
+            createdAt: new Date("2026-04-04T11:00:00.000Z"),
+            orderId: "order-2",
+            orderNumber: "ORDER-2",
+            paidAt: new Date("2026-04-04T10:00:00.000Z"),
+            orderCreatedAt: new Date("2026-04-04T10:00:00.000Z"),
+          }),
+          makeEntitlement({
+            token: "ent-old",
+            createdAt: new Date("2026-04-03T11:00:00.000Z"),
+            paidAt: new Date("2026-04-03T10:00:00.000Z"),
+            orderCreatedAt: new Date("2026-04-03T10:00:00.000Z"),
+          }),
+        ],
+      ),
+    );
+    restore.push(
+      patchMethod(prisma.orderItem as unknown as AnyRecord, "findMany", async () => []),
+    );
+
+    const response = await loadLibrary();
+
+    assert.equal(response.status, 200);
+    const payload = (await response.json()) as {
+      ok: boolean;
+      downloads: Array<{ downloadPath: string }>;
+      availableDownloadFormatsByReleaseId: Record<string, string[]>;
+    };
+
+    assert.equal(payload.ok, true);
+    assert.equal(payload.downloads.length, 1);
+    assert.equal(payload.downloads[0]?.downloadPath, "/api/download/ent-new/file-1");
+    assert.deepEqual(payload.availableDownloadFormatsByReleaseId["release-1"], [
+      "flac",
+    ]);
+  });
+
+  it("adds missing entitlements for newly added release files before returning library downloads", async () => {
+    useTestDatabase();
+    const { prisma } = await import("@/lib/prisma");
+
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "findUnique",
+        async () => makeBuyerLibraryToken({ id: "lib-token-3" }),
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.buyerLibraryToken as unknown as AnyRecord,
+        "update",
+        async () => makeBuyerLibraryTokenUpdate({ accessCount: 4 }),
       ),
     );
 
@@ -176,95 +273,18 @@ describe("GET /api/library/:token", () => {
         async () => {
           entitlementReadCount += 1;
           if (entitlementReadCount === 1) {
-            return [
-              {
-                token: "ent-1",
-                createdAt: new Date("2026-04-04T10:00:00.000Z"),
-                releaseFileId: "file-1",
-                releaseFile: {
-                  id: "file-1",
-                  fileName: "01 - Track One.flac",
-                  sizeBytes: 123456,
-                  mimeType: "audio/flac",
-                },
-                release: {
-                  id: "release-1",
-                  title: "Release One",
-                  slug: "release-one",
-                  coverImageUrl: null,
-                  artist: {
-                    name: "Artist One",
-                  },
-                },
-                orderItem: {
-                  order: {
-                    id: "order-1",
-                    orderNumber: "ORDER-1",
-                    paidAt: new Date("2026-04-03T12:00:00.000Z"),
-                    createdAt: new Date("2026-04-03T12:00:00.000Z"),
-                  },
-                },
-              },
-            ];
+            return [makeEntitlement({ token: "ent-1", releaseFileId: "file-1" })];
           }
 
           return [
-            {
+            makeEntitlement({
               token: "ent-2",
               createdAt: new Date("2026-04-04T11:00:00.000Z"),
               releaseFileId: "file-2",
-              releaseFile: {
-                id: "file-2",
-                fileName: "02 - New Song.flac",
-                sizeBytes: 654321,
-                mimeType: "audio/flac",
-              },
-              release: {
-                id: "release-1",
-                title: "Release One",
-                slug: "release-one",
-                coverImageUrl: null,
-                artist: {
-                  name: "Artist One",
-                },
-              },
-              orderItem: {
-                order: {
-                  id: "order-1",
-                  orderNumber: "ORDER-1",
-                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
-                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
-                },
-              },
-            },
-            {
-              token: "ent-1",
-              createdAt: new Date("2026-04-04T10:00:00.000Z"),
-              releaseFileId: "file-1",
-              releaseFile: {
-                id: "file-1",
-                fileName: "01 - Track One.flac",
-                sizeBytes: 123456,
-                mimeType: "audio/flac",
-              },
-              release: {
-                id: "release-1",
-                title: "Release One",
-                slug: "release-one",
-                coverImageUrl: null,
-                artist: {
-                  name: "Artist One",
-                },
-              },
-              orderItem: {
-                order: {
-                  id: "order-1",
-                  orderNumber: "ORDER-1",
-                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
-                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
-                },
-              },
-            },
+              fileName: "02 - New Song.flac",
+              sizeBytes: 654321,
+            }),
+            makeEntitlement({ token: "ent-1", releaseFileId: "file-1" }),
           ];
         },
       ),
@@ -315,10 +335,7 @@ describe("GET /api/library/:token", () => {
       ),
     );
 
-    const { GET } = await import("@/app/api/library/[token]/route");
-    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
-      params: Promise.resolve({ token: "lib-token" }),
-    });
+    const response = await loadLibrary();
 
     assert.equal(response.status, 200);
     const payload = (await response.json()) as {
@@ -337,57 +354,42 @@ describe("GET /api/library/:token", () => {
   });
 
   it("returns 403 when the token has expired", async () => {
-    process.env.DATABASE_URL ??=
-      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    useTestDatabase();
     const { prisma } = await import("@/lib/prisma");
 
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "findUnique",
-        async () => ({
-          id: "lib-token-2",
-          customerId: "customer-1",
-          revokedAt: null,
-          expiresAt: new Date("2026-04-04T00:00:00.000Z"),
-        }),
+        async () =>
+          makeBuyerLibraryToken({
+            id: "lib-token-2",
+            expiresAt: new Date("2026-04-04T00:00:00.000Z"),
+          }),
       ),
     );
 
-    const { GET } = await import("@/app/api/library/[token]/route");
-    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
-      params: Promise.resolve({ token: "lib-token" }),
-    });
+    const response = await loadLibrary();
 
     assert.equal(response.status, 403);
   });
 
   it("returns refreshed file names after release-file metadata is reconciled", async () => {
-    process.env.DATABASE_URL ??=
-      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    useTestDatabase();
     const { prisma } = await import("@/lib/prisma");
 
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "findUnique",
-        async () => ({
-          id: "lib-token-4",
-          customerId: "customer-1",
-          revokedAt: null,
-          expiresAt: null,
-        }),
+        async () => makeBuyerLibraryToken({ id: "lib-token-4" }),
       ),
     );
     restore.push(
       patchMethod(
         prisma.buyerLibraryToken as unknown as AnyRecord,
         "update",
-        async () => ({
-          lastUsedAt: new Date("2026-04-04T12:00:00.000Z"),
-          accessCount: 7,
-          expiresAt: null,
-        }),
+        async () => makeBuyerLibraryTokenUpdate({ accessCount: 7 }),
       ),
     );
 
@@ -398,39 +400,17 @@ describe("GET /api/library/:token", () => {
         "findMany",
         async () => {
           entitlementReadCount += 1;
-          const fileName =
-            entitlementReadCount === 1
-              ? "01 - Old Name.flac"
-              : "01 - Renamed Track.flac";
           return [
-            {
+            makeEntitlement({
               token: "ent-rename-1",
-              createdAt: new Date("2026-04-04T10:00:00.000Z"),
-              releaseFileId: "file-1",
-              releaseFile: {
-                id: "file-1",
-                fileName,
-                sizeBytes: 111111,
-                mimeType: "audio/flac",
-              },
-              release: {
-                id: "release-1",
-                title: "Renamed Album",
-                slug: "renamed-album",
-                coverImageUrl: null,
-                artist: {
-                  name: "Artist One",
-                },
-              },
-              orderItem: {
-                order: {
-                  id: "order-1",
-                  orderNumber: "ORDER-1",
-                  paidAt: new Date("2026-04-03T12:00:00.000Z"),
-                  createdAt: new Date("2026-04-03T12:00:00.000Z"),
-                },
-              },
-            },
+              releaseTitle: "Renamed Album",
+              releaseSlug: "renamed-album",
+              fileName:
+                entitlementReadCount === 1
+                  ? "01 - Old Name.flac"
+                  : "01 - Renamed Track.flac",
+              sizeBytes: 111111,
+            }),
           ];
         },
       ),
@@ -488,15 +468,19 @@ describe("GET /api/library/:token", () => {
     restore.push(
       patchMethod(
         prisma.releaseFile as unknown as AnyRecord,
+        "deleteMany",
+        async () => ({ count: 0 }),
+      ),
+    );
+    restore.push(
+      patchMethod(
+        prisma.releaseFile as unknown as AnyRecord,
         "findMany",
         async () => [{ id: "file-1", releaseId: "release-1" }],
       ),
     );
 
-    const { GET } = await import("@/app/api/library/[token]/route");
-    const response = await GET(new Request("http://localhost:3000/api/library/lib-token"), {
-      params: Promise.resolve({ token: "lib-token" }),
-    });
+    const response = await loadLibrary();
 
     assert.equal(response.status, 200);
     const payload = (await response.json()) as {
