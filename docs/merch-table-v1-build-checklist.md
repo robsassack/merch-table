@@ -301,7 +301,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Orders & customers panel
 
-- [ ] List orders with email delivery status
+- [x] List orders with email delivery status
 - [ ] Retry action for undelivered (`FAILED`) purchase confirmation emails
 - [ ] Revoke individual `BuyerLibraryToken`s
 
@@ -322,6 +322,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] Add markdown editing tools to release description field
 - [ ] Add default options for pricing, download formats, and preview settings when creating a new release
 - [ ] Add featured track option for releases
+- [ ] Add option to not have track previews on a release
 
 ### Status panel
 

@@ -3,12 +3,14 @@ import { prisma } from "@/lib/prisma";
 
 import { AdminSignOutButton } from "./admin-sign-out-button";
 import { AdminWorkspace, type AdminTab } from "./admin-workspace";
+import type { OrderManagementSearchParams } from "./order-management-panel";
 
 type AdminShellProps = {
   activeTab: AdminTab;
+  ordersSearchParams?: OrderManagementSearchParams;
 };
 
-export async function AdminShell({ activeTab }: AdminShellProps) {
+export async function AdminShell({ activeTab, ordersSearchParams }: AdminShellProps) {
   const settings = await prisma.storeSettings
     .findFirst({
       select: {
@@ -39,6 +41,7 @@ export async function AdminShell({ activeTab }: AdminShellProps) {
             storeStatus={storeStatus}
             storeName={storeName}
             activeTab={activeTab}
+            ordersSearchParams={ordersSearchParams}
           />
         </section>
       </div>

@@ -3,6 +3,10 @@ import Link from "next/link";
 import type { StoreStatus } from "@/generated/prisma/enums";
 
 import { ArtistManagementPanel } from "./artist-management-panel";
+import {
+  OrderManagementPanel,
+  type OrderManagementSearchParams,
+} from "./order-management-panel";
 import { ReleaseManagementPanel } from "./release-management-panel";
 import { SetupManagementPanel } from "./setup-management-panel";
 
@@ -10,9 +14,10 @@ type AdminWorkspaceProps = {
   storeStatus: StoreStatus;
   storeName: string | null;
   activeTab: AdminTab;
+  ordersSearchParams?: OrderManagementSearchParams;
 };
 
-export type AdminTab = "artists" | "releases" | "setup";
+export type AdminTab = "artists" | "releases" | "orders" | "setup";
 
 const tabClassName =
   "inline-flex flex-1 items-center justify-center rounded-lg px-3 py-2.5 text-sm font-medium transition sm:flex-none";
@@ -41,7 +46,12 @@ function getStatusLabel(status: StoreStatus) {
   return "Setup";
 }
 
-export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorkspaceProps) {
+export function AdminWorkspace({
+  storeStatus,
+  storeName,
+  activeTab,
+  ordersSearchParams,
+}: AdminWorkspaceProps) {
   return (
     <>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-700/80 bg-slate-950/50 p-3">
@@ -84,6 +94,17 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
             Releases
           </Link>
           <Link
+            href="/admin/orders"
+            aria-current={activeTab === "orders" ? "page" : undefined}
+            className={`${tabClassName} ${
+              activeTab === "orders"
+                ? "bg-slate-700 text-zinc-100"
+                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
+            }`}
+          >
+            Orders
+          </Link>
+          <Link
             href="/admin/setup"
             aria-current={activeTab === "setup" ? "page" : undefined}
             className={`${tabClassName} ${
@@ -100,6 +121,9 @@ export function AdminWorkspace({ storeStatus, storeName, activeTab }: AdminWorks
       <div className="mt-4">
         {activeTab === "artists" ? <ArtistManagementPanel /> : null}
         {activeTab === "releases" ? <ReleaseManagementPanel /> : null}
+        {activeTab === "orders" ? (
+          <OrderManagementPanel searchParams={ordersSearchParams} />
+        ) : null}
         {activeTab === "setup" ? <SetupManagementPanel /> : null}
       </div>
     </>
