@@ -7,15 +7,17 @@ function makeAsset(input: {
   id: string;
   assetRole: "MASTER" | "PREVIEW" | "DELIVERY";
   updatedAt: string;
+  format?: string;
+  mimeType?: string;
 }) {
   return {
     id: input.id,
     assetRole: input.assetRole,
     updatedAt: input.updatedAt,
-    format: "mp3",
+    format: input.format ?? "mp3",
     isLossless: false,
     storageKey: `tracks/${input.id}.mp3`,
-    mimeType: "audio/mpeg",
+    mimeType: input.mimeType ?? "audio/mpeg",
   };
 }
 
@@ -40,7 +42,7 @@ describe("resolveStorefrontPreviewAsset", () => {
     assert.equal(result?.id, "preview-old");
   });
 
-  it("returns newest master for FULL mode", () => {
+  it("prefers a full-length MP3 for FULL mode", () => {
     const result = resolveStorefrontPreviewAsset({
       previewMode: "FULL",
       assets: [
@@ -48,6 +50,39 @@ describe("resolveStorefrontPreviewAsset", () => {
           id: "master-old",
           assetRole: "MASTER",
           updatedAt: "2026-04-06T12:00:00.000Z",
+          format: "flac",
+          mimeType: "audio/flac",
+        }),
+        makeAsset({
+          id: "delivery-mp3",
+          assetRole: "DELIVERY",
+          updatedAt: "2026-04-06T12:10:00.000Z",
+          format: "mp3",
+          mimeType: "audio/mpeg",
+        }),
+        makeAsset({
+          id: "master-new",
+          assetRole: "MASTER",
+          updatedAt: "2026-04-06T12:30:00.000Z",
+          format: "wav",
+          mimeType: "audio/wav",
+        }),
+      ],
+    });
+
+    assert.equal(result?.id, "delivery-mp3");
+  });
+
+  it("returns newest master for FULL mode when no full-length MP3 exists", () => {
+    const result = resolveStorefrontPreviewAsset({
+      previewMode: "FULL",
+      assets: [
+        makeAsset({
+          id: "master-old",
+          assetRole: "MASTER",
+          updatedAt: "2026-04-06T12:00:00.000Z",
+          format: "flac",
+          mimeType: "audio/flac",
         }),
         makeAsset({
           id: "preview-new",
@@ -58,6 +93,8 @@ describe("resolveStorefrontPreviewAsset", () => {
           id: "master-new",
           assetRole: "MASTER",
           updatedAt: "2026-04-06T12:30:00.000Z",
+          format: "wav",
+          mimeType: "audio/wav",
         }),
       ],
     });
