@@ -3,6 +3,7 @@ export type DownloadFormat = "mp3" | "m4a" | "flac";
 export type LibraryDownload = {
   downloadPath: string;
   fileName: string;
+  sizeBytes: number | null;
   format: DownloadFormat | null;
   release: {
     id: string;
@@ -21,6 +22,7 @@ export type LibrarySuccessPayload = {
 export type LibraryTrackDownloadOption = {
   downloadPath: string;
   fileName: string;
+  sizeBytes: number | null;
   format: DownloadFormat | null;
   formatLabel: string;
 };
@@ -59,6 +61,24 @@ export function normalizeToken(value: string) {
 
 export function formatLabel(format: DownloadFormat) {
   return format.toUpperCase();
+}
+
+export function formatDownloadSize(sizeBytes: number | null) {
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return null;
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"] as const;
+  let value = sizeBytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const decimalPlaces = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(decimalPlaces)} ${units[unitIndex]}`;
 }
 
 export function describeFormats(formats: DownloadFormat[]) {
@@ -106,6 +126,7 @@ function buildTrackGroups(downloads: LibraryDownload[]) {
       existing.downloadOptions.push({
         downloadPath: download.downloadPath,
         fileName: download.fileName,
+        sizeBytes: download.sizeBytes,
         format: download.format,
         formatLabel: resolveFormatOptionLabel(download),
       });
@@ -121,6 +142,7 @@ function buildTrackGroups(downloads: LibraryDownload[]) {
         {
           downloadPath: download.downloadPath,
           fileName: download.fileName,
+          sizeBytes: download.sizeBytes,
           format: download.format,
           formatLabel: resolveFormatOptionLabel(download),
         },

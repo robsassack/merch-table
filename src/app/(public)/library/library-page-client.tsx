@@ -6,13 +6,16 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import { markOwnedReleaseInStorage } from "@/app/(public)/release/owned-release-storage";
 import {
+  type DownloadFormat,
   type LibraryState,
+  type LibraryReleaseGroup,
   type LibrarySuccessPayload,
   type LibraryTrackDownloadOption,
   type MixedZipPromptState,
   createReleaseZipPath,
   describeFormats,
   extractTokenFromWindow,
+  formatDownloadSize,
   formatLabel,
   groupDownloadsByRelease,
   normalizeToken,
@@ -44,6 +47,7 @@ function TrackDownloadControl({
   if (!selectedOption) {
     return null;
   }
+  const selectedSizeLabel = formatDownloadSize(selectedOption.sizeBytes);
 
   return (
     <div className="flex w-full items-center justify-end gap-2 sm:w-auto">
@@ -72,8 +76,37 @@ function TrackDownloadControl({
       >
         Download
       </a>
+      {selectedSizeLabel ? (
+        <span className="shrink-0 text-xs font-medium text-zinc-500">
+          {selectedSizeLabel}
+        </span>
+      ) : null}
     </div>
   );
+}
+
+function getReleaseZipSizeBytes(
+  release: LibraryReleaseGroup,
+  selectedFormat: DownloadFormat | null,
+) {
+  let total = 0;
+
+  for (const track of release.tracks) {
+    const option = selectedFormat
+      ? track.downloadOptions.find((candidate) => candidate.format === selectedFormat)
+      : track.downloadOptions[0];
+    if (
+      !option ||
+      typeof option.sizeBytes !== "number" ||
+      !Number.isFinite(option.sizeBytes) ||
+      option.sizeBytes <= 0
+    ) {
+      return null;
+    }
+    total += option.sizeBytes;
+  }
+
+  return total > 0 ? total : null;
 }
 
 export default function LibraryPageClient() {
@@ -83,6 +116,9 @@ export default function LibraryPageClient() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [library, setLibrary] = useState<LibrarySuccessPayload | null>(null);
   const [mixedZipPrompt, setMixedZipPrompt] = useState<MixedZipPromptState | null>(null);
+  const [selectedZipFormats, setSelectedZipFormats] = useState<
+    Partial<Record<string, DownloadFormat>>
+  >({});
   const tokenHelpTextId = "library-token-help";
   const tokenErrorTextId = "library-token-error";
 
@@ -311,126 +347,164 @@ export default function LibraryPageClient() {
         {state === "ready" && groupedReleases.length > 0 ? (
           <div className="space-y-8">
             {groupedReleases.map((release) => (
-              <article
-                key={release.id}
-                className="rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_64px_-44px_rgba(15,23,42,0.35)] sm:p-6"
-              >
-                <div className="grid gap-5 md:grid-cols-[220px_1fr]">
-                  <div className="mx-auto aspect-square w-full max-w-75 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 md:mx-0 md:max-w-none">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={resolveCoverSrc(release.coverImageUrl)}
-                      alt={`${release.title} cover`}
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
+              (() => {
+                const selectedZipFormat = release.canSelectZipFormat
+                  ? selectedZipFormats[release.id] ?? release.zipFormat
+                  : release.availableFormats.length === 1
+                    ? release.availableFormats[0] ?? null
+                    : null;
+                const releaseZipSizeLabel = formatDownloadSize(
+                  getReleaseZipSizeBytes(release, selectedZipFormat),
+                );
 
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700">
-                      Album
-                    </p>
-                    <h2 className="mt-2 text-3xl font-semibold tracking-tight">
-                      {release.title}
-                    </h2>
-                    <p className="mt-2 text-sm text-zinc-600">
-                      {release.artistName} • {release.downloads.length} files •{" "}
-                      {describeFormats(release.availableFormats)}
-                    </p>
+                return (
+                  <article
+                    key={release.id}
+                    className="rounded-2xl border border-zinc-200 bg-white/90 p-4 shadow-[0_24px_64px_-44px_rgba(15,23,42,0.35)] sm:p-6"
+                  >
+                    <div className="grid gap-5 md:grid-cols-[220px_1fr]">
+                      <div className="mx-auto aspect-square w-full max-w-75 overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 md:mx-0 md:max-w-none">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={resolveCoverSrc(release.coverImageUrl)}
+                          alt={`${release.title} cover`}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
 
-                    <div className="mt-5 flex flex-wrap items-center gap-2.5">
-                      {release.zipFormat ? (
-                        release.canSelectZipFormat ? (
-                          <form
-                            action={createReleaseZipPath({
-                              token,
-                              releaseId: release.id,
-                            })}
-                            method="get"
-                            className="flex flex-wrap items-center gap-2.5"
-                          >
-                            <label htmlFor={`zip-format-${release.id}`} className="sr-only">
-                              Select ZIP format for {release.title}
-                            </label>
-                            <select
-                              id={`zip-format-${release.id}`}
-                              name="format"
-                              defaultValue={release.zipFormat}
-                              className="h-8 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300"
-                            >
-                              {sortFormats(release.availableFormats).map((format) => (
-                                <option key={format} value={format}>
-                                  {formatLabel(format)}
-                                </option>
-                              ))}
-                            </select>
-                            <button type="submit" className={buyerTheme.buttonPrimary}>
-                              Download ZIP
-                            </button>
-                          </form>
-                        ) : (
-                          release.availableFormats.length > 1 ? (
-                            <button
-                              type="button"
-                              className={buyerTheme.buttonPrimary}
-                              onClick={() =>
-                                setMixedZipPrompt({
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-emerald-700">
+                          Album
+                        </p>
+                        <h2 className="mt-2 text-3xl font-semibold tracking-tight">
+                          {release.title}
+                        </h2>
+                        <p className="mt-2 text-sm text-zinc-600">
+                          {release.artistName} • {release.downloads.length} files •{" "}
+                          {describeFormats(release.availableFormats)}
+                        </p>
+
+                        <div className="mt-5 flex flex-wrap items-center gap-2.5">
+                          {release.zipFormat ? (
+                            release.canSelectZipFormat ? (
+                              <form
+                                action={createReleaseZipPath({
+                                  token,
                                   releaseId: release.id,
-                                  releaseTitle: release.title,
-                                })
-                              }
-                            >
-                              Download ZIP
-                            </button>
+                                })}
+                                method="get"
+                                className="flex flex-wrap items-center gap-2.5"
+                              >
+                                <label htmlFor={`zip-format-${release.id}`} className="sr-only">
+                                  Select ZIP format for {release.title}
+                                </label>
+                                <select
+                                  id={`zip-format-${release.id}`}
+                                  name="format"
+                                  value={selectedZipFormat ?? release.zipFormat}
+                                  onChange={(event) =>
+                                    setSelectedZipFormats((previous) => ({
+                                      ...previous,
+                                      [release.id]: event.target.value as DownloadFormat,
+                                    }))
+                                  }
+                                  className="h-8 rounded-xl border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-900 shadow-sm outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-300"
+                                >
+                                  {sortFormats(release.availableFormats).map((format) => (
+                                    <option key={format} value={format}>
+                                      {formatLabel(format)}
+                                    </option>
+                                  ))}
+                                </select>
+                                <button type="submit" className={buyerTheme.buttonPrimary}>
+                                  Download ZIP
+                                </button>
+                                {releaseZipSizeLabel ? (
+                                  <span className="text-xs font-medium text-zinc-500">
+                                    {releaseZipSizeLabel}
+                                  </span>
+                                ) : null}
+                              </form>
+                            ) : (
+                              release.availableFormats.length > 1 ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={buyerTheme.buttonPrimary}
+                                    onClick={() =>
+                                      setMixedZipPrompt({
+                                        releaseId: release.id,
+                                        releaseTitle: release.title,
+                                      })
+                                    }
+                                  >
+                                    Download ZIP
+                                  </button>
+                                  {releaseZipSizeLabel ? (
+                                    <span className="text-xs font-medium text-zinc-500">
+                                      {releaseZipSizeLabel}
+                                    </span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
+                                  <a
+                                    href={createReleaseZipPath({
+                                      token,
+                                      releaseId: release.id,
+                                    })}
+                                    className={buyerTheme.buttonPrimary}
+                                  >
+                                    Download ZIP
+                                  </a>
+                                  {releaseZipSizeLabel ? (
+                                    <span className="text-xs font-medium text-zinc-500">
+                                      {releaseZipSizeLabel}
+                                    </span>
+                                  ) : null}
+                                </>
+                              )
+                            )
                           ) : (
-                            <a
-                              href={createReleaseZipPath({
-                                token,
-                                releaseId: release.id,
-                              })}
-                              className={buyerTheme.buttonPrimary}
-                            >
-                              Download ZIP
-                            </a>
-                          )
-                        )
-                      ) : (
-                        <span className={buyerTheme.statusError}>
-                          ZIP unavailable
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50">
-                  <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2.5 text-xs uppercase tracking-[0.16em] text-zinc-500">
-                    <span>Tracklist</span>
-                    <span>{release.tracks.length} tracks</span>
-                  </div>
-                  <ul className="divide-y divide-zinc-200/70">
-                    {release.tracks.map((track) => {
-                      return (
-                        <li
-                          key={track.key}
-                          className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
-                        >
-                          <div className="flex min-w-0 items-center gap-3 sm:flex-1">
-                            <span className="w-6 text-right text-xs font-medium text-zinc-500">
-                              {track.number}
+                            <span className={buyerTheme.statusError}>
+                              ZIP unavailable
                             </span>
-                            <div className="min-w-0">
-                              <p className="truncate text-sm text-zinc-900">
-                                {track.title}
-                              </p>
-                            </div>
-                          </div>
-                          <TrackDownloadControl options={track.downloadOptions} />
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
-              </article>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50">
+                      <div className="flex items-center justify-between border-b border-zinc-200 px-3 py-2.5 text-xs uppercase tracking-[0.16em] text-zinc-500">
+                        <span>Tracklist</span>
+                        <span>{release.tracks.length} tracks</span>
+                      </div>
+                      <ul className="divide-y divide-zinc-200/70">
+                        {release.tracks.map((track) => {
+                          return (
+                            <li
+                              key={track.key}
+                              className="flex flex-col gap-2 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between"
+                            >
+                              <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+                                <span className="w-6 text-right text-xs font-medium text-zinc-500">
+                                  {track.number}
+                                </span>
+                                <div className="min-w-0">
+                                  <p className="truncate text-sm text-zinc-900">
+                                    {track.title}
+                                  </p>
+                                </div>
+                              </div>
+                              <TrackDownloadControl options={track.downloadOptions} />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </article>
+                );
+              })()
             ))}
           </div>
         ) : null}
