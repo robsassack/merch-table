@@ -167,6 +167,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Idempotency: check existing `Order` by `checkoutSessionId` inside a transaction; skip if exists
 - [x] Unique constraint on `Order.checkoutSessionId` as database-level safety net
 - [x] Webhook endpoint is not rate-limited
+- [x] Handle Stripe refund webhooks (`charge.refunded`, `refund.updated`) to sync `Order.status` and refunded amounts
 
 ### Email templates
 
@@ -302,8 +303,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 ### Orders & customers panel
 
 - [x] List orders with email delivery status
-- [ ] Retry action for undelivered (`FAILED`) purchase confirmation emails
-- [ ] Revoke individual `BuyerLibraryToken`s
+- [x] Retry action for undelivered (`FAILED`) purchase confirmation emails
+- [x] Revoke individual `BuyerLibraryToken`s
 
 ### Store management
 

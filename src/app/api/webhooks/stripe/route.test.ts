@@ -155,4 +155,134 @@ describe("POST /api/webhooks/stripe", () => {
     assert.equal(email.templateType, "purchase_confirmation");
     assert.equal(email.to, "buyer@example.com");
   });
+
+  it("marks a paid order as REFUNDED when Stripe sends charge.refunded", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+
+    const { prisma } = await import("@/lib/prisma");
+
+    const statusUpdates: string[] = [];
+
+    restore.push(
+      patchMethod(
+        prisma.setupWizardState as unknown as AnyRecord,
+        "findUnique",
+        async () => null,
+      ),
+    );
+
+    restore.push(
+      patchMethod(prisma.order as unknown as AnyRecord, "findFirst", async () => ({
+        id: "order-refund-1",
+        totalCents: 1200,
+        status: "FULFILLED",
+      })),
+    );
+
+    restore.push(
+      patchMethod(prisma.order as unknown as AnyRecord, "update", async (args: AnyRecord) => {
+        const data = (args.data as { status?: string } | undefined) ?? {};
+        if (data.status) {
+          statusUpdates.push(data.status);
+        }
+        return { id: "order-refund-1" };
+      }),
+    );
+
+    restore.push(
+      patchMethod(Stripe.webhooks as unknown as AnyRecord, "constructEvent", () => ({
+        type: "charge.refunded",
+        data: {
+          object: {
+            payment_intent: "pi_test_refund_1",
+            amount_refunded: 1200,
+            refunded: true,
+          },
+        },
+      })),
+    );
+
+    const { POST } = await import("@/app/api/webhooks/stripe/route");
+
+    const response = await POST(
+      new Request("http://localhost:3000/api/webhooks/stripe", {
+        method: "POST",
+        headers: {
+          "stripe-signature": "t=1,v1=fake",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      }),
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, refundSynced: true });
+    assert.deepEqual(statusUpdates, ["REFUNDED"]);
+    assert.equal(getMockEmailSentCount("purchase_confirmation"), 0);
+  });
+
+  it("ignores partial refund.updated events that do not fully refund the order", async () => {
+    process.env.STRIPE_WEBHOOK_SECRET = "whsec_test";
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+
+    const { prisma } = await import("@/lib/prisma");
+
+    let updateCalls = 0;
+
+    restore.push(
+      patchMethod(
+        prisma.setupWizardState as unknown as AnyRecord,
+        "findUnique",
+        async () => null,
+      ),
+    );
+
+    restore.push(
+      patchMethod(prisma.order as unknown as AnyRecord, "findFirst", async () => ({
+        id: "order-refund-2",
+        totalCents: 2400,
+        status: "FULFILLED",
+      })),
+    );
+
+    restore.push(
+      patchMethod(prisma.order as unknown as AnyRecord, "update", async () => {
+        updateCalls += 1;
+        return { id: "order-refund-2" };
+      }),
+    );
+
+    restore.push(
+      patchMethod(Stripe.webhooks as unknown as AnyRecord, "constructEvent", () => ({
+        type: "refund.updated",
+        data: {
+          object: {
+            payment_intent: "pi_test_refund_2",
+            amount: 300,
+            status: "succeeded",
+          },
+        },
+      })),
+    );
+
+    const { POST } = await import("@/app/api/webhooks/stripe/route");
+
+    const response = await POST(
+      new Request("http://localhost:3000/api/webhooks/stripe", {
+        method: "POST",
+        headers: {
+          "stripe-signature": "t=1,v1=fake",
+          "content-type": "application/json",
+        },
+        body: "{}",
+      }),
+    );
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { ok: true, ignored: true });
+    assert.equal(updateCalls, 0);
+  });
 });

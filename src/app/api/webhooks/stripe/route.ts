@@ -87,6 +87,144 @@ async function readStripeWebhookSecret() {
   );
 }
 
+function readRecord(value: unknown) {
+  if (typeof value !== "object" || value === null) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function readStringField(value: unknown, fieldName: string) {
+  const record = readRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const field = record[fieldName];
+  if (typeof field !== "string") {
+    return null;
+  }
+
+  const trimmed = field.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readNumberField(value: unknown, fieldName: string) {
+  const record = readRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const field = record[fieldName];
+  if (typeof field !== "number" || !Number.isFinite(field)) {
+    return null;
+  }
+
+  return Math.max(0, Math.round(field));
+}
+
+function readBooleanField(value: unknown, fieldName: string) {
+  const record = readRecord(value);
+  if (!record) {
+    return false;
+  }
+
+  return record[fieldName] === true;
+}
+
+function readStripeExpandableId(value: unknown) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  const record = readRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  const id = record.id;
+  if (typeof id !== "string") {
+    return null;
+  }
+
+  const trimmed = id.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readPaymentIntentId(value: unknown) {
+  const record = readRecord(value);
+  if (!record) {
+    return null;
+  }
+
+  return readStripeExpandableId(record.payment_intent);
+}
+
+async function syncRefundStatusByPaymentIntent(input: {
+  paymentIntentId: string | null;
+  refundedAmountCents: number;
+  fullyRefunded: boolean;
+}) {
+  if (!input.paymentIntentId || input.refundedAmountCents <= 0) {
+    return false;
+  }
+
+  const order = await prisma.order.findFirst({
+    where: { paymentIntentId: input.paymentIntentId },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      totalCents: true,
+      status: true,
+    },
+  });
+
+  if (!order) {
+    return false;
+  }
+
+  const shouldMarkRefunded =
+    input.fullyRefunded || input.refundedAmountCents >= order.totalCents;
+  if (!shouldMarkRefunded || order.status === "REFUNDED") {
+    return false;
+  }
+
+  await prisma.order.update({
+    where: { id: order.id },
+    data: { status: "REFUNDED" },
+  });
+
+  return true;
+}
+
+async function handleRefundWebhookEvent(event: Stripe.Event) {
+  if (event.type === "charge.refunded") {
+    const object = event.data.object;
+    return syncRefundStatusByPaymentIntent({
+      paymentIntentId: readPaymentIntentId(object),
+      refundedAmountCents: readNumberField(object, "amount_refunded") ?? 0,
+      fullyRefunded: readBooleanField(object, "refunded"),
+    });
+  }
+
+  if (event.type === "refund.updated") {
+    const object = event.data.object;
+    if (readStringField(object, "status") !== "succeeded") {
+      return false;
+    }
+
+    return syncRefundStatusByPaymentIntent({
+      paymentIntentId: readPaymentIntentId(object),
+      refundedAmountCents: readNumberField(object, "amount") ?? 0,
+      fullyRefunded: false,
+    });
+  }
+
+  return false;
+}
+
 type FinalizeResult =
   | {
       status: "send-email";
@@ -317,6 +455,15 @@ export async function POST(request: Request) {
       { ok: false, error: "Invalid Stripe signature." },
       { status: 400 },
     );
+  }
+
+  if (event.type === "charge.refunded" || event.type === "refund.updated") {
+    const refundSynced = await handleRefundWebhookEvent(event);
+    if (!refundSynced) {
+      return NextResponse.json({ ok: true, ignored: true });
+    }
+
+    return NextResponse.json({ ok: true, refundSynced: true });
   }
 
   if (event.type !== "checkout.session.completed") {

@@ -4,6 +4,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import type { EmailStatus, OrderStatus } from "@/generated/prisma/enums";
 import { prisma } from "@/lib/prisma";
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
+import { OrderRowActions, type OrderRowActionData } from "./order-row-actions";
 
 const ORDER_PAGE_SIZE = 25;
 const STATUS_CHIP_BASE =
@@ -326,10 +327,25 @@ export async function OrderManagementPanel({
         currency: true,
         createdAt: true,
         paidAt: true,
+        checkoutSessionId: true,
+        paymentIntentId: true,
         customer: {
           select: {
             email: true,
             name: true,
+            buyerLibraryTokens: {
+              orderBy: { createdAt: "desc" },
+              take: 12,
+              select: {
+                id: true,
+                token: true,
+                createdAt: true,
+                expiresAt: true,
+                revokedAt: true,
+                lastUsedAt: true,
+                accessCount: true,
+              },
+            },
           },
         },
         items: {
@@ -445,6 +461,9 @@ export async function OrderManagementPanel({
             <thead className="border-b border-slate-700/80 bg-slate-900/70">
               <tr className="text-left text-xs uppercase tracking-wide text-zinc-400">
                 <th scope="col" className="px-4 py-3 font-medium">
+                  Actions
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
                   Order
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
@@ -470,6 +489,39 @@ export async function OrderManagementPanel({
             <tbody>
               {visibleOrders.map((order) => (
                 <tr key={order.id} className="border-b border-slate-800/80 align-top text-sm">
+                  <td className="px-4 py-3">
+                    <OrderRowActions
+                      order={
+                        {
+                          id: order.id,
+                          orderNumber: order.orderNumber,
+                          status: order.status,
+                          emailStatus: order.emailStatus,
+                          totalCents: order.totalCents,
+                          currency: order.currency,
+                          createdAt: order.createdAt.toISOString(),
+                          paidAt: order.paidAt?.toISOString() ?? null,
+                          emailSentAt: order.emailSentAt?.toISOString() ?? null,
+                          checkoutSessionId: order.checkoutSessionId,
+                          paymentIntentId: order.paymentIntentId,
+                          customer: {
+                            email: order.customer.email,
+                            name: order.customer.name,
+                          },
+                          releases: order.items.map((item) => item.release.title),
+                          tokens: order.customer.buyerLibraryTokens.map((token) => ({
+                            id: token.id,
+                            token: token.token,
+                            createdAt: token.createdAt.toISOString(),
+                            expiresAt: token.expiresAt?.toISOString() ?? null,
+                            revokedAt: token.revokedAt?.toISOString() ?? null,
+                            lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+                            accessCount: token.accessCount,
+                          })),
+                        } satisfies OrderRowActionData
+                      }
+                    />
+                  </td>
                   <td className="px-4 py-3 text-zinc-200">
                     <p className="font-medium">{order.orderNumber}</p>
                     {order.paidAt ? (
