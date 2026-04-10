@@ -13,6 +13,7 @@ import {
   resolveTargetStorage,
 } from "@/lib/admin/storage-management";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
+import { prisma } from "@/lib/prisma";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 import { saveStepThreeState, validateExternalS3Credentials } from "@/lib/setup/step-three";
 import { buildAdminStorageSettingsData } from "../storage-response";
@@ -115,6 +116,28 @@ export async function POST(request: Request) {
     }
 
     const finishedAt = new Date();
+    const runtimeSwitchPending =
+      sourceAdapter.provider !== resolvedTarget.adapter.provider;
+    const migrationMessage =
+      validationMessage ??
+      `Copied ${migration.copied} storage objects to the ${resolvedTarget.adapter.provider} target.`;
+
+    await prisma.storageMigrationRun.create({
+      data: {
+        organizationId: auth.context.organizationId,
+        initiatedByUserId: auth.context.session.userId,
+        status: "SUCCEEDED",
+        sourceProvider: sourceAdapter.provider,
+        targetProvider: resolvedTarget.adapter.provider,
+        runtimeSwitchPending,
+        totalObjects: usage.totalReferencedObjects,
+        copiedObjects: migration.copied,
+        message: migrationMessage,
+        startedAt,
+        finishedAt,
+      },
+    });
+
     const data = await buildAdminStorageSettingsData({
       organizationId: auth.context.organizationId,
     });
@@ -127,12 +150,10 @@ export async function POST(request: Request) {
         totalObjects: usage.totalReferencedObjects,
         startedAt: startedAt.toISOString(),
         finishedAt: finishedAt.toISOString(),
-        message:
-          validationMessage ??
-          `Copied ${migration.copied} storage objects to the ${resolvedTarget.adapter.provider} target.`,
+        message: migrationMessage,
         runtimeProvider: sourceAdapter.provider,
         targetProvider: resolvedTarget.adapter.provider,
-        runtimeSwitchPending: sourceAdapter.provider !== resolvedTarget.adapter.provider,
+        runtimeSwitchPending,
       },
     });
   } catch (error) {

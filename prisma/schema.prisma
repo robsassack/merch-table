@@ -105,6 +105,7 @@ model User {
   memberships   Membership[]
   organizations Organization[] @relation("OrganizationOwner")
   artists       Artist[]       @relation("ArtistOwner")
+  storageMigrationRuns StorageMigrationRun[] @relation("StorageMigrationRunInitiator")
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
 }
@@ -167,6 +168,7 @@ model Organization {
   storeSettings      StoreSettings?
   buyerLibraryTokens BuyerLibraryToken[]
   transcodeJobs      TranscodeJob[]
+  storageMigrationRuns StorageMigrationRun[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 }
@@ -524,4 +526,26 @@ model SetupToken {
   updatedAt DateTime @updatedAt
 
   @@index([consumedAt, expiresAt])
+}
+
+model StorageMigrationRun {
+  id                  String       @id @default(cuid())
+  organizationId      String
+  initiatedByUserId   String
+  status              String
+  sourceProvider      String
+  targetProvider      String
+  runtimeSwitchPending Boolean     @default(false)
+  totalObjects        Int
+  copiedObjects       Int
+  message             String?
+  startedAt           DateTime
+  finishedAt          DateTime
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  initiatedBy         User         @relation("StorageMigrationRunInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt])
+  @@index([initiatedByUserId])
 }
