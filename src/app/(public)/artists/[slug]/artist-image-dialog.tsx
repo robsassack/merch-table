@@ -10,11 +10,7 @@ type ArtistImageDialogProps = {
 
 export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogProps) {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const canUsePortal = typeof document !== "undefined";
 
   useEffect(() => {
     if (!open) {
@@ -62,7 +58,7 @@ export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogPro
         />
       </button>
 
-      {mounted && open
+      {canUsePortal && open
         ? createPortal(
             <div
               className="fixed inset-0 z-[100] flex items-center justify-center bg-zinc-950/80 p-4 backdrop-blur-sm sm:p-6"

@@ -7,19 +7,11 @@ import { renderReleasePricingDetails } from "./release-management-pricing-detail
 import { syncReleaseDraftState, syncReleaseTrackState } from "./release-management-sync";
 import { useReleaseManagementState } from "./use-release-management-state";
 import type {
-  RecoverStuckTranscodesResponse,
-  ReleaseDraft,
-  ReleaseRecord,
-  ReleasesListResponse,
-  TranscodeTasksStatusResponse,
-  TrackRecordPatch,
+  RecoverStuckTranscodesResponse, ReleaseDraft, ReleaseRecord, ReleasesListResponse,
+  TranscodeTasksStatusResponse, TrackRecordPatch,
 } from "./types";
 import {
-  sortTracks,
-  toNewTrackDraft,
-  toReleaseDraft,
-  toReleasePreviewDraft,
-  toTrackDraft,
+  sortTracks, toNewTrackDraft, toReleaseDraft, toReleasePreviewDraft, toTrackDraft,
   withReleaseDerivedTrackStats,
 } from "./utils";
 import { resolveNormalizedFeaturedReleaseId } from "./featured-release";
@@ -563,6 +555,4 @@ export function useReleaseManagementController() {
   };
 }
 
-export type ReleaseManagementController = ReturnType<
-  typeof useReleaseManagementController
->;
+export type ReleaseManagementController = ReturnType<typeof useReleaseManagementController>;

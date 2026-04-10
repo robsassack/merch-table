@@ -1,6 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  images: {
+    localPatterns: [
+      {
+        pathname: "/api/cover",
+      },
+    ],
+  },
   async headers() {
     const commonHeaders = [
       { key: "X-Content-Type-Options", value: "nosniff" },

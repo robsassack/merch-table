@@ -72,28 +72,6 @@ export function AdminWorkspace({
           className="flex w-full rounded-xl border border-slate-700 bg-slate-900/70 p-1 sm:inline-flex sm:w-auto"
         >
           <Link
-            href="/admin/artists"
-            aria-current={activeTab === "artists" ? "page" : undefined}
-            className={`${tabClassName} ${
-              activeTab === "artists"
-                ? "bg-slate-700 text-zinc-100"
-                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
-            }`}
-          >
-            Artists
-          </Link>
-          <Link
-            href="/admin/releases"
-            aria-current={activeTab === "releases" ? "page" : undefined}
-            className={`${tabClassName} ${
-              activeTab === "releases"
-                ? "bg-slate-700 text-zinc-100"
-                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
-            }`}
-          >
-            Releases
-          </Link>
-          <Link
             href="/admin/orders"
             aria-current={activeTab === "orders" ? "page" : undefined}
             className={`${tabClassName} ${
@@ -113,7 +91,29 @@ export function AdminWorkspace({
                 : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
             }`}
           >
-            Setup
+            Store
+          </Link>
+          <Link
+            href="/admin/releases"
+            aria-current={activeTab === "releases" ? "page" : undefined}
+            className={`${tabClassName} ${
+              activeTab === "releases"
+                ? "bg-slate-700 text-zinc-100"
+                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
+            }`}
+          >
+            Releases
+          </Link>
+          <Link
+            href="/admin/artists"
+            aria-current={activeTab === "artists" ? "page" : undefined}
+            className={`${tabClassName} ${
+              activeTab === "artists"
+                ? "bg-slate-700 text-zinc-100"
+                : "text-zinc-400 hover:bg-slate-800 hover:text-zinc-200"
+            }`}
+          >
+            Artists
           </Link>
         </nav>
       </div>
