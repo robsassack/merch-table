@@ -322,8 +322,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [ ] "Factory reset" option in settings (re-triggers wizard; does not wipe data without explicit confirmation)
 - [ ] Add markdown editing tools to release description field
 - [x] Add default options for pricing, download formats, and preview settings when creating a new release
-- [ ] Add featured track option for releases
-- [ ] Add option to not have track previews on a release
+- [x] Add featured track option for releases
+- [x] Add option to not have track previews on a release
 - [ ] Improve handling for other currencies in storefront UI
 
 ### Status panel
