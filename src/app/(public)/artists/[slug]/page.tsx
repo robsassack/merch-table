@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import ArtistBio from "@/app/(public)/release/artist-bio";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import { ArtistImageDialog } from "./artist-image-dialog";
 import StorefrontHeader from "@/app/(public)/storefront-header";
@@ -260,7 +261,9 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                 <p className="mt-1 text-sm text-zinc-600">{artist.location}</p>
               ) : null}
               {artist.bio ? (
-                <p className="mt-3 max-w-3xl text-sm text-zinc-700">{artist.bio}</p>
+                <div className="mt-3 max-w-3xl">
+                  <ArtistBio bio={artist.bio} collapsible={false} />
+                </div>
               ) : null}
             </div>
           </div>

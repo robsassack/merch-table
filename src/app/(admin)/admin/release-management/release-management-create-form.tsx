@@ -14,6 +14,7 @@ import {
   slugify,
   toCoverDisplaySrc,
 } from "./utils";
+import { MarkdownTextarea } from "./markdown-textarea";
 
 export function ReleaseManagementCreateForm(props: {
   controller: ReleaseManagementController;
@@ -165,17 +166,16 @@ export function ReleaseManagementCreateForm(props: {
             </label>
           ) : null}
 
-          <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
-            Description
-            <textarea
+          <div className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
+            <p>Description</p>
+            <MarkdownTextarea
               rows={3}
               maxLength={4_000}
               value={newDescription}
-              onChange={(event) => setNewDescription(event.target.value)}
-              className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+              onChange={setNewDescription}
               placeholder="Optional release description"
             />
-          </label>
+          </div>
 
           <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
             <p className="font-medium text-zinc-300">Cover artwork</p>

@@ -8,6 +8,7 @@ import { ReleaseManagementReleaseFooter } from "./release-management-release-foo
 import { ReleaseManagementDeliveryFormatSelector } from "./release-management-delivery-format-selector";
 import { ReleaseManagementStorefrontPreview } from "./release-management-storefront-preview";
 import { ReleaseManagementTrackManagement } from "./release-management-track-management";
+import { MarkdownTextarea } from "./markdown-textarea";
 import type { DeliveryFormat, PricingMode, ReleaseStatus, ReleaseType } from "./types";
 import type { ReleaseManagementController } from "./use-release-management-controller";
 import {
@@ -172,21 +173,21 @@ export function ReleaseManagementSelectedReleaseList(props: {
                     </label>
                   ) : null}
 
-                  <label className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
-                    Description
-                    <textarea
+                  <div className="flex flex-col gap-1 text-xs text-zinc-500 md:col-span-2">
+                    <p>Description</p>
+                    <MarkdownTextarea
                       rows={3}
                       maxLength={4_000}
                       value={draft.description}
-                      onChange={(event) =>
+                      onChange={(value) =>
                         setDraftsById((previous) => ({
                           ...previous,
-                          [release.id]: { ...draft, description: event.target.value },
+                          [release.id]: { ...draft, description: value },
                         }))
                       }
-                      className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+                      placeholder="Optional release description"
                     />
-                  </label>
+                  </div>
 
                   <div className="rounded-lg border border-slate-700/80 bg-slate-900/50 p-3 text-xs text-zinc-400 md:col-span-2">
                     <p className="font-medium text-zinc-300">Cover artwork</p>

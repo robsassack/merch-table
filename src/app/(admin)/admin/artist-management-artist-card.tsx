@@ -9,6 +9,7 @@ import {
   resolveArtistImageSrc,
   sanitizeUrlInput,
 } from "./artist-management-panel-shared";
+import { MarkdownTextarea } from "./release-management/markdown-textarea";
 import type { ArtistDraft, ArtistRecord } from "./artist-management-panel-shared";
 
 type ArtistManagementArtistCardProps = {
@@ -118,16 +119,16 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
           </div>
         </div>
 
-        <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
-          Bio
-          <textarea
+        <div className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
+          <p>Bio</p>
+          <MarkdownTextarea
             rows={3}
             maxLength={4_000}
             value={draft.bio}
-            onChange={(event) => onDraftChange({ ...draft, bio: event.target.value })}
-            className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
+            onChange={(value) => onDraftChange({ ...draft, bio: value })}
+            placeholder="Optional artist bio"
           />
-        </label>
+        </div>
 
         {advancedOpen ? (
           <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">

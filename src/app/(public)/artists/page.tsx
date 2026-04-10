@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 
+import ArtistBio from "@/app/(public)/release/artist-bio";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
@@ -192,7 +193,9 @@ export default async function ArtistsPage() {
                   </div>
 
                   {artist.bio ? (
-                    <p className="mt-4 line-clamp-3 text-sm text-zinc-600">{artist.bio}</p>
+                    <div className="mt-4">
+                      <ArtistBio bio={artist.bio} />
+                    </div>
                   ) : null}
 
                   <div className="mt-4">

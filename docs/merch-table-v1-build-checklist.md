@@ -320,7 +320,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Storage safety guardrail: disallow switching `GARAGE` ↔ `S3` after assets exist
 - [x] Storage migration path (optional later): explicit, guided migration job with confirmation + validation
 - [x] "Factory reset" option in settings (re-triggers wizard; does not wipe data without explicit confirmation)
-- [ ] Add markdown editing tools to release description field
+- [x] Add markdown editing tools to release description field
 - [x] Add default options for pricing, download formats, and preview settings when creating a new release
 - [x] Add featured track option for releases
 - [x] Add option to not have track previews on a release
