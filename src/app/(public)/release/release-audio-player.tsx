@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { Howl } from "howler";
+import { resolvePlayTrackMode } from "@/app/(public)/release/release-audio-player-state";
 
 export type ReleaseAudioTrack = {
   id: string;
@@ -139,6 +140,7 @@ export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProvi
   const [visualPlaybackHoldCount, setVisualPlaybackHoldCount] = useState(0);
 
   const howlRef = useRef<Howl | null>(null);
+  const loadedTrackIdRef = useRef<string | null>(null);
   const activeHowlSoundIdRef = useRef<number | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playbackSessionRef = useRef(0);
@@ -153,6 +155,7 @@ export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProvi
 
   const stopAndUnloadHowl = useCallback(() => {
     stopProgressLoop();
+    loadedTrackIdRef.current = null;
     activeHowlSoundIdRef.current = null;
     if (!howlRef.current) {
       return;
@@ -229,7 +232,14 @@ export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProvi
       }
 
       const currentHowl = howlRef.current;
-      if (currentHowl && resolvedActiveTrackId === requestedTrack.id) {
+      const playTrackMode = resolvePlayTrackMode({
+        hasLoadedHowl: currentHowl !== null,
+        loadedTrackId: loadedTrackIdRef.current,
+        resolvedActiveTrackId,
+        requestedTrackId: requestedTrack.id,
+      });
+
+      if (currentHowl && playTrackMode === "toggle-current") {
         const activeSoundId = activeHowlSoundIdRef.current;
         const isActiveSoundPlaying =
           activeSoundId !== null ? currentHowl.playing(activeSoundId) : currentHowl.playing();
@@ -346,11 +356,11 @@ export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProvi
             return;
           }
 
-          activeHowlSoundIdRef.current = null;
+          stopAndUnloadHowl();
           setIsPlaying(false);
           setHasPlaybackStarted(false);
-          stopProgressLoop();
-          updateProgressFromHowl();
+          setCurrentTimeSeconds(0);
+          setDurationSeconds(0);
         },
         onloaderror: () => {
           if (playbackSessionRef.current !== playbackSession) {
@@ -370,6 +380,7 @@ export function ReleaseAudioPlayerProvider({ children }: ReleaseAudioPlayerProvi
         },
       });
 
+      loadedTrackIdRef.current = requestedTrack.id;
       howlRef.current = sound;
       const startedSoundId = sound.play();
       if (typeof startedSoundId === "number" && Number.isFinite(startedSoundId)) {
