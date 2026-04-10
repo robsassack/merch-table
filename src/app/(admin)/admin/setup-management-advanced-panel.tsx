@@ -25,14 +25,14 @@ export function AdvancedPanel({
       </section>
 
       <section className={panelCardClassName}>
-        <h3 className="text-xl font-semibold tracking-tight text-zinc-100">Storage Migration</h3>
+        <h3 className="text-xl font-semibold tracking-tight text-zinc-100">Storage Migration History</h3>
         <p className="mt-1 text-sm text-zinc-400">
-          Optional guided migration between storage providers with confirmation and validation.
+          Guided migration controls are available in Integrations → Storage. Migration history and rollback tooling will be added here.
         </p>
         <div className="mt-4 rounded-lg border border-dashed border-slate-600 bg-slate-900/80 p-4">
-          <p className="text-sm text-zinc-300">Migration tools are planned for a later Phase 9 follow-up.</p>
+          <p className="text-sm text-zinc-300">History and rollback tools are planned for a later Phase 9 follow-up.</p>
           <button type="button" disabled className={`mt-3 ${secondaryButtonClassName}`}>
-            Start Migration (Coming Soon)
+            View Migration History (Coming Soon)
           </button>
         </div>
       </section>
