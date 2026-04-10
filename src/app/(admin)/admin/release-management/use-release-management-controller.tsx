@@ -3,18 +3,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createReleaseActions } from "./use-release-management-release-actions";
 import { createTrackEditActions } from "./use-release-management-track-edit-actions";
 import { createTrackImportUploadActions } from "./use-release-management-track-import-upload-actions";
+import {
+  applyTrackPatchToReleaseState,
+  replaceReleaseState,
+} from "./release-management-state-updaters";
+import { recoverStuckTranscodeJobs } from "./release-management-recover-stuck";
+import { useReleaseManagementFeaturedReleaseSync } from "./use-release-management-featured-release-sync";
 import { renderReleasePricingDetails } from "./release-management-pricing-details";
 import { syncReleaseDraftState, syncReleaseTrackState } from "./release-management-sync";
 import { useReleaseManagementState } from "./use-release-management-state";
 import type {
-  RecoverStuckTranscodesResponse, ReleaseDraft, ReleaseRecord, ReleasesListResponse,
+  ReleaseDraft, ReleaseRecord, ReleasesListResponse,
   TranscodeTasksStatusResponse, TrackRecordPatch,
 } from "./types";
 import {
-  centsToDecimalString, sortTracks, toNewTrackDraft, toReleaseDraft, toReleasePreviewDraft, toTrackDraft,
+  centsToDecimalString,
   withReleaseDerivedTrackStats,
 } from "./utils";
-import { resolveNormalizedFeaturedReleaseId } from "./featured-release";
 
 export function useReleaseManagementController() {
   const TRANSCODE_POLL_INTERVAL_MS = 4_000;
@@ -330,45 +335,18 @@ export function useReleaseManagementController() {
     };
   }, [loadTasksStatus]);
 
-  const onRecoverStuckJobs = useCallback(async () => {
-    setError(null);
-    setTasksError(null);
-    setRecoverStuckPending(true);
-
-    try {
-      const response = await fetch("/api/admin/transcode-status/recover-stuck", {
-        method: "POST",
-      });
-      const body = (await response.json().catch(() => null)) as RecoverStuckTranscodesResponse | null;
-      if (!response.ok || !body?.ok || !body.summary) {
-        throw new Error(body?.error ?? "Could not recover stuck transcode jobs.");
-      }
-
-      const staleQueuedRecovered = body.summary.staleQueued.requeued;
-      const staleRunningRecovered = body.summary.staleRunning.requeued;
-      const retryEnqueued = body.summary.retryDue.enqueued;
-      const totalRecoveries = staleQueuedRecovered + staleRunningRecovered + retryEnqueued;
-
-      if (totalRecoveries === 0) {
-        setNotice("No stuck transcode jobs were recovered.");
-      } else {
-        setNotice(
-          `Recovered ${staleQueuedRecovered} stale queued, ${staleRunningRecovered} stale running, and re-enqueued ${retryEnqueued} retry job${retryEnqueued === 1 ? "" : "s"}.`,
-        );
-      }
-
-      await Promise.all([
-        loadTasksStatus({ silent: true }),
-        loadReleases({ silent: true }),
-      ]);
-    } catch (error) {
-      setTasksError(
-        error instanceof Error ? error.message : "Could not recover stuck transcode jobs.",
-      );
-    } finally {
-      setRecoverStuckPending(false);
-    }
-  }, [loadReleases, loadTasksStatus, setError, setNotice, setTasksError]);
+  const onRecoverStuckJobs = useCallback(
+    async () =>
+      recoverStuckTranscodeJobs({
+        setError,
+        setTasksError,
+        setNotice,
+        setRecoverStuckPending,
+        loadTasksStatus,
+        loadReleases,
+      }),
+    [loadReleases, loadTasksStatus, setError, setNotice, setTasksError],
+  );
 
   useEffect(() => {
     setSelectedReleaseId((current) => {
@@ -390,84 +368,31 @@ export function useReleaseManagementController() {
     }
   }, [loading, releases.length, setCreateComposerOpen]);
 
-  const replaceRelease = (updated: ReleaseRecord) => {
-    const normalized = withReleaseDerivedTrackStats(updated);
-    setReleases((previous) =>
-      previous.map((release) => (release.id === normalized.id ? normalized : release)),
-    );
-    setDraftsById((previous) => ({
-      ...previous,
-      [normalized.id]: toReleaseDraft(normalized),
-    }));
-    setTrackDraftsById((previous) => {
-      const next = { ...previous };
-      for (const track of normalized.tracks) {
-        next[track.id] = previous[track.id] ?? toTrackDraft(track);
-      }
-      return next;
+  const replaceRelease = useCallback((updated: ReleaseRecord) => {
+    replaceReleaseState({
+      updated,
+      setReleases,
+      setDraftsById,
+      setTrackDraftsById,
+      setNewTrackByReleaseId,
+      setPreviewByReleaseId,
     });
-    setNewTrackByReleaseId((previous) => ({
-      ...previous,
-      [normalized.id]: previous[normalized.id] ?? toNewTrackDraft(normalized),
-    }));
-    setPreviewByReleaseId((previous) => ({
-      ...previous,
-      [normalized.id]: previous[normalized.id] ?? toReleasePreviewDraft(normalized),
-    }));
-  };
+  }, [
+    setDraftsById,
+    setNewTrackByReleaseId,
+    setPreviewByReleaseId,
+    setReleases,
+    setTrackDraftsById,
+  ]);
 
-  const applyTrackPatchToRelease = (releaseId: string, track: TrackRecordPatch) => {
-    let nextTracksForDraftSync: TrackRecordPatch[] | null = null;
-
-    setReleases((previous) =>
-      previous.map((release) => {
-        if (release.id !== releaseId) {
-          return release;
-        }
-
-        const sorted = sortTracks(release.tracks);
-        const existingIndex = sorted.findIndex((entry) => entry.id === track.id);
-        const withoutTrack =
-          existingIndex >= 0
-            ? sorted.filter((entry) => entry.id !== track.id)
-            : [...sorted];
-
-        const targetIndex = Math.max(
-          0,
-          Math.min(withoutTrack.length, track.trackNumber - 1),
-        );
-        const nextTracks = [
-          ...withoutTrack.slice(0, targetIndex),
-          track,
-          ...withoutTrack.slice(targetIndex),
-        ].map((entry, index) => ({
-          ...entry,
-          trackNumber: index + 1,
-        }));
-        nextTracksForDraftSync = nextTracks;
-
-        return withReleaseDerivedTrackStats({
-          ...release,
-          tracks: nextTracks,
-        });
-      }),
-    );
-
-    setTrackDraftsById((previous) => {
-      if (!nextTracksForDraftSync) {
-        return {
-          ...previous,
-          [track.id]: toTrackDraft(track),
-        };
-      }
-
-      const next = { ...previous };
-      for (const nextTrack of nextTracksForDraftSync) {
-        next[nextTrack.id] = toTrackDraft(nextTrack);
-      }
-      return next;
+  const applyTrackPatchToRelease = useCallback((releaseId: string, track: TrackRecordPatch) => {
+    applyTrackPatchToReleaseState({
+      releaseId,
+      track,
+      setReleases,
+      setTrackDraftsById,
     });
-  };
+  }, [setReleases, setTrackDraftsById]);
 
   const {
     getPricingEstimate,
@@ -515,77 +440,15 @@ export function useReleaseManagementController() {
       getPricingEstimate,
     });
 
-  const onSetFeaturedRelease = useCallback(async (releaseId: string) => {
-    setError(null);
-    setNotice(null);
-    setPendingFeaturedReleaseId(releaseId);
-
-    try {
-      const response = await fetch("/api/admin/settings/store", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ featuredReleaseId: releaseId }),
-      });
-      const body = (await response.json().catch(() => null)) as
-        | {
-            ok?: boolean;
-            error?: string;
-            data?: { featuredReleaseId?: string | null };
-          }
-        | null;
-
-      if (!response.ok || !body?.ok || !body.data) {
-        throw new Error(body?.error ?? "Could not set featured release.");
-      }
-
-      setFeaturedReleaseId(body.data.featuredReleaseId ?? null);
-      setNotice("Featured release updated.");
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not set featured release.");
-    } finally {
-      setPendingFeaturedReleaseId(null);
-    }
-  }, [setError, setFeaturedReleaseId, setNotice]);
-
-  useEffect(() => {
-    if (pendingFeaturedReleaseId !== null) {
-      return;
-    }
-
-    const normalizedFeaturedReleaseId = resolveNormalizedFeaturedReleaseId({
-      currentFeaturedReleaseId: state.featuredReleaseId,
-      releases,
-    });
-
-    if (normalizedFeaturedReleaseId === state.featuredReleaseId) {
-      return;
-    }
-
-    setPendingFeaturedReleaseId(normalizedFeaturedReleaseId ?? "__clear__");
-
-    const payload = { featuredReleaseId: normalizedFeaturedReleaseId };
-    void fetch("/api/admin/settings/store", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    })
-      .then((response) => response.json().catch(() => null).then((body) => ({ response, body })))
-      .then(({ response, body }) => {
-        if (!response.ok || !body?.ok || !body?.data) {
-          return;
-        }
-
-        setFeaturedReleaseId(body.data.featuredReleaseId ?? null);
-      })
-      .finally(() => {
-        setPendingFeaturedReleaseId(null);
-      });
-  }, [
-    pendingFeaturedReleaseId,
+  const { onSetFeaturedRelease } = useReleaseManagementFeaturedReleaseSync({
+    featuredReleaseId: state.featuredReleaseId,
     releases,
+    pendingFeaturedReleaseId,
+    setPendingFeaturedReleaseId,
     setFeaturedReleaseId,
-    state.featuredReleaseId,
-  ]);
+    setError,
+    setNotice,
+  });
 
   return {
     ...state,

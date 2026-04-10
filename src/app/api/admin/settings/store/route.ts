@@ -10,6 +10,7 @@ import {
   resolveCoverImageUrlFromStorageKey,
 } from "@/lib/storage/cover-art";
 import { readMinimumPriceFloorCentsFromEnv } from "@/lib/pricing/pricing-rules";
+import { buildStoreSettingsResponseData } from "./store-settings-response";
 
 export const runtime = "nodejs";
 
@@ -142,71 +143,16 @@ export async function GET() {
     return auth.response;
   }
 
-  const settings = await prisma.storeSettings.findFirst({
-    where: { organizationId: auth.context.organizationId },
-    select: {
-      storeName: true,
-      organizationLogoUrl: true,
-      contactEmail: true,
-      currency: true,
-      storeStatus: true,
-      featuredReleaseId: true,
-      defaultReleaseArtistId: true,
-      defaultReleasePricingMode: true,
-      defaultReleaseStatus: true,
-      defaultReleaseType: true,
-      defaultReleasePwywMinimumCents: true,
-      defaultReleaseAllowFreeCheckout: true,
-      defaultPreviewMode: true,
-      defaultPreviewSeconds: true,
-      organization: {
-        select: { name: true },
-      },
-    },
-  });
-
-  const artists = await prisma.artist.findMany({
-    where: {
-      organizationId: auth.context.organizationId,
-      deletedAt: null,
-    },
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-    },
-  });
-
-  const adminUser = await prisma.user.findUnique({
-    where: { id: auth.context.session.userId },
-    select: { email: true },
+  const data = await buildStoreSettingsResponseData({
+    organizationId: auth.context.organizationId,
+    userId: auth.context.session.userId,
+    fallbackAdminEmail: auth.context.session.email,
   });
 
   return NextResponse.json(
     {
       ok: true,
-      data: {
-        orgName: settings?.organization?.name ?? "",
-        storeName: settings?.storeName ?? "",
-        organizationLogoUrl: settings?.organizationLogoUrl ?? null,
-        contactEmail: settings?.contactEmail ?? "",
-        adminEmail: adminUser?.email ?? auth.context.session.email,
-        currency: settings?.currency ?? "USD",
-        storeStatus: settings?.storeStatus ?? "SETUP",
-        featuredReleaseId: settings?.featuredReleaseId ?? null,
-        defaultReleaseArtistId: settings?.defaultReleaseArtistId ?? null,
-        defaultReleasePricingMode: settings?.defaultReleasePricingMode ?? null,
-        defaultReleaseStatus: settings?.defaultReleaseStatus ?? null,
-        defaultReleaseType: settings?.defaultReleaseType ?? null,
-        defaultReleasePwywMinimumCents: settings?.defaultReleasePwywMinimumCents ?? null,
-        defaultReleaseAllowFreeCheckout: settings?.defaultReleaseAllowFreeCheckout ?? null,
-        defaultPreviewMode: settings?.defaultPreviewMode ?? "CLIP",
-        defaultPreviewSeconds: settings?.defaultPreviewSeconds ?? 30,
-        releaseDefaultArtists: artists.map((artist) => ({
-          id: artist.id,
-          name: artist.name,
-        })),
-      },
+      data,
     },
     { headers: { "cache-control": "no-store" } },
   );
@@ -463,70 +409,16 @@ export async function POST(request: Request) {
       );
     }
 
-    const settings = await prisma.storeSettings.findFirst({
-      where: { organizationId: auth.context.organizationId },
-      select: {
-        storeName: true,
-        organizationLogoUrl: true,
-        contactEmail: true,
-        currency: true,
-        storeStatus: true,
-        featuredReleaseId: true,
-        defaultReleaseArtistId: true,
-        defaultReleasePricingMode: true,
-        defaultReleaseStatus: true,
-        defaultReleaseType: true,
-        defaultReleasePwywMinimumCents: true,
-        defaultReleaseAllowFreeCheckout: true,
-        defaultPreviewMode: true,
-        defaultPreviewSeconds: true,
-        organization: {
-          select: { name: true },
-        },
-      },
-    });
-
-    const artists = await prisma.artist.findMany({
-      where: {
-        organizationId: auth.context.organizationId,
-        deletedAt: null,
-      },
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-      },
-    });
-
-    const adminUser = await prisma.user.findUnique({
-      where: { id: auth.context.session.userId },
-      select: { email: true },
+    const data = await buildStoreSettingsResponseData({
+      organizationId: auth.context.organizationId,
+      userId: auth.context.session.userId,
+      fallbackAdminEmail:
+        normalizedNextAdminEmail ?? auth.context.session.email,
     });
 
     return NextResponse.json({
       ok: true,
-      data: {
-        orgName: settings?.organization?.name ?? "",
-        storeName: settings?.storeName ?? "",
-        organizationLogoUrl: settings?.organizationLogoUrl ?? null,
-        contactEmail: settings?.contactEmail ?? "",
-        adminEmail: adminUser?.email ?? normalizedNextAdminEmail ?? auth.context.session.email,
-        currency: settings?.currency ?? "USD",
-        storeStatus: settings?.storeStatus ?? "SETUP",
-        featuredReleaseId: settings?.featuredReleaseId ?? null,
-        defaultReleaseArtistId: settings?.defaultReleaseArtistId ?? null,
-        defaultReleasePricingMode: settings?.defaultReleasePricingMode ?? null,
-        defaultReleaseStatus: settings?.defaultReleaseStatus ?? null,
-        defaultReleaseType: settings?.defaultReleaseType ?? null,
-        defaultReleasePwywMinimumCents: settings?.defaultReleasePwywMinimumCents ?? null,
-        defaultReleaseAllowFreeCheckout: settings?.defaultReleaseAllowFreeCheckout ?? null,
-        defaultPreviewMode: settings?.defaultPreviewMode ?? "CLIP",
-        defaultPreviewSeconds: settings?.defaultPreviewSeconds ?? 30,
-        releaseDefaultArtists: artists.map((artist) => ({
-          id: artist.id,
-          name: artist.name,
-        })),
-      },
+      data,
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
