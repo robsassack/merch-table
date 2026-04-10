@@ -22,6 +22,29 @@ const updateStoreSettingsSchema = z.object({
   currency: z.enum(SUPPORTED_CURRENCY_CODES).optional(),
   storeStatus: z.enum(["PRIVATE", "PUBLIC"]).optional(),
   featuredReleaseId: z.string().trim().min(1).max(64).nullable().optional(),
+  defaultReleaseArtistId: z.string().trim().min(1).max(64).nullable().optional(),
+  defaultReleasePricingMode: z.enum(["FREE", "FIXED", "PWYW"]).nullable().optional(),
+  defaultReleaseStatus: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).nullable().optional(),
+  defaultReleaseType: z
+    .enum([
+      "ALBUM",
+      "EP",
+      "SINGLE",
+      "COMPILATION",
+      "MIXTAPE",
+      "LIVE_ALBUM",
+      "SOUNDTRACK_SCORE",
+      "DEMO",
+      "BOOTLEG",
+      "REMIX",
+      "OTHER",
+    ])
+    .nullable()
+    .optional(),
+  defaultReleasePwywMinimumCents: z.number().int().min(0).nullable().optional(),
+  defaultReleaseAllowFreeCheckout: z.boolean().nullable().optional(),
+  defaultPreviewMode: z.enum(["CLIP", "FULL", "NONE"]).optional(),
+  defaultPreviewSeconds: z.number().int().positive().max(3600).optional(),
 })
   .refine(
     (value) =>
@@ -32,7 +55,15 @@ const updateStoreSettingsSchema = z.object({
       typeof value.adminEmail === "string" ||
       typeof value.currency === "string" ||
       typeof value.storeStatus === "string" ||
-      value.featuredReleaseId !== undefined,
+      value.featuredReleaseId !== undefined ||
+      value.defaultReleaseArtistId !== undefined ||
+      value.defaultReleasePricingMode !== undefined ||
+      value.defaultReleaseStatus !== undefined ||
+      value.defaultReleaseType !== undefined ||
+      value.defaultReleasePwywMinimumCents !== undefined ||
+      value.defaultReleaseAllowFreeCheckout !== undefined ||
+      typeof value.defaultPreviewMode === "string" ||
+      typeof value.defaultPreviewSeconds === "number",
     {
       message: "Provide at least one store setting to update.",
       path: ["orgName"],
@@ -120,9 +151,29 @@ export async function GET() {
       currency: true,
       storeStatus: true,
       featuredReleaseId: true,
+      defaultReleaseArtistId: true,
+      defaultReleasePricingMode: true,
+      defaultReleaseStatus: true,
+      defaultReleaseType: true,
+      defaultReleasePwywMinimumCents: true,
+      defaultReleaseAllowFreeCheckout: true,
+      defaultPreviewMode: true,
+      defaultPreviewSeconds: true,
       organization: {
         select: { name: true },
       },
+    },
+  });
+
+  const artists = await prisma.artist.findMany({
+    where: {
+      organizationId: auth.context.organizationId,
+      deletedAt: null,
+    },
+    orderBy: { name: "asc" },
+    select: {
+      id: true,
+      name: true,
     },
   });
 
@@ -143,6 +194,18 @@ export async function GET() {
         currency: settings?.currency ?? "USD",
         storeStatus: settings?.storeStatus ?? "SETUP",
         featuredReleaseId: settings?.featuredReleaseId ?? null,
+        defaultReleaseArtistId: settings?.defaultReleaseArtistId ?? null,
+        defaultReleasePricingMode: settings?.defaultReleasePricingMode ?? null,
+        defaultReleaseStatus: settings?.defaultReleaseStatus ?? null,
+        defaultReleaseType: settings?.defaultReleaseType ?? null,
+        defaultReleasePwywMinimumCents: settings?.defaultReleasePwywMinimumCents ?? null,
+        defaultReleaseAllowFreeCheckout: settings?.defaultReleaseAllowFreeCheckout ?? null,
+        defaultPreviewMode: settings?.defaultPreviewMode ?? "CLIP",
+        defaultPreviewSeconds: settings?.defaultPreviewSeconds ?? 30,
+        releaseDefaultArtists: artists.map((artist) => ({
+          id: artist.id,
+          name: artist.name,
+        })),
       },
     },
     { headers: { "cache-control": "no-store" } },
@@ -181,6 +244,27 @@ export async function POST(request: Request) {
           {
             ok: false,
             error: "Featured release must be an active published release.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (typeof parsed.defaultReleaseArtistId === "string") {
+      const defaultArtist = await prisma.artist.findFirst({
+        where: {
+          id: parsed.defaultReleaseArtistId,
+          organizationId: auth.context.organizationId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+
+      if (!defaultArtist) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: "Default release artist must be an active artist.",
           },
           { status: 400 },
         );
@@ -260,6 +344,30 @@ export async function POST(request: Request) {
           ...(typeof parsed.storeStatus === "string" ? { storeStatus: parsed.storeStatus } : {}),
           ...(parsed.featuredReleaseId !== undefined
             ? { featuredReleaseId: parsed.featuredReleaseId }
+            : {}),
+          ...(parsed.defaultReleaseArtistId !== undefined
+            ? { defaultReleaseArtistId: parsed.defaultReleaseArtistId }
+            : {}),
+          ...(parsed.defaultReleasePricingMode !== undefined
+            ? { defaultReleasePricingMode: parsed.defaultReleasePricingMode }
+            : {}),
+          ...(parsed.defaultReleaseStatus !== undefined
+            ? { defaultReleaseStatus: parsed.defaultReleaseStatus }
+            : {}),
+          ...(parsed.defaultReleaseType !== undefined
+            ? { defaultReleaseType: parsed.defaultReleaseType }
+            : {}),
+          ...(parsed.defaultReleasePwywMinimumCents !== undefined
+            ? { defaultReleasePwywMinimumCents: parsed.defaultReleasePwywMinimumCents }
+            : {}),
+          ...(parsed.defaultReleaseAllowFreeCheckout !== undefined
+            ? { defaultReleaseAllowFreeCheckout: parsed.defaultReleaseAllowFreeCheckout }
+            : {}),
+          ...(typeof parsed.defaultPreviewMode === "string"
+            ? { defaultPreviewMode: parsed.defaultPreviewMode }
+            : {}),
+          ...(typeof parsed.defaultPreviewSeconds === "number"
+            ? { defaultPreviewSeconds: parsed.defaultPreviewSeconds }
             : {}),
         },
       });
@@ -364,9 +472,29 @@ export async function POST(request: Request) {
         currency: true,
         storeStatus: true,
         featuredReleaseId: true,
+        defaultReleaseArtistId: true,
+        defaultReleasePricingMode: true,
+        defaultReleaseStatus: true,
+        defaultReleaseType: true,
+        defaultReleasePwywMinimumCents: true,
+        defaultReleaseAllowFreeCheckout: true,
+        defaultPreviewMode: true,
+        defaultPreviewSeconds: true,
         organization: {
           select: { name: true },
         },
+      },
+    });
+
+    const artists = await prisma.artist.findMany({
+      where: {
+        organizationId: auth.context.organizationId,
+        deletedAt: null,
+      },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
       },
     });
 
@@ -386,6 +514,18 @@ export async function POST(request: Request) {
         currency: settings?.currency ?? "USD",
         storeStatus: settings?.storeStatus ?? "SETUP",
         featuredReleaseId: settings?.featuredReleaseId ?? null,
+        defaultReleaseArtistId: settings?.defaultReleaseArtistId ?? null,
+        defaultReleasePricingMode: settings?.defaultReleasePricingMode ?? null,
+        defaultReleaseStatus: settings?.defaultReleaseStatus ?? null,
+        defaultReleaseType: settings?.defaultReleaseType ?? null,
+        defaultReleasePwywMinimumCents: settings?.defaultReleasePwywMinimumCents ?? null,
+        defaultReleaseAllowFreeCheckout: settings?.defaultReleaseAllowFreeCheckout ?? null,
+        defaultPreviewMode: settings?.defaultPreviewMode ?? "CLIP",
+        defaultPreviewSeconds: settings?.defaultPreviewSeconds ?? 30,
+        releaseDefaultArtists: artists.map((artist) => ({
+          id: artist.id,
+          name: artist.name,
+        })),
       },
     });
   } catch (error) {

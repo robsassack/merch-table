@@ -8,6 +8,26 @@ import { uploadReleaseCoverFile } from "./release-management/release-cover-uploa
 import { SUPPORTED_CURRENCIES } from "@/lib/setup/currencies";
 
 type StoreStatus = "SETUP" | "PRIVATE" | "PUBLIC";
+type ReleasePricingMode = "FREE" | "FIXED" | "PWYW";
+type ReleaseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
+type ReleaseType =
+  | "ALBUM"
+  | "EP"
+  | "SINGLE"
+  | "COMPILATION"
+  | "MIXTAPE"
+  | "LIVE_ALBUM"
+  | "SOUNDTRACK_SCORE"
+  | "DEMO"
+  | "BOOTLEG"
+  | "REMIX"
+  | "OTHER";
+type PreviewMode = "CLIP" | "FULL" | "NONE";
+
+type ReleaseDefaultArtist = {
+  id: string;
+  name: string;
+};
 
 type StoreSettingsResponse = {
   ok?: boolean;
@@ -22,6 +42,15 @@ type StoreSettingsResponse = {
     adminEmail: string;
     currency: string;
     storeStatus: StoreStatus;
+    defaultReleaseArtistId: string | null;
+    defaultReleasePricingMode: ReleasePricingMode | null;
+    defaultReleaseStatus: ReleaseStatus | null;
+    defaultReleaseType: ReleaseType | null;
+    defaultReleasePwywMinimumCents: number | null;
+    defaultReleaseAllowFreeCheckout: boolean | null;
+    defaultPreviewMode: PreviewMode;
+    defaultPreviewSeconds: number;
+    releaseDefaultArtists: ReleaseDefaultArtist[];
   };
 };
 
@@ -33,6 +62,68 @@ type StoreSettingsPanelProps = {
 
 function resolveOrganizationLogoSrc(organizationLogoUrl: string) {
   return `/api/cover?url=${encodeURIComponent(organizationLogoUrl)}`;
+}
+
+const releasePricingModeOptions: Array<{ value: ReleasePricingMode; label: string }> = [
+  { value: "FREE", label: "Free" },
+  { value: "FIXED", label: "Fixed" },
+  { value: "PWYW", label: "Pay What You Want" },
+];
+
+const releaseStatusOptions: Array<{ value: ReleaseStatus; label: string }> = [
+  { value: "PUBLISHED", label: "Published" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "ARCHIVED", label: "Archived" },
+];
+
+const releaseTypeOptions: Array<{ value: ReleaseType; label: string }> = [
+  { value: "ALBUM", label: "Album" },
+  { value: "EP", label: "EP" },
+  { value: "SINGLE", label: "Single" },
+  { value: "COMPILATION", label: "Compilation" },
+  { value: "MIXTAPE", label: "Mixtape" },
+  { value: "LIVE_ALBUM", label: "Live Album" },
+  { value: "SOUNDTRACK_SCORE", label: "Soundtrack / Score" },
+  { value: "DEMO", label: "Demo" },
+  { value: "BOOTLEG", label: "Bootleg" },
+  { value: "REMIX", label: "Remix" },
+  { value: "OTHER", label: "Other" },
+];
+
+function centsToCurrencyInput(cents: number | null | undefined) {
+  if (typeof cents !== "number" || !Number.isFinite(cents) || cents < 0) {
+    return "";
+  }
+
+  return (cents / 100).toFixed(2);
+}
+
+function parseCurrencyInputToCents(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return Math.round(parsed * 100);
+}
+
+function parsePositiveInteger(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+
+  return Math.round(parsed);
 }
 
 function refreshDocumentFavicon() {
@@ -68,6 +159,15 @@ export function StoreSettingsPanel({
   const [adminEmail, setAdminEmail] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [storeStatus, setStoreStatus] = useState<StoreStatus>("SETUP");
+  const [defaultReleaseArtists, setDefaultReleaseArtists] = useState<ReleaseDefaultArtist[]>([]);
+  const [defaultReleaseArtistId, setDefaultReleaseArtistId] = useState("");
+  const [defaultReleasePricingMode, setDefaultReleasePricingMode] = useState<ReleasePricingMode | "">("");
+  const [defaultReleaseStatus, setDefaultReleaseStatus] = useState<ReleaseStatus | "">("");
+  const [defaultReleaseType, setDefaultReleaseType] = useState<ReleaseType | "">("");
+  const [defaultReleasePwywMinimum, setDefaultReleasePwywMinimum] = useState("");
+  const [defaultReleaseAllowFreeCheckout, setDefaultReleaseAllowFreeCheckout] = useState(false);
+  const [defaultPreviewMode, setDefaultPreviewMode] = useState<PreviewMode>("CLIP");
+  const [defaultPreviewSeconds, setDefaultPreviewSeconds] = useState("30");
   const [saving, setSaving] = useState(false);
   const [savingStatus, setSavingStatus] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -77,6 +177,25 @@ export function StoreSettingsPanel({
   const [notice, setNotice] = useState<string | null>(null);
   const contactErrorId = "admin-store-settings-error";
   const initialLoad = useRef(true);
+
+  const applyStoreSettingsData = (data: NonNullable<StoreSettingsResponse["data"]>) => {
+    setOrgName(data.orgName);
+    setStoreName(data.storeName);
+    setOrganizationLogoUrl(data.organizationLogoUrl);
+    setContactEmail(data.contactEmail);
+    setAdminEmail(data.adminEmail);
+    setCurrency(data.currency);
+    setStoreStatus(data.storeStatus);
+    setDefaultReleaseArtists(data.releaseDefaultArtists ?? []);
+    setDefaultReleaseArtistId(data.defaultReleaseArtistId ?? "");
+    setDefaultReleasePricingMode(data.defaultReleasePricingMode ?? "");
+    setDefaultReleaseStatus(data.defaultReleaseStatus ?? "");
+    setDefaultReleaseType(data.defaultReleaseType ?? "");
+    setDefaultReleasePwywMinimum(centsToCurrencyInput(data.defaultReleasePwywMinimumCents));
+    setDefaultReleaseAllowFreeCheckout(data.defaultReleaseAllowFreeCheckout ?? false);
+    setDefaultPreviewMode(data.defaultPreviewMode ?? "CLIP");
+    setDefaultPreviewSeconds(String(data.defaultPreviewSeconds ?? 30));
+  };
 
   useEffect(() => {
     setIsHydrated(true);
@@ -103,14 +222,7 @@ export function StoreSettingsPanel({
         if (!body.ok || !body.data) {
           return;
         }
-
-        setOrgName(body.data.orgName);
-        setStoreName(body.data.storeName);
-        setOrganizationLogoUrl(body.data.organizationLogoUrl);
-        setContactEmail(body.data.contactEmail);
-        setAdminEmail(body.data.adminEmail);
-        setCurrency(body.data.currency);
-        setStoreStatus(body.data.storeStatus);
+        applyStoreSettingsData(body.data);
       })
       .catch(() => undefined);
   }, []);
@@ -119,25 +231,57 @@ export function StoreSettingsPanel({
     event.preventDefault();
     setError(null);
     setNotice(null);
+
+    const parsedDefaultReleasePwywMinimum = parseCurrencyInputToCents(defaultReleasePwywMinimum);
+    if (defaultReleasePricingMode === "PWYW" && defaultReleasePwywMinimum.trim().length > 0 && parsedDefaultReleasePwywMinimum === null) {
+      setError("Enter a valid PWYW minimum amount.");
+      return;
+    }
+
+    const parsedDefaultPreviewSeconds = parsePositiveInteger(defaultPreviewSeconds);
+    if (defaultPreviewMode === "CLIP" && parsedDefaultPreviewSeconds === null) {
+      setError("Enter preview seconds as a whole number greater than 0.");
+      return;
+    }
+
     setSaving(true);
 
     try {
+      const defaultReleasePwywMinimumCents =
+        defaultReleasePricingMode === "PWYW"
+          ? (parsedDefaultReleasePwywMinimum ??
+            (defaultReleaseAllowFreeCheckout ? 0 : null))
+          : null;
+
       const response = await fetch("/api/admin/settings/store", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ orgName, storeName, contactEmail, adminEmail, currency }),
+        body: JSON.stringify({
+          orgName,
+          storeName,
+          contactEmail,
+          adminEmail,
+          currency,
+          defaultReleaseArtistId: defaultReleaseArtistId.length > 0 ? defaultReleaseArtistId : null,
+          defaultReleasePricingMode:
+            defaultReleasePricingMode.length > 0 ? defaultReleasePricingMode : null,
+          defaultReleaseStatus: defaultReleaseStatus.length > 0 ? defaultReleaseStatus : null,
+          defaultReleaseType: defaultReleaseType.length > 0 ? defaultReleaseType : null,
+          defaultReleasePwywMinimumCents,
+          defaultReleaseAllowFreeCheckout:
+            defaultReleasePricingMode === "PWYW" ? defaultReleaseAllowFreeCheckout : null,
+          defaultPreviewMode,
+          defaultPreviewSeconds:
+            parsedDefaultPreviewSeconds ??
+            parsePositiveInteger(defaultPreviewSeconds) ??
+            30,
+        }),
       });
       const body = (await response.json().catch(() => null)) as StoreSettingsResponse | null;
       if (!response.ok || !body?.ok || !body.data) {
         throw new Error(body?.error ?? "Could not save store settings.");
       }
-      setOrgName(body.data.orgName);
-      setStoreName(body.data.storeName);
-      setOrganizationLogoUrl(body.data.organizationLogoUrl);
-      setContactEmail(body.data.contactEmail);
-      setAdminEmail(body.data.adminEmail);
-      setCurrency(body.data.currency);
-      setStoreStatus(body.data.storeStatus);
+      applyStoreSettingsData(body.data);
       router.refresh();
       setNotice("Store settings saved.");
     } catch (saveError) {
@@ -167,14 +311,7 @@ export function StoreSettingsPanel({
       if (!response.ok || !body?.ok || !body.data) {
         throw new Error(body?.error ?? "Could not update store visibility.");
       }
-
-      setOrgName(body.data.orgName);
-      setStoreName(body.data.storeName);
-      setOrganizationLogoUrl(body.data.organizationLogoUrl);
-      setContactEmail(body.data.contactEmail);
-      setAdminEmail(body.data.adminEmail);
-      setCurrency(body.data.currency);
-      setStoreStatus(body.data.storeStatus);
+      applyStoreSettingsData(body.data);
       router.refresh();
       setNotice(body.data.storeStatus === "PUBLIC" ? "Store is now public." : "Store is now private.");
     } catch (toggleError) {
@@ -208,14 +345,7 @@ export function StoreSettingsPanel({
       if (!response.ok || !body?.ok || !body.data) {
         throw new Error(body?.error ?? "Could not save organization logo.");
       }
-
-      setOrgName(body.data.orgName);
-      setStoreName(body.data.storeName);
-      setOrganizationLogoUrl(body.data.organizationLogoUrl);
-      setContactEmail(body.data.contactEmail);
-      setAdminEmail(body.data.adminEmail);
-      setCurrency(body.data.currency);
-      setStoreStatus(body.data.storeStatus);
+      applyStoreSettingsData(body.data);
       router.refresh();
       setNotice("Organization logo uploaded.");
     } catch (uploadError) {
@@ -240,14 +370,7 @@ export function StoreSettingsPanel({
       if (!response.ok || !body?.ok || !body.data) {
         throw new Error(body?.error ?? "Could not remove organization logo.");
       }
-
-      setOrgName(body.data.orgName);
-      setStoreName(body.data.storeName);
-      setOrganizationLogoUrl(body.data.organizationLogoUrl);
-      setContactEmail(body.data.contactEmail);
-      setAdminEmail(body.data.adminEmail);
-      setCurrency(body.data.currency);
-      setStoreStatus(body.data.storeStatus);
+      applyStoreSettingsData(body.data);
       router.refresh();
       setNotice("Organization logo removed.");
     } catch (removeError) {
@@ -490,6 +613,141 @@ export function StoreSettingsPanel({
             ))}
           </select>
         </label>
+
+        <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-4">
+          <p className="text-xs uppercase tracking-wide text-zinc-500">Release Defaults</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Artist
+              <select
+                value={defaultReleaseArtistId}
+                onChange={(event) => setDefaultReleaseArtistId(event.target.value)}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+              >
+                <option value="">No default artist</option>
+                {defaultReleaseArtists.map((artist) => (
+                  <option key={artist.id} value={artist.id}>
+                    {artist.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Pricing mode
+              <select
+                value={defaultReleasePricingMode}
+                onChange={(event) => {
+                  const nextMode = event.target.value as ReleasePricingMode | "";
+                  setDefaultReleasePricingMode(nextMode);
+                  if (nextMode !== "PWYW") {
+                    setDefaultReleaseAllowFreeCheckout(false);
+                  }
+                }}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+              >
+                <option value="">No default pricing mode</option>
+                {releasePricingModeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Status
+              <select
+                value={defaultReleaseStatus}
+                onChange={(event) => setDefaultReleaseStatus(event.target.value as ReleaseStatus | "")}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+              >
+                <option value="">No default status</option>
+                {releaseStatusOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Type
+              <select
+                value={defaultReleaseType}
+                onChange={(event) => setDefaultReleaseType(event.target.value as ReleaseType | "")}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+              >
+                <option value="">No default type</option>
+                {releaseTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {defaultReleasePricingMode === "PWYW" ? (
+              <div className="flex flex-col gap-2 text-sm text-zinc-300 md:col-span-2">
+                <label className="flex flex-col gap-1">
+                  PWYW minimum ({currency})
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    inputMode="decimal"
+                    value={defaultReleasePwywMinimum}
+                    onChange={(event) => setDefaultReleasePwywMinimum(event.target.value)}
+                    placeholder={defaultReleaseAllowFreeCheckout ? "0.00" : "2.00"}
+                    className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+                  />
+                </label>
+                <label className="inline-flex items-center gap-2 text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={defaultReleaseAllowFreeCheckout}
+                    onChange={(event) => {
+                      const checked = event.target.checked;
+                      setDefaultReleaseAllowFreeCheckout(checked);
+                      if (checked && defaultReleasePwywMinimum.trim().length === 0) {
+                        setDefaultReleasePwywMinimum("0.00");
+                      }
+                    }}
+                  />
+                  Allow free checkout ($0)
+                </label>
+              </div>
+            ) : null}
+
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Release preview mode
+              <select
+                value={defaultPreviewMode}
+                onChange={(event) => setDefaultPreviewMode(event.target.value as PreviewMode)}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
+              >
+                <option value="CLIP">Clip</option>
+                <option value="FULL">Full</option>
+                <option value="NONE">No Preview</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1 text-sm text-zinc-300">
+              Release preview seconds
+              <input
+                type="number"
+                min="1"
+                step="1"
+                inputMode="numeric"
+                value={defaultPreviewSeconds}
+                onChange={(event) => setDefaultPreviewSeconds(event.target.value)}
+                placeholder="30"
+                disabled={defaultPreviewMode !== "CLIP"}
+                className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600 disabled:opacity-50"
+              />
+            </label>
+          </div>
+        </div>
         <div>
           <button
             type="submit"
@@ -501,12 +759,6 @@ export function StoreSettingsPanel({
         </div>
       </form>
 
-      <div className="mt-4 rounded-lg border border-slate-700 bg-slate-900/80 p-4">
-        <p className="text-xs uppercase tracking-wide text-zinc-500">Planned for Phase 9</p>
-        <p className="mt-2 text-sm text-zinc-300">
-          Additional account and role management will be added here as separate forms.
-        </p>
-      </div>
     </section>
   );
 }

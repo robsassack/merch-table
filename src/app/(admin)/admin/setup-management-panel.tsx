@@ -84,7 +84,7 @@ export function SetupManagementPanel() {
       <section className={panelCardClassName}>
         <h2 className="text-xl font-semibold tracking-tight text-zinc-100">Store</h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Store management is split into focused areas so each set of controls stays manageable.
+          Use these sections to manage storefront details, integrations, system health, and advanced tools.
         </p>
 
         <nav

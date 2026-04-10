@@ -96,9 +96,8 @@ export default function ReleaseDetailPurchaseCard({
   const isCurrentReleaseTrackActive = Boolean(
     activeTrackId && playablePreviewTrackIds.includes(activeTrackId),
   );
-  const playbackButtonLabel = !hasPreviewTrack
-    ? "No Preview"
-    : isCurrentReleaseTrackActive && isPlaybackVisuallyActive
+  const playbackButtonLabel =
+    isCurrentReleaseTrackActive && isPlaybackVisuallyActive
       ? "Pause"
       : "Play";
 
@@ -312,43 +311,40 @@ export default function ReleaseDetailPurchaseCard({
   return (
     <section className="mt-5">
       <div className="flex flex-wrap items-center gap-2.5">
-        <button
-          type="button"
-          disabled={!hasPreviewTrack}
-          className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900`}
-          onClick={() => {
-            if (!hasPreviewTrack) {
-              return;
-            }
+        {hasPreviewTrack ? (
+          <button
+            type="button"
+            className={primaryActionButtonClass}
+            onClick={() => {
+              if (activeTrackId && playablePreviewTrackIds.includes(activeTrackId)) {
+                playTrack(activeTrackId);
+                return;
+              }
 
-            if (activeTrackId && playablePreviewTrackIds.includes(activeTrackId)) {
-              playTrack(activeTrackId);
-              return;
-            }
-
-            if (previewTrackId) {
-              playTrack(previewTrackId);
-            }
-          }}
-        >
-          <svg
-            aria-hidden="true"
-            viewBox="0 0 24 24"
-            className="h-[1.35rem] w-[1.35rem]"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.9"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+              if (previewTrackId) {
+                playTrack(previewTrackId);
+              }
+            }}
           >
-            {isCurrentReleaseTrackActive && isPlaybackVisuallyActive ? (
-              <path d="M9 6v12M15 6v12" />
-            ) : (
-              <path d="M8 6.5v11l9-5.5-9-5.5Z" />
-            )}
-          </svg>
-          {playbackButtonLabel}
-        </button>
+            <svg
+              aria-hidden="true"
+              viewBox="0 0 24 24"
+              className="h-[1.35rem] w-[1.35rem]"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.9"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              {isCurrentReleaseTrackActive && isPlaybackVisuallyActive ? (
+                <path d="M9 6v12M15 6v12" />
+              ) : (
+                <path d="M8 6.5v11l9-5.5-9-5.5Z" />
+              )}
+            </svg>
+            {playbackButtonLabel}
+          </button>
+        ) : null}
 
         <button
           type="button"

@@ -11,7 +11,7 @@ import type {
   TranscodeTasksStatusResponse, TrackRecordPatch,
 } from "./types";
 import {
-  sortTracks, toNewTrackDraft, toReleaseDraft, toReleasePreviewDraft, toTrackDraft,
+  centsToDecimalString, sortTracks, toNewTrackDraft, toReleaseDraft, toReleasePreviewDraft, toTrackDraft,
   withReleaseDerivedTrackStats,
 } from "./utils";
 import { resolveNormalizedFeaturedReleaseId } from "./featured-release";
@@ -50,12 +50,26 @@ export function useReleaseManagementController() {
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
+    setNewPricingMode,
+    setNewMinimumPrice,
+    setNewAllowFreeCheckout,
+    setNewStatus,
+    setNewReleaseType,
     setNewLabel,
     setNewReleaseLabelDefault,
+    setCreateDefaultArtistId,
+    setCreateDefaultPricingMode,
+    setCreateDefaultStatus,
+    setCreateDefaultReleaseType,
+    setCreateDefaultPwywMinimum,
+    setCreateDefaultAllowFreeCheckout,
+    setCreateDefaultPreviewMode,
+    setCreateDefaultPreviewSeconds,
     setSelectedReleaseId,
     setCreateComposerOpen,
   } = state;
   const pollingInFlightRef = useRef(false);
+  const createDefaultsInitializedRef = useRef(false);
   const [recoverStuckPending, setRecoverStuckPending] = useState(false);
   const [pendingFeaturedReleaseId, setPendingFeaturedReleaseId] = useState<string | null>(null);
 
@@ -124,14 +138,54 @@ export function useReleaseManagementController() {
         current.trim().length === 0 || current === "Independent" ? defaultReleaseLabel : current,
       );
       const artistList = body.artists;
+      const firstActiveArtist = artistList.find((artist) => artist.deletedAt === null);
+      const defaultArtistId =
+        body.releaseDefaults?.artistId &&
+        artistList.some(
+          (artist) => artist.id === body.releaseDefaults?.artistId && artist.deletedAt === null,
+        )
+          ? body.releaseDefaults.artistId
+          : null;
+      const preferredArtistId = defaultArtistId ?? firstActiveArtist?.id ?? null;
+      const defaultPricingMode = body.releaseDefaults?.pricingMode ?? "FREE";
+      const defaultStatus = body.releaseDefaults?.status ?? "PUBLISHED";
+      const defaultReleaseType = body.releaseDefaults?.type ?? "ALBUM";
+      const defaultAllowFreeCheckout =
+        body.releaseDefaults?.allowFreeCheckout === true && defaultPricingMode === "PWYW";
+      const defaultPwywMinimum = (() => {
+        if (typeof body.releaseDefaults?.pwywMinimumCents === "number") {
+          return centsToDecimalString(body.releaseDefaults.pwywMinimumCents);
+        }
+
+        return defaultAllowFreeCheckout ? "0.00" : "";
+      })();
+      const defaultPreviewMode = body.releaseDefaults?.previewMode ?? "CLIP";
+      const defaultPreviewSeconds = String(body.releaseDefaults?.previewSeconds ?? 30);
+
+      setCreateDefaultArtistId(preferredArtistId);
+      setCreateDefaultPricingMode(defaultPricingMode);
+      setCreateDefaultStatus(defaultStatus);
+      setCreateDefaultReleaseType(defaultReleaseType);
+      setCreateDefaultPwywMinimum(defaultPwywMinimum);
+      setCreateDefaultAllowFreeCheckout(defaultAllowFreeCheckout);
+      setCreateDefaultPreviewMode(defaultPreviewMode);
+      setCreateDefaultPreviewSeconds(defaultPreviewSeconds);
+
+      if (!createDefaultsInitializedRef.current) {
+        createDefaultsInitializedRef.current = true;
+        setNewPricingMode(defaultPricingMode);
+        setNewStatus(defaultStatus);
+        setNewReleaseType(defaultReleaseType);
+        setNewMinimumPrice(defaultPricingMode === "PWYW" ? defaultPwywMinimum : "");
+        setNewAllowFreeCheckout(defaultPricingMode === "PWYW" ? defaultAllowFreeCheckout : false);
+      }
 
       setNewArtistId((current) => {
         if (current.length > 0) {
           return current;
         }
 
-        const firstArtist = artistList.find((artist) => artist.deletedAt === null);
-        return firstArtist?.id ?? current;
+        return preferredArtistId ?? current;
       });
     } catch (loadError) {
       if (!silent) {
@@ -155,8 +209,21 @@ export function useReleaseManagementController() {
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
+    setNewPricingMode,
+    setNewMinimumPrice,
+    setNewAllowFreeCheckout,
+    setNewStatus,
+    setNewReleaseType,
     setNewLabel,
     setNewReleaseLabelDefault,
+    setCreateDefaultArtistId,
+    setCreateDefaultPricingMode,
+    setCreateDefaultStatus,
+    setCreateDefaultReleaseType,
+    setCreateDefaultPwywMinimum,
+    setCreateDefaultAllowFreeCheckout,
+    setCreateDefaultPreviewMode,
+    setCreateDefaultPreviewSeconds,
   ]);
 
   useEffect(() => {

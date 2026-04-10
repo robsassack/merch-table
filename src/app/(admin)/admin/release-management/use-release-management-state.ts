@@ -12,6 +12,7 @@ import type {
   DeliveryFormat,
   ImportConflictDialogState,
   NewTrackDraft,
+  PreviewMode,
   PricingMode,
   ReleaseDraft,
   ReleaseType,
@@ -81,6 +82,14 @@ export function useReleaseManagementState() {
   const [newStatus, setNewStatus] = useState<ReleaseStatus>("PUBLISHED");
   const [newReleaseType, setNewReleaseType] = useState<ReleaseType>("ALBUM");
   const [newReleaseDate, setNewReleaseDate] = useState(getTodayDateInputValue());
+  const [createDefaultArtistId, setCreateDefaultArtistId] = useState<string | null>(null);
+  const [createDefaultPricingMode, setCreateDefaultPricingMode] = useState<PricingMode>("FREE");
+  const [createDefaultStatus, setCreateDefaultStatus] = useState<ReleaseStatus>("PUBLISHED");
+  const [createDefaultReleaseType, setCreateDefaultReleaseType] = useState<ReleaseType>("ALBUM");
+  const [createDefaultPwywMinimum, setCreateDefaultPwywMinimum] = useState("");
+  const [createDefaultAllowFreeCheckout, setCreateDefaultAllowFreeCheckout] = useState(false);
+  const [createDefaultPreviewMode, setCreateDefaultPreviewMode] = useState<PreviewMode>("CLIP");
+  const [createDefaultPreviewSeconds, setCreateDefaultPreviewSeconds] = useState("30");
   const [newMarkLossyOnly, setNewMarkLossyOnly] = useState(false);
   const [newConfirmLossyOnly, setNewConfirmLossyOnly] = useState(false);
   const [newUrlTouched, setNewUrlTouched] = useState(false);
@@ -277,6 +286,22 @@ export function useReleaseManagementState() {
     setNewReleaseType,
     newReleaseDate,
     setNewReleaseDate,
+    createDefaultArtistId,
+    setCreateDefaultArtistId,
+    createDefaultPricingMode,
+    setCreateDefaultPricingMode,
+    createDefaultStatus,
+    setCreateDefaultStatus,
+    createDefaultReleaseType,
+    setCreateDefaultReleaseType,
+    createDefaultPwywMinimum,
+    setCreateDefaultPwywMinimum,
+    createDefaultAllowFreeCheckout,
+    setCreateDefaultAllowFreeCheckout,
+    createDefaultPreviewMode,
+    setCreateDefaultPreviewMode,
+    createDefaultPreviewSeconds,
+    setCreateDefaultPreviewSeconds,
     newMarkLossyOnly,
     setNewMarkLossyOnly,
     newConfirmLossyOnly,

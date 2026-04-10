@@ -25,7 +25,7 @@ const createTrackSchema = z.object({
   durationMs: z.number().int().positive().nullable().optional(),
   lyrics: z.string().max(20_000).nullable().optional(),
   credits: z.string().max(8_000).nullable().optional(),
-  previewMode: z.enum(["CLIP", "FULL"]).optional(),
+  previewMode: z.enum(["CLIP", "FULL", "NONE"]).optional(),
   previewSeconds: z.number().int().positive().nullable().optional(),
 });
 

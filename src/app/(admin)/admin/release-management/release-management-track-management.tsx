@@ -153,7 +153,7 @@ export function ReleaseManagementTrackManagement(props: {
                                     importTrackPending ||
                                     previewApplyPending ||
                                     reorderTrackPending ||
-                                    previewDraft.previewMode === "FULL"
+                                    previewDraft.previewMode !== "CLIP"
                                   }
                                 />
                               </label>

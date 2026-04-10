@@ -8,7 +8,7 @@ import { adminTrackSelect, toAdminTrackRecord } from "./track-management";
 
 type ExistingTrack = {
   id: string;
-  previewMode: "CLIP" | "FULL" | null;
+  previewMode: "CLIP" | "FULL" | "NONE" | null;
   assets: Array<{ id: string; isLossless: boolean }>;
   transcodeJobs: Array<{
     status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";

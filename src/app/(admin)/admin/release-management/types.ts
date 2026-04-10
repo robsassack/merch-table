@@ -14,7 +14,7 @@ export type ReleaseType =
   | "BOOTLEG"
   | "REMIX"
   | "OTHER";
-export type PreviewMode = "CLIP" | "FULL";
+export type PreviewMode = "CLIP" | "FULL" | "NONE";
 export type AssetRole = "MASTER" | "PREVIEW" | "DELIVERY";
 export type TranscodeStatus = "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED";
 export type TranscodeJobKind = "PREVIEW_CLIP" | "DELIVERY_FORMATS";
@@ -116,6 +116,16 @@ export type ReleasesListResponse = {
   minimumPriceFloorCents?: number;
   storeCurrency?: string;
   featuredReleaseId?: string | null;
+  releaseDefaults?: {
+    artistId: string | null;
+    pricingMode: PricingMode | null;
+    status: ReleaseStatus | null;
+    type: ReleaseType | null;
+    pwywMinimumCents: number | null;
+    allowFreeCheckout: boolean | null;
+    previewMode: PreviewMode;
+    previewSeconds: number;
+  };
   stripeFeeEstimate?: {
     percentBps: number;
     fixedFeeCents: number;

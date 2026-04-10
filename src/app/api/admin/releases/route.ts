@@ -27,7 +27,7 @@ import {
 export const runtime = "nodejs";
 
 const createReleaseSchema = z.object({
-  artistId: z.string().trim().min(1),
+  artistId: z.string().trim().min(1).optional(),
   title: z.string().trim().min(1).max(160),
   label: z.string().max(160).nullable().optional(),
   releaseType: z
@@ -44,17 +44,17 @@ const createReleaseSchema = z.object({
       "REMIX",
       "OTHER",
     ])
-    .default("ALBUM"),
+    .optional(),
   slug: z.string().trim().max(160).optional(),
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
   coverStorageKey: z.string().trim().max(500).nullable().optional(),
-  pricingMode: z.enum(["FREE", "FIXED", "PWYW"]),
+  pricingMode: z.enum(["FREE", "FIXED", "PWYW"]).optional(),
   fixedPriceCents: z.number().int().nullable().optional(),
   minimumPriceCents: z.number().int().nullable().optional(),
   deliveryFormats: z.array(z.enum(["MP3", "M4A", "FLAC"])).min(1).optional(),
   allowFreeCheckout: z.boolean().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).default("PUBLISHED"),
+  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
   markLossyOnly: z.boolean().default(false),
   confirmLossyOnly: z.boolean().optional(),
 });
@@ -149,7 +149,18 @@ export async function GET() {
     prisma.storeSettings.findFirst({
       where: { organizationId: auth.context.organizationId },
       orderBy: { createdAt: "asc" },
-      select: { currency: true, featuredReleaseId: true },
+      select: {
+        currency: true,
+        featuredReleaseId: true,
+        defaultReleaseArtistId: true,
+        defaultReleasePricingMode: true,
+        defaultReleaseStatus: true,
+        defaultReleaseType: true,
+        defaultReleasePwywMinimumCents: true,
+        defaultReleaseAllowFreeCheckout: true,
+        defaultPreviewMode: true,
+        defaultPreviewSeconds: true,
+      },
     }),
     prisma.organization.findFirst({
       where: { id: auth.context.organizationId },
@@ -165,6 +176,16 @@ export async function GET() {
       stripeFeeEstimate,
       storeCurrency: settings?.currency ?? "USD",
       featuredReleaseId: settings?.featuredReleaseId ?? null,
+      releaseDefaults: {
+        artistId: settings?.defaultReleaseArtistId ?? null,
+        pricingMode: settings?.defaultReleasePricingMode ?? null,
+        status: settings?.defaultReleaseStatus ?? null,
+        type: settings?.defaultReleaseType ?? null,
+        pwywMinimumCents: settings?.defaultReleasePwywMinimumCents ?? null,
+        allowFreeCheckout: settings?.defaultReleaseAllowFreeCheckout ?? null,
+        previewMode: settings?.defaultPreviewMode ?? "CLIP",
+        previewSeconds: settings?.defaultPreviewSeconds ?? 30,
+      },
       artists: artists.map((artist) => ({
         id: artist.id,
         name: artist.name,
@@ -223,9 +244,38 @@ export async function POST(request: Request) {
       }
     }
 
+    const settings = await prisma.storeSettings.findFirst({
+      where: { organizationId: auth.context.organizationId },
+      orderBy: { createdAt: "asc" },
+      select: {
+        currency: true,
+        defaultReleaseArtistId: true,
+        defaultReleasePricingMode: true,
+        defaultReleaseStatus: true,
+        defaultReleaseType: true,
+        defaultReleasePwywMinimumCents: true,
+        defaultReleaseAllowFreeCheckout: true,
+      },
+    });
+
+    const resolvedArtistId =
+      (typeof parsed.artistId === "string" && parsed.artistId.length > 0
+        ? parsed.artistId
+        : settings?.defaultReleaseArtistId) ?? null;
+
+    if (!resolvedArtistId) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Select an active artist for this release.",
+        },
+        { status: 400 },
+      );
+    }
+
     const activeArtist = await prisma.artist.findFirst({
       where: {
-        id: parsed.artistId,
+        id: resolvedArtistId,
         organizationId: auth.context.organizationId,
         deletedAt: null,
       },
@@ -242,11 +292,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const resolvedPricingMode = parsed.pricingMode ?? settings?.defaultReleasePricingMode ?? "FREE";
+    const resolvedStatus = parsed.status ?? settings?.defaultReleaseStatus ?? "PUBLISHED";
+    const resolvedReleaseType = parsed.releaseType ?? settings?.defaultReleaseType ?? "ALBUM";
+    const resolvedAllowFreeCheckout =
+      parsed.allowFreeCheckout ??
+      (resolvedPricingMode === "PWYW" ? (settings?.defaultReleaseAllowFreeCheckout ?? false) : false);
+    const resolvedMinimumPriceCents =
+      parsed.minimumPriceCents ??
+      (resolvedPricingMode === "PWYW"
+        ? (settings?.defaultReleasePwywMinimumCents ??
+          (resolvedAllowFreeCheckout ? 0 : null))
+        : null);
+
     const normalizedPricing = normalizePricingForRelease({
-      pricingMode: parsed.pricingMode,
+      pricingMode: resolvedPricingMode,
       fixedPriceCents: parsed.fixedPriceCents,
-      minimumPriceCents: parsed.minimumPriceCents,
-      allowFreeCheckout: parsed.allowFreeCheckout ?? false,
+      minimumPriceCents: resolvedMinimumPriceCents,
+      allowFreeCheckout: resolvedAllowFreeCheckout,
       floorCents: minimumPriceFloorCents,
     });
 
@@ -295,23 +358,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const settings = await prisma.storeSettings.findFirst({
-      where: { organizationId: auth.context.organizationId },
-      orderBy: { createdAt: "asc" },
-      select: { currency: true },
-    });
-
     const created = await prisma.release.create({
       data: {
         organizationId: auth.context.organizationId,
         artistId: activeArtist.id,
         title: parsed.title.trim(),
         label: resolveReleaseLabel(parsed.label),
-        releaseType: parsed.releaseType,
+        releaseType: resolvedReleaseType,
         slug: resolvedSlug,
         description: normalizeNullableText(parsed.description),
         coverImageUrl,
-        pricingMode: parsed.pricingMode,
+        pricingMode: resolvedPricingMode,
         fixedPriceCents: normalizedPricing.value.fixedPriceCents,
         minimumPriceCents: normalizedPricing.value.minimumPriceCents,
         ...(deliveryFormatsSupported
@@ -319,9 +376,9 @@ export async function POST(request: Request) {
           : {}),
         priceCents: normalizedPricing.value.priceCents,
         currency: settings?.currency ?? "USD",
-        status: parsed.status,
+        status: resolvedStatus,
         ...(releaseDateSupported && releaseDate ? { releaseDate } : {}),
-        publishedAt: parsed.status === "PUBLISHED" ? new Date() : null,
+        publishedAt: resolvedStatus === "PUBLISHED" ? new Date() : null,
         isLossyOnly: parsed.markLossyOnly,
       },
       select: releaseSelect,

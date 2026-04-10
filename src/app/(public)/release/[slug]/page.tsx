@@ -176,6 +176,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           lyrics: true,
           credits: true,
           previewMode: true,
+          previewSeconds: true,
           assets: {
             orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
             select: {
@@ -236,6 +237,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
       trackNumber: track.trackNumber,
       durationMs: track.durationMs,
       previewFormat: previewAsset?.format ?? null,
+      previewVersion: `${track.previewMode}:${track.previewMode === "CLIP" ? String(track.previewSeconds ?? 30) : "na"}:${previewAsset?.id ?? "none"}`,
       artistOverride: track.artistOverride,
       lyrics: track.lyrics,
       credits: track.credits,
@@ -250,7 +252,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     durationMs: track.durationMs,
     isPlayablePreview: track.isPlayablePreview,
     previewFormat: track.previewFormat,
-    previewUrl: `/api/release/tracks/${encodeURIComponent(track.id)}/preview`,
+    previewUrl: `/api/release/tracks/${encodeURIComponent(track.id)}/preview?v=${encodeURIComponent(track.previewVersion)}`,
   }));
   const releasePreviewTrackId = resolvePreviewTrackId(
     releasePlayerTracks,

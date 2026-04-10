@@ -44,6 +44,7 @@ export const releaseTypeOptions: Array<{ value: ReleaseType; label: string }> = 
 export const previewModeOptions: Array<{ value: PreviewMode; label: string }> = [
   { value: "CLIP", label: "Clip" },
   { value: "FULL", label: "Full" },
+  { value: "NONE", label: "No Preview" },
 ];
 
 export const deliveryFormatOptions: Array<{

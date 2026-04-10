@@ -1,0 +1,6 @@
+DO $$
+BEGIN
+  ALTER TYPE "PreviewMode" ADD VALUE IF NOT EXISTS 'NONE';
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;

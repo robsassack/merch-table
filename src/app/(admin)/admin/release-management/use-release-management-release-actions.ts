@@ -39,6 +39,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setLocalCoverPreviewForRelease,
     setDraftsById,
     setCreatePending,
+    setNewArtistId,
     newArtistId,
     newTitle,
     newSlug,
@@ -54,6 +55,14 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newStatus,
     newReleaseType,
     newReleaseDate,
+    createDefaultArtistId,
+    createDefaultPricingMode,
+    createDefaultStatus,
+    createDefaultReleaseType,
+    createDefaultPwywMinimum,
+    createDefaultAllowFreeCheckout,
+    createDefaultPreviewMode,
+    createDefaultPreviewSeconds,
     newMarkLossyOnly,
     newConfirmLossyOnly,
     setReleases,
@@ -256,13 +265,16 @@ export function createReleaseActions(input: ReleaseActionsInput) {
         return null;
       });
       setNewCoverStorageKey(null);
-      setNewPricingMode("FREE");
+      setNewArtistId(createDefaultArtistId ?? newArtistId);
+      setNewPricingMode(createDefaultPricingMode);
       setNewFixedPrice("");
-      setNewMinimumPrice("");
+      setNewMinimumPrice(createDefaultPricingMode === "PWYW" ? createDefaultPwywMinimum : "");
       setNewDeliveryFormats(["MP3", "M4A", "FLAC"]);
-      setNewAllowFreeCheckout(false);
-      setNewStatus("PUBLISHED");
-      setNewReleaseType("ALBUM");
+      setNewAllowFreeCheckout(
+        createDefaultPricingMode === "PWYW" ? createDefaultAllowFreeCheckout : false,
+      );
+      setNewStatus(createDefaultStatus);
+      setNewReleaseType(createDefaultReleaseType);
       setNewReleaseDate(getTodayDateInputValue());
       setNewMarkLossyOnly(false);
       setNewConfirmLossyOnly(false);
@@ -270,6 +282,14 @@ export function createReleaseActions(input: ReleaseActionsInput) {
       setCreateAdvancedOpen(false);
       setCreateComposerOpen(false);
       setSelectedReleaseId(createdRelease.id);
+      setPreviewByReleaseId((previous) => ({
+        ...previous,
+        [createdRelease.id]: {
+          previewMode: createDefaultPreviewMode,
+          previewSeconds:
+            createDefaultPreviewMode === "CLIP" ? createDefaultPreviewSeconds : "30",
+        },
+      }));
       setNotice(`Created release "${createdRelease.title}".`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : "Could not create release.");

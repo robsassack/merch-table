@@ -117,6 +117,10 @@ function pickSourceAsset(track: TrackRecord, mode: PlaybackSourceMode) {
     return masterAsset ?? previewAsset;
   }
 
+  if (track.previewMode === "NONE") {
+    return null;
+  }
+
   return previewAsset;
 }
 

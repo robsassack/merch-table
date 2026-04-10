@@ -140,4 +140,24 @@ describe("resolveStorefrontPreviewAsset", () => {
 
     assert.equal(result, null);
   });
+
+  it("returns null for NONE mode even when assets exist", () => {
+    const result = resolveStorefrontPreviewAsset({
+      previewMode: "NONE",
+      assets: [
+        makeAsset({
+          id: "preview-track",
+          assetRole: "PREVIEW",
+          updatedAt: "2026-04-06T12:00:00.000Z",
+        }),
+        makeAsset({
+          id: "master-track",
+          assetRole: "MASTER",
+          updatedAt: "2026-04-06T12:05:00.000Z",
+        }),
+      ],
+    });
+
+    assert.equal(result, null);
+  });
 });

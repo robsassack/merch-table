@@ -80,7 +80,7 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
           const hasMetadata = Boolean(track.normalizedLyrics || track.normalizedCredits);
           const isActiveTrack = activeTrackId === track.id;
           const canPlayTrack = track.isPlayablePreview;
-          const hasSecondaryRow = Boolean(track.artistOverride) || !track.isPlayablePreview;
+          const hasSecondaryRow = Boolean(track.artistOverride);
           return (
             <li
               key={track.id}
@@ -194,11 +194,6 @@ export default function ReleaseTrackList({ tracks }: ReleaseTrackListProps) {
                     {track.artistOverride ? (
                       <p className="text-xs text-zinc-500">{track.artistOverride}</p>
                     ) : null}
-                    <div className={`${track.artistOverride ? "mt-1" : ""} flex flex-wrap items-center gap-2`}>
-                      {!track.isPlayablePreview ? (
-                        <span className="text-xs text-zinc-500">Preview not ready</span>
-                      ) : null}
-                    </div>
                   </div>
                   <span aria-hidden />
                 </div>

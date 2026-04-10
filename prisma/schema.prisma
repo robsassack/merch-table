@@ -41,6 +41,7 @@ enum PricingMode {
 enum PreviewMode {
   CLIP
   FULL
+  NONE
 }
 
 enum AssetRole {
@@ -254,6 +255,12 @@ model StoreSettings {
   defaultPreviewMode    PreviewMode  @default(CLIP)
   defaultPreviewSeconds Int          @default(30)
   featuredReleaseId     String?
+  defaultReleaseArtistId String?
+  defaultReleasePricingMode PricingMode?
+  defaultReleaseStatus   ReleaseStatus?
+  defaultReleaseType     ReleaseType?
+  defaultReleasePwywMinimumCents Int?
+  defaultReleaseAllowFreeCheckout Boolean?
   organizationLogoUrl   String?
   contactEmail          String?
   contactName           String?

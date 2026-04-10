@@ -302,6 +302,13 @@ export function toReleasePreviewDraft(release: ReleaseRecord): ReleasePreviewDra
 }
 
 export function resolvePreviewPayload(draft: ReleasePreviewDraft) {
+  if (draft.previewMode === "NONE") {
+    return {
+      previewMode: "NONE" as const,
+      previewSeconds: null,
+    };
+  }
+
   if (draft.previewMode === "FULL") {
     return {
       previewMode: "FULL" as const,
@@ -367,6 +374,13 @@ export function getTrackPreviewStatus(track: TrackRecord) {
   const previewJobs = track.transcodeJobs.filter(
     (job) => job.jobKind === "PREVIEW_CLIP",
   );
+
+  if (track.previewMode === "NONE") {
+    return {
+      label: "preview disabled",
+      className: withTrackStatusTone("border-slate-700/80 bg-slate-900/70 text-zinc-400"),
+    };
+  }
 
   if (track.previewMode === "FULL") {
     return {

@@ -101,7 +101,7 @@ export async function maybeQueueDeliveryReconcileJob(input: {
 
 function resolveStaleQueuedRecoveryAction(input: {
   jobKind: TranscodeJobKind;
-  previewMode: "CLIP" | "FULL";
+  previewMode: "CLIP" | "FULL" | "NONE";
   isLossless: boolean;
 }): StaleQueuedRecoveryAction {
   if (input.jobKind === "PREVIEW_CLIP") {
@@ -109,7 +109,7 @@ function resolveStaleQueuedRecoveryAction(input: {
       return {
         type: "FAIL",
         reason:
-          "Stale queued preview job is no longer valid because the track preview mode changed to FULL. Queue a new preview clip job if needed.",
+          "Stale queued preview job is no longer valid because the track preview mode changed away from CLIP. Queue a new preview clip job if needed.",
       };
     }
 

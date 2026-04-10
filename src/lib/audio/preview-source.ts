@@ -1,4 +1,4 @@
-export type StorefrontPreviewMode = "CLIP" | "FULL";
+export type StorefrontPreviewMode = "CLIP" | "FULL" | "NONE";
 
 export type StorefrontPreviewAsset = {
   id: string;
@@ -31,6 +31,10 @@ export function resolveStorefrontPreviewAsset(input: {
   previewMode: StorefrontPreviewMode;
   assets: StorefrontPreviewAsset[];
 }) {
+  if (input.previewMode === "NONE") {
+    return null;
+  }
+
   const sortedAssets = sortPreviewAssetsByUpdatedAtDesc(input.assets);
   const previewAsset = sortedAssets.find((asset) => asset.assetRole === "PREVIEW") ?? null;
   const masterAsset = sortedAssets.find((asset) => asset.assetRole === "MASTER") ?? null;

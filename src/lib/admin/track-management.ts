@@ -142,7 +142,7 @@ export function resolveTrackPreviewValues(input: {
   fallbackSeconds: number;
 }) {
   const resolvedMode = input.previewMode ?? input.fallbackMode;
-  if (resolvedMode === "FULL") {
+  if (resolvedMode === "FULL" || resolvedMode === "NONE") {
     return {
       previewMode: resolvedMode,
       previewSeconds: null,
