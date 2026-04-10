@@ -58,6 +58,8 @@ export function useReleaseManagementController() {
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
+    setNewLabel,
+    setNewReleaseLabelDefault,
     setSelectedReleaseId,
     setCreateComposerOpen,
   } = state;
@@ -121,6 +123,14 @@ export function useReleaseManagementController() {
       setFeaturedReleaseId(body.featuredReleaseId ?? null);
       setStripeFeePercentBps(body.stripeFeeEstimate?.percentBps ?? 290);
       setStripeFeeFixedCents(body.stripeFeeEstimate?.fixedFeeCents ?? 30);
+      const defaultReleaseLabel =
+        typeof body.orgName === "string" && body.orgName.trim().length > 0
+          ? body.orgName.trim()
+          : "Independent";
+      setNewReleaseLabelDefault(defaultReleaseLabel);
+      setNewLabel((current) =>
+        current.trim().length === 0 || current === "Independent" ? defaultReleaseLabel : current,
+      );
       const artistList = body.artists;
 
       setNewArtistId((current) => {
@@ -153,6 +163,8 @@ export function useReleaseManagementController() {
     setStripeFeePercentBps,
     setStripeFeeFixedCents,
     setNewArtistId,
+    setNewLabel,
+    setNewReleaseLabelDefault,
   ]);
 
   useEffect(() => {

@@ -4,6 +4,10 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import {
+  isValidCoverStorageKey,
+  resolveCoverImageUrlFromStorageKey,
+} from "@/lib/storage/cover-art";
 
 export const runtime = "nodejs";
 
@@ -15,6 +19,7 @@ const updateArtistSchema = z.object({
   action: z.literal("update"),
   name: z.string().trim().min(2).max(120),
   slug: z.string().trim().max(120).optional(),
+  imageStorageKey: z.string().trim().min(1).max(500).nullable().optional(),
   location: z.string().max(160).nullable().optional(),
   bio: z.string().max(4_000).nullable().optional(),
 });
@@ -67,6 +72,24 @@ function normalizeLocation(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveArtistImageUpdate(
+  value: string | null | undefined,
+): string | null | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value === null) {
+    return null;
+  }
+
+  if (!isValidCoverStorageKey(value)) {
+    throw new Error("Invalid artist image upload key.");
+  }
+
+  return resolveCoverImageUrlFromStorageKey(value);
+}
+
 function isUniqueConstraintError(error: unknown) {
   return (
     typeof error === "object" &&
@@ -108,6 +131,7 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: true,
         name: true,
         slug: true,
+        imageUrl: true,
         location: true,
         bio: true,
         deletedAt: true,
@@ -152,6 +176,9 @@ export async function PATCH(request: Request, context: RouteContext) {
         data: {
           name: parsed.name.trim(),
           slug: resolvedSlug,
+          ...(parsed.imageStorageKey !== undefined
+            ? { imageUrl: resolveArtistImageUpdate(parsed.imageStorageKey) }
+            : {}),
           location: normalizeLocation(parsed.location),
           bio: normalizeBio(parsed.bio),
         },
@@ -159,6 +186,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           id: true,
           name: true,
           slug: true,
+          imageUrl: true,
           location: true,
           bio: true,
           deletedAt: true,
@@ -183,6 +211,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           id: true,
           name: true,
           slug: true,
+          imageUrl: true,
           location: true,
           bio: true,
           deletedAt: true,
@@ -205,6 +234,7 @@ export async function PATCH(request: Request, context: RouteContext) {
           id: true,
           name: true,
           slug: true,
+          imageUrl: true,
           location: true,
           bio: true,
           deletedAt: true,
@@ -264,6 +294,13 @@ export async function PATCH(request: Request, context: RouteContext) {
       return NextResponse.json(
         { ok: false, error: "That artist slug is already in use." },
         { status: 409 },
+      );
+    }
+
+    if (error instanceof Error && error.message === "Invalid artist image upload key.") {
+      return NextResponse.json(
+        { ok: false, error: error.message },
+        { status: 400 },
       );
     }
 

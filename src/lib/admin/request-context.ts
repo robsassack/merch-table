@@ -12,6 +12,7 @@ export type AdminRequestContext = {
     userId: string;
     email: string;
     expiresAt: number;
+    sessionToken: string;
     organizationId?: string;
   };
 };
@@ -70,6 +71,7 @@ export async function requireAdminRequestContext() {
         userId: authSession.user.id,
         email: authSession.user.email,
         expiresAt: authSession.session.expiresAt.getTime(),
+        sessionToken: authSession.session.token,
       },
     } satisfies AdminRequestContext,
   };

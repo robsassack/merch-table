@@ -190,6 +190,7 @@ model Artist {
   ownerId        String?
   name           String
   slug           String
+  imageUrl       String?
   location       String?
   bio            String?
   deletedAt      DateTime?
@@ -253,6 +254,7 @@ model StoreSettings {
   defaultPreviewMode    PreviewMode  @default(CLIP)
   defaultPreviewSeconds Int          @default(30)
   featuredReleaseId     String?
+  organizationLogoUrl   String?
   contactEmail          String?
   contactName           String?
   supportEmail          String?

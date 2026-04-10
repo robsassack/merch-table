@@ -18,6 +18,18 @@ export function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+export function resolveArtistAvatarSrc(input: {
+  artistImageUrl: string | null | undefined;
+  ownerImageUrl: string | null | undefined;
+}) {
+  const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
+  if (artistImageUrl) {
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+  }
+
+  return resolveOptionalImageUrl(input.ownerImageUrl);
+}
+
 export function resolveInitials(name: string) {
   const parts = name
     .trim()

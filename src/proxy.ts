@@ -74,6 +74,7 @@ export async function proxy(request: NextRequest) {
   const isSetupMagicLinkPath = pathname.startsWith("/admin/auth/magic-link");
   const isLibraryPath = pathname === "/library";
   const isFindPurchasesPath = pathname === "/find-my-purchases";
+  const isMediaPath = pathname.startsWith("/media/");
 
   if (setup.storeStatus === "SETUP" || !setup.setupComplete) {
     if (isSetupPath || isSetupMagicLinkPath) {
@@ -90,7 +91,7 @@ export async function proxy(request: NextRequest) {
 
   if (setup.storeStatus === "PRIVATE") {
     const isBuyerFulfillmentPath = isLibraryPath || isFindPurchasesPath;
-    if (!isAdminPath && !isMaintenancePath && !isApiPath && !isBuyerFulfillmentPath) {
+    if (!isAdminPath && !isMaintenancePath && !isApiPath && !isBuyerFulfillmentPath && !isMediaPath) {
       return NextResponse.redirect(new URL("/coming-soon", request.url));
     }
   }

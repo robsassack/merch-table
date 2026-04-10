@@ -112,6 +112,7 @@ export type TrackRecord = {
 export type ReleasesListResponse = {
   ok?: boolean;
   error?: string;
+  orgName?: string;
   minimumPriceFloorCents?: number;
   storeCurrency?: string;
   featuredReleaseId?: string | null;

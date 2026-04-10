@@ -1,9 +1,10 @@
-import type { FormEvent } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 
 import {
   buttonClassName,
   getArtistUrlPreview,
   primaryButtonClassName,
+  resolveArtistImageSrc,
   sanitizeUrlInput,
   slugify,
 } from "./artist-management-panel-shared";
@@ -14,6 +15,10 @@ type ArtistManagementCreateFormProps = {
   setNewName: (value: string) => void;
   newSlug: string;
   setNewSlug: (value: string) => void;
+  newImageUrl: string;
+  createImageUploading: boolean;
+  onArtistImageFileChange: (event: ChangeEvent<HTMLInputElement>) => Promise<void>;
+  onRemoveArtistImage: () => void;
   newLocation: string;
   setNewLocation: (value: string) => void;
   newBio: string;
@@ -32,6 +37,10 @@ export function ArtistManagementCreateForm(props: ArtistManagementCreateFormProp
     setNewName,
     newSlug,
     setNewSlug,
+    newImageUrl,
+    createImageUploading,
+    onArtistImageFileChange,
+    onRemoveArtistImage,
     newLocation,
     setNewLocation,
     newBio,
@@ -92,6 +101,47 @@ export function ArtistManagementCreateForm(props: ArtistManagementCreateFormProp
             </span>
           </label>
         ) : null}
+
+        <div className="sm:col-span-2">
+          <p className="text-xs text-zinc-500">Artist image</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
+              {resolveArtistImageSrc(newImageUrl) ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={resolveArtistImageSrc(newImageUrl) ?? ""}
+                  alt={`${newName || "Artist"} image`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-[11px] text-zinc-500">No image</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className={buttonClassName}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                  onChange={(event) => void onArtistImageFileChange(event)}
+                  disabled={createPending || createImageUploading}
+                  className="sr-only"
+                />
+                {createImageUploading ? "Uploading..." : newImageUrl ? "Replace Image" : "Upload Image"}
+              </label>
+              <button
+                type="button"
+                onClick={onRemoveArtistImage}
+                disabled={!newImageUrl || createPending || createImageUploading}
+                className={buttonClassName}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+          <p className="mt-1 text-[11px] text-zinc-500">
+            Accepted formats: JPEG, PNG, WEBP, AVIF, GIF.
+          </p>
+        </div>
 
         <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
           Location

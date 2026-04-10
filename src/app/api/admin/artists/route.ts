@@ -4,12 +4,17 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
+import {
+  isValidCoverStorageKey,
+  resolveCoverImageUrlFromStorageKey,
+} from "@/lib/storage/cover-art";
 
 export const runtime = "nodejs";
 
 const createArtistSchema = z.object({
   name: z.string().trim().min(2).max(120),
   slug: z.string().trim().max(120).optional(),
+  imageStorageKey: z.string().trim().min(1).max(500).nullable().optional(),
   location: z.string().max(160).nullable().optional(),
   bio: z.string().max(4_000).nullable().optional(),
 });
@@ -42,6 +47,18 @@ function normalizeLocation(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveArtistImageUrl(value: string | null | undefined) {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  if (!isValidCoverStorageKey(value)) {
+    throw new Error("Invalid artist image upload key.");
+  }
+
+  return resolveCoverImageUrlFromStorageKey(value);
+}
+
 function isUniqueConstraintError(error: unknown) {
   return (
     typeof error === "object" &&
@@ -64,6 +81,7 @@ export async function GET() {
       id: true,
       name: true,
       slug: true,
+      imageUrl: true,
       location: true,
       bio: true,
       deletedAt: true,
@@ -122,6 +140,7 @@ export async function POST(request: Request) {
         ownerId: auth.context.session.userId,
         name: parsed.name.trim(),
         slug: resolvedSlug,
+        imageUrl: resolveArtistImageUrl(parsed.imageStorageKey),
         location: normalizeLocation(parsed.location),
         bio: normalizeBio(parsed.bio),
       },
@@ -129,6 +148,7 @@ export async function POST(request: Request) {
         id: true,
         name: true,
         slug: true,
+        imageUrl: true,
         location: true,
         bio: true,
         deletedAt: true,
@@ -144,7 +164,14 @@ export async function POST(request: Request) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { ok: false, error: "Provide a valid artist name, URL, location, and bio." },
+        { ok: false, error: "Provide a valid artist name, URL, image, location, and bio." },
+        { status: 400 },
+      );
+    }
+
+    if (error instanceof Error && error.message === "Invalid artist image upload key.") {
+      return NextResponse.json(
+        { ok: false, error: error.message },
         { status: 400 },
       );
     }

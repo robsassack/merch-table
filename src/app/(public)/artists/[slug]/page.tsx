@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { buyerTheme } from "@/app/(public)/buyer-theme";
+import { ArtistImageDialog } from "./artist-image-dialog";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
@@ -23,6 +24,18 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
 
   const trimmed = value.trim();
   return trimmed.length > 0 ? trimmed : null;
+}
+
+function resolveArtistAvatarSrc(input: {
+  artistImageUrl: string | null | undefined;
+  ownerImageUrl: string | null | undefined;
+}) {
+  const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
+  if (artistImageUrl) {
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+  }
+
+  return resolveOptionalImageUrl(input.ownerImageUrl);
 }
 
 function resolveInitials(name: string) {
@@ -171,6 +184,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
       id: true,
       slug: true,
       name: true,
+      imageUrl: true,
       location: true,
       bio: true,
       owner: {
@@ -210,7 +224,10 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
     notFound();
   }
 
-  const artistImageUrl = resolveOptionalImageUrl(artist.owner?.image);
+  const artistImageUrl = resolveArtistAvatarSrc({
+    artistImageUrl: artist.imageUrl,
+    ownerImageUrl: artist.owner?.image,
+  });
 
   return (
     <div className={buyerTheme.page}>
@@ -230,14 +247,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
           </Link>
           <div className="mt-3 flex items-start gap-4">
             {artistImageUrl ? (
-              <span className="inline-flex h-16 w-16 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={artistImageUrl}
-                  alt={`${artist.name} profile`}
-                  className="h-full w-full object-cover"
-                />
-              </span>
+              <ArtistImageDialog artistName={artist.name} imageUrl={artistImageUrl} />
             ) : (
               <span className="inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full border border-zinc-300 bg-zinc-200 text-lg font-semibold text-zinc-700">
                 {resolveInitials(artist.name)}

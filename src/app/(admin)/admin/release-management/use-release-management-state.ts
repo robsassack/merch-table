@@ -60,6 +60,7 @@ export function useReleaseManagementState() {
   const [newArtistId, setNewArtistId] = useState("");
   const [newTitle, setNewTitle] = useState("");
   const [newSlug, setNewSlug] = useState("");
+  const [newReleaseLabelDefault, setNewReleaseLabelDefault] = useState("Independent");
   const [newLabel, setNewLabel] = useState("Independent");
   const [newDescription, setNewDescription] = useState("");
   const [newCoverImageUrl, setNewCoverImageUrl] = useState("");
@@ -247,6 +248,8 @@ export function useReleaseManagementState() {
     setNewTitle,
     newSlug,
     setNewSlug,
+    newReleaseLabelDefault,
+    setNewReleaseLabelDefault,
     newLabel,
     setNewLabel,
     newDescription,

@@ -17,6 +17,7 @@ import {
   formatReleaseType,
   formatReleaseYear,
   formatTotalDuration,
+  resolveArtistAvatarSrc,
   resolveCoverSrc,
   resolveInitials,
   resolveOptionalImageUrl,
@@ -154,6 +155,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
         select: {
           slug: true,
           name: true,
+          imageUrl: true,
           location: true,
           bio: true,
           owner: {
@@ -257,7 +259,10 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const releasePlayablePreviewTrackIds = releasePlayerTracks
     .filter((track) => track.isPlayablePreview)
     .map((track) => track.id);
-  const artistImageUrl = resolveOptionalImageUrl(release.artist.owner?.image);
+  const artistImageUrl = resolveArtistAvatarSrc({
+    artistImageUrl: release.artist.imageUrl,
+    ownerImageUrl: release.artist.owner?.image,
+  });
   const totalDurationMs = releaseTracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
   const hasArtwork = resolveOptionalImageUrl(release.coverImageUrl) !== null;
   const releaseCoverSrc = resolveCoverSrc(release.coverImageUrl);

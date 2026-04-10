@@ -15,6 +15,18 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveArtistAvatarSrc(input: {
+  artistImageUrl: string | null | undefined;
+  ownerImageUrl: string | null | undefined;
+}) {
+  const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
+  if (artistImageUrl) {
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+  }
+
+  return resolveOptionalImageUrl(input.ownerImageUrl);
+}
+
 function resolveInitials(name: string) {
   const parts = name
     .trim()
@@ -102,6 +114,7 @@ export default async function ArtistsPage() {
           id: true,
           slug: true,
           name: true,
+          imageUrl: true,
           location: true,
           bio: true,
           owner: {
@@ -161,7 +174,10 @@ export default async function ArtistsPage() {
                   <div className="flex items-center gap-3">
                     <ArtistAvatar
                       artistName={artist.name}
-                      artistImageUrl={resolveOptionalImageUrl(artist.owner?.image)}
+                      artistImageUrl={resolveArtistAvatarSrc({
+                        artistImageUrl: artist.imageUrl,
+                        ownerImageUrl: artist.owner?.image,
+                      })}
                     />
                     <div className="min-w-0">
                       <h2 className="truncate text-lg font-semibold tracking-tight text-zinc-950">

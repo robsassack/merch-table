@@ -42,6 +42,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newArtistId,
     newTitle,
     newSlug,
+    newReleaseLabelDefault,
     newLabel,
     newDescription,
     newCoverStorageKey,
@@ -247,7 +248,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
 
       setNewTitle("");
       setNewSlug("");
-      setNewLabel("Independent");
+      setNewLabel(newReleaseLabelDefault);
       setNewDescription("");
       setNewCoverImageUrl("");
       setNewCoverPreviewUrl((previous) => {

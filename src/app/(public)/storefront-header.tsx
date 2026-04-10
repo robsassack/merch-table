@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 
 import { buyerTheme, resolveBrandGlyph } from "@/app/(public)/buyer-theme";
 import { prisma } from "@/lib/prisma";
@@ -19,26 +20,36 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveCoverProxySrc(value: string | null | undefined) {
+  const imageUrl = resolveOptionalImageUrl(value);
+  if (!imageUrl) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(imageUrl)}`;
+}
+
 export default async function StorefrontHeader({
   activePage,
 }: StorefrontHeaderProps) {
+  noStore();
+
   const settings = await prisma.storeSettings.findFirst({
+    where: {
+      setupComplete: true,
+    },
     select: {
       organizationId: true,
       storeName: true,
       brandName: true,
+      organizationLogoUrl: true,
       organization: {
         select: {
           name: true,
-          owner: {
-            select: {
-              image: true,
-            },
-          },
         },
       },
     },
-    orderBy: { createdAt: "asc" },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
   });
 
   const artistCount = await prisma.artist.count({
@@ -54,7 +65,7 @@ export default async function StorefrontHeader({
     organizationName: settings?.organization?.name ?? null,
   });
   const brandGlyph = resolveBrandGlyph(brandLabel);
-  const organizationLogoUrl = resolveOptionalImageUrl(settings?.organization?.owner?.image);
+  const organizationLogoUrl = resolveCoverProxySrc(settings?.organizationLogoUrl);
   const showArtists = artistCount > 1;
   const activeNavLinkClassName =
     "rounded-md px-1.5 py-0.5 font-semibold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700";
@@ -68,14 +79,22 @@ export default async function StorefrontHeader({
           aria-current={activePage === "home" ? "page" : undefined}
         >
           {organizationLogoUrl ? (
-            <span className="inline-flex h-7 w-7 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={organizationLogoUrl}
-                alt={`${brandLabel} logo`}
-                className="h-full w-full object-cover"
-              />
-            </span>
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={organizationLogoUrl}
+              alt={`${brandLabel} logo`}
+              className="block h-10 w-auto max-w-[min(56vw,18rem)] shrink-0 border-0 object-contain"
+              style={{
+                border: 0,
+                borderRadius: 0,
+                clipPath: "none",
+                WebkitClipPath: "none",
+                maskImage: "none",
+                WebkitMaskImage: "none",
+                overflow: "visible",
+                background: "transparent",
+              }}
+            />
           ) : (
             <span className={buyerTheme.brandBadge}>{brandGlyph}</span>
           )}

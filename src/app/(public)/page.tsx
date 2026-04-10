@@ -24,6 +24,18 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveArtistAvatarSrc(input: {
+  artistImageUrl: string | null | undefined;
+  ownerImageUrl: string | null | undefined;
+}) {
+  const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
+  if (artistImageUrl) {
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+  }
+
+  return resolveOptionalImageUrl(input.ownerImageUrl);
+}
+
 function resolveInitials(name: string) {
   const parts = name
     .trim()
@@ -170,6 +182,7 @@ export default async function Home() {
             select: {
               slug: true,
               name: true,
+              imageUrl: true,
               owner: {
                 select: {
                   image: true,
@@ -237,7 +250,10 @@ export default async function Home() {
                   <Link href={`/artists/${featured.artist.slug}`} aria-label={`Open artist ${featured.artist.name}`}>
                     <ArtistAvatar
                       artistName={featured.artist.name}
-                      artistImageUrl={resolveOptionalImageUrl(featured.artist.owner?.image)}
+                      artistImageUrl={resolveArtistAvatarSrc({
+                        artistImageUrl: featured.artist.imageUrl,
+                        ownerImageUrl: featured.artist.owner?.image,
+                      })}
                     />
                   </Link>
                   <div>
@@ -311,7 +327,10 @@ export default async function Home() {
                         <Link href={`/artists/${release.artist.slug}`} aria-label={`Open artist ${release.artist.name}`}>
                           <ArtistAvatar
                             artistName={release.artist.name}
-                            artistImageUrl={resolveOptionalImageUrl(release.artist.owner?.image)}
+                            artistImageUrl={resolveArtistAvatarSrc({
+                              artistImageUrl: release.artist.imageUrl,
+                              ownerImageUrl: release.artist.owner?.image,
+                            })}
                           />
                         </Link>
                       <div className="min-w-0">

@@ -129,7 +129,7 @@ export async function GET() {
   const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const stripeFeeEstimate = readStripeFeeEstimateConfigFromEnv();
 
-  const [artists, releases, settings] = await Promise.all([
+  const [artists, releases, settings, organization] = await Promise.all([
     prisma.artist.findMany({
       where: { organizationId: auth.context.organizationId },
       orderBy: [{ deletedAt: "asc" }, { name: "asc" }],
@@ -151,11 +151,16 @@ export async function GET() {
       orderBy: { createdAt: "asc" },
       select: { currency: true, featuredReleaseId: true },
     }),
+    prisma.organization.findFirst({
+      where: { id: auth.context.organizationId },
+      select: { name: true },
+    }),
   ]);
 
   return NextResponse.json(
     {
       ok: true,
+      orgName: organization?.name ?? null,
       minimumPriceFloorCents,
       stripeFeeEstimate,
       storeCurrency: settings?.currency ?? "USD",

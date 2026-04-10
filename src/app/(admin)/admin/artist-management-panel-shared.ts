@@ -2,6 +2,7 @@ export type ArtistRecord = {
   id: string;
   name: string;
   slug: string;
+  imageUrl: string | null;
   location: string | null;
   bio: string | null;
   deletedAt: string | null;
@@ -28,6 +29,8 @@ export type ArtistMutationResponse = {
 export type ArtistDraft = {
   name: string;
   slug: string;
+  imageUrl: string;
+  imageStorageKey: string | null | undefined;
   location: string;
   bio: string;
 };
@@ -63,6 +66,14 @@ export function getArtistUrlPreview(name: string, slug: string) {
   const custom = sanitizeUrlInput(slug);
   const resolved = custom.length > 0 ? custom : slugify(name);
   return `/artist/${resolved}`;
+}
+
+export function resolveArtistImageSrc(imageUrl: string | null | undefined) {
+  if (typeof imageUrl !== "string" || imageUrl.trim().length === 0) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(imageUrl)}`;
 }
 
 export function getMutationError(responseBody: ArtistMutationResponse | null, fallback: string) {

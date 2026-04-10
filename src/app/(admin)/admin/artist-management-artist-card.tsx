@@ -1,9 +1,12 @@
+import type { ChangeEvent } from "react";
+
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 
 import {
   buttonClassName,
   dangerButtonClassName,
   getArtistUrlPreview,
+  resolveArtistImageSrc,
   sanitizeUrlInput,
 } from "./artist-management-panel-shared";
 import type { ArtistDraft, ArtistRecord } from "./artist-management-panel-shared";
@@ -12,10 +15,13 @@ type ArtistManagementArtistCardProps = {
   artist: ArtistRecord;
   draft: ArtistDraft;
   isPending: boolean;
+  isUploadingImage: boolean;
   createPending: boolean;
   advancedOpen: boolean;
   onDraftChange: (next: ArtistDraft) => void;
   onToggleAdvanced: () => void;
+  onArtistImageFileChange: (event: ChangeEvent<HTMLInputElement>) => void;
+  onRemoveArtistImage: () => void;
   onSave: () => void;
   onSoftDeleteOrRestore: () => void;
   onOpenPurgeDialog: () => void;
@@ -26,10 +32,13 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
     artist,
     draft,
     isPending,
+    isUploadingImage,
     createPending,
     advancedOpen,
     onDraftChange,
     onToggleAdvanced,
+    onArtistImageFileChange,
+    onRemoveArtistImage,
     onSave,
     onSoftDeleteOrRestore,
     onOpenPurgeDialog,
@@ -71,6 +80,44 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
           />
         </label>
 
+        <div className="sm:col-span-2">
+          <p className="text-xs text-zinc-500">Artist image</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
+              {resolveArtistImageSrc(draft.imageUrl) ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={resolveArtistImageSrc(draft.imageUrl) ?? ""}
+                  alt={`${draft.name || artist.name} image`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <span className="text-[11px] text-zinc-500">No image</span>
+              )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <label className={buttonClassName}>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
+                  onChange={onArtistImageFileChange}
+                  disabled={isPending || createPending || isUploadingImage}
+                  className="sr-only"
+                />
+                {isUploadingImage ? "Uploading..." : draft.imageUrl ? "Replace Image" : "Upload Image"}
+              </label>
+              <button
+                type="button"
+                onClick={onRemoveArtistImage}
+                disabled={!draft.imageUrl || isPending || createPending || isUploadingImage}
+                className={buttonClassName}
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+
         <label className="flex flex-col gap-1 text-xs text-zinc-500 sm:col-span-2">
           Bio
           <textarea
@@ -111,7 +158,7 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
-          disabled={isPending || createPending}
+          disabled={isPending || createPending || isUploadingImage}
           onClick={onToggleAdvanced}
           className={buttonClassName}
         >
@@ -120,7 +167,7 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
 
         <button
           type="button"
-          disabled={isPending || createPending}
+          disabled={isPending || createPending || isUploadingImage}
           onClick={onSave}
           className={buttonClassName}
         >
@@ -129,7 +176,7 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
 
         <button
           type="button"
-          disabled={isPending || createPending}
+          disabled={isPending || createPending || isUploadingImage}
           onClick={onSoftDeleteOrRestore}
           className={buttonClassName}
         >
@@ -145,7 +192,7 @@ export function ArtistManagementArtistCard(props: ArtistManagementArtistCardProp
         {artist.deletedAt ? (
           <button
             type="button"
-            disabled={isPending || createPending}
+            disabled={isPending || createPending || isUploadingImage}
             onClick={onOpenPurgeDialog}
             className={dangerButtonClassName}
           >
