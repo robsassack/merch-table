@@ -24,6 +24,11 @@ export const metadata: Metadata = {
     template: "%s | Merch Table",
   },
   description: "Merch Table",
+  icons: {
+    icon: "/favicon.ico",
+    shortcut: "/favicon.ico",
+    apple: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

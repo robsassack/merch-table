@@ -35,6 +35,25 @@ function resolveOrganizationLogoSrc(organizationLogoUrl: string) {
   return `/api/cover?url=${encodeURIComponent(organizationLogoUrl)}`;
 }
 
+function refreshDocumentFavicon() {
+  if (typeof document === "undefined") {
+    return;
+  }
+
+  const nextHref = `/favicon.ico?v=${Date.now()}`;
+  const rels = ["icon", "shortcut icon", "apple-touch-icon"] as const;
+
+  for (const rel of rels) {
+    let linkElement = document.querySelector<HTMLLinkElement>(`link[rel='${rel}']`);
+    if (!linkElement) {
+      linkElement = document.createElement("link");
+      linkElement.rel = rel;
+      document.head.appendChild(linkElement);
+    }
+    linkElement.href = nextHref;
+  }
+}
+
 export function StoreSettingsPanel({
   panelCardClassName,
   primaryButtonClassName,
@@ -62,6 +81,14 @@ export function StoreSettingsPanel({
   useEffect(() => {
     setIsHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (!isHydrated) {
+      return;
+    }
+
+    refreshDocumentFavicon();
+  }, [isHydrated, organizationLogoUrl]);
 
   useEffect(() => {
     if (!initialLoad.current) {
