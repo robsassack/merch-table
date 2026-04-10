@@ -57,6 +57,28 @@ type TranscodeStatusResponse = {
     workerStaleAfterSeconds: number;
     lastSuccessfulJobAt: string | null;
     checkedAt: string;
+    serviceConnectivity: {
+      database: {
+        reachable: boolean;
+        error: string | null;
+      };
+      redis: {
+        reachable: boolean;
+        error: string | null;
+      };
+      storage: {
+        reachable: boolean;
+        error: string | null;
+        provider: "GARAGE" | "S3" | null;
+        bucket: string | null;
+      };
+    };
+    emailAndStorageMetrics: {
+      recentFailedEmailCount: number;
+      recentFailedEmailWindowDays: number;
+      recentFailedEmailsSince: string;
+      totalTrackAssetSizeBytes: number;
+    };
     warnings: string[];
   };
 };
@@ -68,6 +90,24 @@ type SharedPanelProps = {
   primaryButtonClassName: string;
   secondaryButtonClassName: string;
 };
+
+function formatBytes(sizeBytes: number | null | undefined) {
+  if (typeof sizeBytes !== "number" || !Number.isFinite(sizeBytes) || sizeBytes <= 0) {
+    return "0 B";
+  }
+
+  const units = ["B", "KB", "MB", "GB", "TB"] as const;
+  let value = sizeBytes;
+  let unitIndex = 0;
+
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const decimalPlaces = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(decimalPlaces)} ${units[unitIndex]}`;
+}
 
 function detectPresetFromSmtpSettings(state: Pick<SmtpSettingsState, "smtpHost" | "smtpPort" | "smtpSecure">) {
   const preset = SMTP_PRESETS.find(
@@ -745,28 +785,6 @@ function SmtpSettingsPanel({
   );
 }
 
-type PhaseNinePlaceholderCardProps = {
-  panelCardClassName: string;
-  title: string;
-  description: string;
-};
-
-function PhaseNinePlaceholderCard({
-  panelCardClassName,
-  title,
-  description,
-}: PhaseNinePlaceholderCardProps) {
-  return (
-    <section className={panelCardClassName}>
-      <h3 className="text-xl font-semibold tracking-tight text-zinc-100">{title}</h3>
-      <p className="mt-1 text-sm text-zinc-400">{description}</p>
-      <div className="mt-4 rounded-lg border border-dashed border-slate-600 bg-slate-900/80 p-4">
-        <p className="text-sm text-zinc-300">Planned for Phase 9 implementation.</p>
-      </div>
-    </section>
-  );
-}
-
 export function IntegrationsPanel({
   panelCardClassName,
   primaryButtonClassName,
@@ -907,17 +925,103 @@ export function StatusPanel({
         </div>
       </section>
 
-      <PhaseNinePlaceholderCard
-        panelCardClassName={panelCardClassName}
-        title="Service Connectivity"
-        description="Database, Redis, and storage reachability checks will appear here as explicit health rows."
-      />
+      <section className={panelCardClassName}>
+        <h3 className="text-xl font-semibold tracking-tight text-zinc-100">Service Connectivity</h3>
+        <p className="mt-1 text-sm text-zinc-400">
+          Reachability checks for database, Redis, and active object storage.
+        </p>
 
-      <PhaseNinePlaceholderCard
-        panelCardClassName={panelCardClassName}
-        title="Email and Storage Metrics"
-        description="Failed-email counts and database-derived storage usage totals will be added in this section."
-      />
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Database</p>
+            <p
+              className={`mt-1 text-sm ${
+                status?.serviceConnectivity.database.reachable ? "text-emerald-300" : "text-rose-300"
+              }`}
+            >
+              {status?.serviceConnectivity.database.reachable ? "Reachable" : "Unreachable"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Redis</p>
+            <p
+              className={`mt-1 text-sm ${
+                status?.serviceConnectivity.redis.reachable ? "text-emerald-300" : "text-rose-300"
+              }`}
+            >
+              {status?.serviceConnectivity.redis.reachable ? "Reachable" : "Unreachable"}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">Storage</p>
+            <p
+              className={`mt-1 text-sm ${
+                status?.serviceConnectivity.storage.reachable ? "text-emerald-300" : "text-rose-300"
+              }`}
+            >
+              {status?.serviceConnectivity.storage.reachable ? "Reachable" : "Unreachable"}
+            </p>
+            {status?.serviceConnectivity.storage.provider ? (
+              <p className="mt-1 text-xs text-zinc-500">
+                {status.serviceConnectivity.storage.provider}
+                {status.serviceConnectivity.storage.bucket
+                  ? ` · ${status.serviceConnectivity.storage.bucket}`
+                  : ""}
+              </p>
+            ) : null}
+          </div>
+        </div>
+
+        {status?.serviceConnectivity.redis.error || status?.serviceConnectivity.storage.error ? (
+          <div className="mt-3 rounded-lg border border-amber-800/70 bg-amber-950/30 p-3 text-xs text-amber-200">
+            {status.serviceConnectivity.redis.error ? (
+              <p>Redis: {status.serviceConnectivity.redis.error}</p>
+            ) : null}
+            {status.serviceConnectivity.storage.error ? (
+              <p className={status.serviceConnectivity.redis.error ? "mt-1" : ""}>
+                Storage: {status.serviceConnectivity.storage.error}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+
+      <section className={panelCardClassName}>
+        <h3 className="text-xl font-semibold tracking-tight text-zinc-100">
+          Email and Storage Metrics
+        </h3>
+        <p className="mt-1 text-sm text-zinc-400">
+          Recent failed delivery count and database-derived asset usage.
+        </p>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">
+              Failed emails (last {status?.emailAndStorageMetrics.recentFailedEmailWindowDays ?? 7} days)
+            </p>
+            <p className="mt-1 text-sm text-zinc-200">
+              {status?.emailAndStorageMetrics.recentFailedEmailCount ?? 0}
+            </p>
+            <a
+              href="/admin/orders?emailStatus=FAILED"
+              className="mt-2 inline-flex text-xs text-emerald-300 underline underline-offset-2 hover:text-emerald-200"
+            >
+              Open failed emails in Orders
+            </a>
+          </div>
+          <div className="rounded-lg border border-slate-700 bg-slate-900/80 p-3">
+            <p className="text-xs uppercase tracking-wide text-zinc-500">
+              Track asset storage usage (DB)
+            </p>
+            <p className="mt-1 text-sm text-zinc-200">
+              {formatBytes(status?.emailAndStorageMetrics.totalTrackAssetSizeBytes)}
+            </p>
+            <p className="mt-1 text-xs text-zinc-500">
+              {status?.emailAndStorageMetrics.totalTrackAssetSizeBytes ?? 0} bytes total
+            </p>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

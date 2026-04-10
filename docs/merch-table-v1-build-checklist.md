@@ -328,10 +328,10 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Status panel
 
-- [ ] Service connectivity: database, Redis, storage reachable/unreachable
-- [ ] Worker health: connected status, transcode queue depth, last completed job timestamp
-- [ ] Email delivery: count of recent `FAILED` emails with link to orders panel
-- [ ] Storage usage: total asset size from database (not live bucket query)
+- [x] Service connectivity: database, Redis, storage reachable/unreachable
+- [x] Worker health: connected status, transcode queue depth, last completed job timestamp
+- [x] Email delivery: count of recent `FAILED` emails with link to orders panel
+- [x] Storage usage: total asset size from database (not live bucket query)
 
 ---
 
