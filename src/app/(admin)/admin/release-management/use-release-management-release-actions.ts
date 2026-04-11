@@ -1,11 +1,11 @@
-import type { ChangeEvent, FormEvent } from "react";
+import type { FormEvent } from "react";
 
 import {
   estimateNetPayoutCents,
   estimateStripeFeeCents,
 } from "@/lib/pricing/pricing-rules";
 
-import { uploadReleaseCoverFile } from "./release-cover-upload";
+import { createReleaseCoverActions } from "./release-cover-actions";
 import { createReleaseTranscodeActions } from "./use-release-management-release-transcode-actions";
 import type { ReleaseManagementState } from "./use-release-management-state";
 import type { ReleaseDraft, ReleaseMutationResponse, ReleaseRecord } from "./types";
@@ -100,87 +100,19 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     replaceRelease,
   } = input;
 
-  const onNewCoverFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) {
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    trackLocalObjectUrl(objectUrl);
-    setNewCoverPreviewUrl((previous) => {
-      if (previous && previous !== objectUrl) {
-        revokeLocalObjectUrl(previous);
-      }
-      return objectUrl;
-    });
-
-    setError(null);
-    setNotice(null);
-    setCoverUploadTarget("new");
-
-    try {
-      const uploaded = await uploadReleaseCoverFile(file);
-      setNewCoverStorageKey(uploaded.storageKey);
-      setNewCoverImageUrl(uploaded.publicUrl);
-      setNotice(`Uploaded cover artwork "${file.name}".`);
-    } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Could not upload cover artwork.",
-      );
-    } finally {
-      setCoverUploadTarget(null);
-    }
-  };
-
-  const onExistingCoverFileChange = async (
-    releaseId: string,
-    event: ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file) {
-      return;
-    }
-
-    const draft = draftsById[releaseId];
-    if (!draft) {
-      return;
-    }
-
-    const objectUrl = URL.createObjectURL(file);
-    trackLocalObjectUrl(objectUrl);
-    setLocalCoverPreviewForRelease(releaseId, objectUrl);
-
-    setError(null);
-    setNotice(null);
-    setCoverUploadTarget(releaseId);
-
-    try {
-      const uploaded = await uploadReleaseCoverFile(file);
-      setDraftsById((previous) => ({
-        ...previous,
-        [releaseId]: {
-          ...draft,
-          coverImageUrl: uploaded.publicUrl,
-          coverStorageKey: uploaded.storageKey,
-          removeCoverImage: false,
-        },
-      }));
-      setNotice(`Uploaded cover artwork "${file.name}".`);
-    } catch (uploadError) {
-      setError(
-        uploadError instanceof Error
-          ? uploadError.message
-          : "Could not upload cover artwork.",
-      );
-    } finally {
-      setCoverUploadTarget(null);
-    }
-  };
+  const { onNewCoverFileChange, onExistingCoverFileChange } = createReleaseCoverActions({
+    draftsById,
+    trackLocalObjectUrl,
+    revokeLocalObjectUrl,
+    setNewCoverPreviewUrl,
+    setError,
+    setNotice,
+    setCoverUploadTarget,
+    setNewCoverStorageKey,
+    setNewCoverImageUrl,
+    setLocalCoverPreviewForRelease,
+    setDraftsById,
+  });
 
   const getPricingEstimate = (draft: ReleaseDraft, currency: string) => {
     const source = draft.pricingMode === "FIXED" ? draft.fixedPrice : draft.minimumPrice;
