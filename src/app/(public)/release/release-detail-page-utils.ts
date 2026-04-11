@@ -27,7 +27,12 @@ export function resolveArtistAvatarSrc(input: {
     return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
   }
 
-  return resolveOptionalImageUrl(input.ownerImageUrl);
+  const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
+  if (!ownerImageUrl) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
 }
 
 export function resolveInitials(name: string) {

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -33,7 +34,12 @@ function resolveArtistAvatarSrc(input: {
     return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
   }
 
-  return resolveOptionalImageUrl(input.ownerImageUrl);
+  const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
+  if (!ownerImageUrl) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
 }
 
 function resolveInitials(name: string) {
@@ -101,12 +107,13 @@ function ArtistAvatar({
 }) {
   if (artistImageUrl) {
     return (
-      <span className="inline-flex h-9 w-9 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <span className="relative inline-flex h-9 w-9 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+        <Image
           src={artistImageUrl}
           alt={`${artistName} profile`}
-          className="h-full w-full object-cover"
+          fill
+          sizes="36px"
+          className="object-cover"
         />
       </span>
     );
@@ -225,13 +232,14 @@ export default async function Home() {
               <Link
                 href={`/release/${featured.slug}`}
                 aria-label={`Open release ${featured.title}`}
-                className="group block aspect-square w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100"
+                className="group relative block aspect-square w-full overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={resolveCoverSrc(featured.coverImageUrl)}
                   alt={`${featured.title} cover`}
-                  className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                  fill
+                  sizes="(max-width: 768px) 100vw, 340px"
+                  className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
                 />
               </Link>
 
@@ -312,13 +320,14 @@ export default async function Home() {
                     <Link
                       href={`/release/${release.slug}`}
                       aria-label={`Open release ${release.title}`}
-                      className="group block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
+                      className="group relative block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={resolveCoverSrc(release.coverImageUrl)}
                         alt={`${release.title} cover`}
-                        className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                        fill
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
                       />
                     </Link>
 

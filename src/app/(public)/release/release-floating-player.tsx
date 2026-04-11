@@ -1,6 +1,7 @@
 "use client";
 
 import { Howler } from "howler";
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 
@@ -280,10 +281,11 @@ export default function ReleaseFloatingPlayer() {
         >
           <div className="flex flex-col gap-3 md:flex-row md:items-center md:gap-5">
             <div className="flex min-w-0 items-center gap-3 md:w-[16rem] lg:w-[18rem]">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
+              <Image
                 src={releaseCoverSrc ?? "/default-artwork.png"}
                 alt=""
+                width={56}
+                height={56}
                 className="h-14 w-14 shrink-0 rounded-lg border border-zinc-200 object-cover"
               />
               <div className="min-w-0">

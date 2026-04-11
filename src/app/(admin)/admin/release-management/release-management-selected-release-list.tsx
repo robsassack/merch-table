@@ -230,7 +230,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
 
                     {existingCoverPreviewSrc ? (
                       <div className="mt-3">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {/* eslint-disable-next-line @next/next/no-img-element -- preview source may be blob/data URL before persistence */}
                         <img
                           src={toCoverDisplaySrc(existingCoverPreviewSrc)}
                           alt={`${draft.title} cover preview`}

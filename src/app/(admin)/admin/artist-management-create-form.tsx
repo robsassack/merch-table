@@ -1,4 +1,5 @@
 import type { ChangeEvent, FormEvent } from "react";
+import Image from "next/image";
 
 import {
   buttonClassName,
@@ -106,13 +107,14 @@ export function ArtistManagementCreateForm(props: ArtistManagementCreateFormProp
         <div className="sm:col-span-2">
           <p className="text-xs text-zinc-500">Artist image</p>
           <div className="mt-2 flex flex-wrap items-center gap-3">
-            <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
+            <div className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-lg border border-slate-700 bg-slate-950">
               {resolveArtistImageSrc(newImageUrl) ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
+                <Image
                   src={resolveArtistImageSrc(newImageUrl) ?? ""}
                   alt={`${newName || "Artist"} image`}
-                  className="h-full w-full object-cover"
+                  fill
+                  sizes="64px"
+                  className="object-cover"
                 />
               ) : (
                 <span className="text-[11px] text-zinc-500">No image</span>

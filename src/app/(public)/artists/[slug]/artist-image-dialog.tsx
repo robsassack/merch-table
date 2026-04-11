@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -50,10 +51,11 @@ export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogPro
         className="inline-flex h-16 w-16 shrink-0 cursor-zoom-in overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 transition hover:border-zinc-300"
         aria-label={`View larger image for ${artistName}`}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={imageUrl}
           alt={`${artistName} profile`}
+          width={64}
+          height={64}
           className="h-full w-full object-cover"
         />
       </button>
@@ -86,11 +88,13 @@ export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogPro
                 </div>
 
                 <div className="flex max-h-[calc(92vh-56px)] items-center justify-center bg-zinc-950 p-3 sm:p-5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={imageUrl}
                     alt={`${artistName} profile enlarged`}
-                    className="max-h-[calc(92vh-110px)] max-w-full rounded-xl border border-white/15 bg-white object-contain shadow-xl"
+                    width={1600}
+                    height={1600}
+                    sizes="92vw"
+                    className="max-h-[calc(92vh-110px)] w-auto max-w-full rounded-xl border border-white/15 bg-white object-contain shadow-xl"
                   />
                 </div>
               </div>

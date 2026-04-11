@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -36,7 +37,12 @@ function resolveArtistAvatarSrc(input: {
     return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
   }
 
-  return resolveOptionalImageUrl(input.ownerImageUrl);
+  const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
+  if (!ownerImageUrl) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
 }
 
 function resolveInitials(name: string) {
@@ -286,13 +292,14 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                   <Link
                     href={`/release/${release.slug}`}
                     aria-label={`Open release ${release.title}`}
-                    className="group block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
+                    className="group relative block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
                   >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
+                    <Image
                       src={resolveCoverSrc(release.coverImageUrl)}
                       alt={`${release.title} cover`}
-                      className="h-full w-full object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
+                      fill
+                      sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
                     />
                   </Link>
 

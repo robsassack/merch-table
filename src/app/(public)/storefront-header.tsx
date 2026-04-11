@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -79,10 +80,12 @@ export default async function StorefrontHeader({
           aria-current={activePage === "home" ? "page" : undefined}
         >
           {organizationLogoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={organizationLogoUrl}
               alt={`${brandLabel} logo`}
+              width={320}
+              height={80}
+              sizes="(max-width: 768px) 56vw, 18rem"
               className="block h-10 w-auto max-w-[min(56vw,18rem)] shrink-0 border-0 object-contain"
               style={{
                 border: 0,

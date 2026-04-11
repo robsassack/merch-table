@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useReleaseAudioPlayer } from "@/app/(public)/release/release-audio-player";
 
 type ReleaseArtworkPlayToggleProps = {
@@ -46,10 +47,11 @@ export default function ReleaseArtworkPlayToggle({
       aria-label={artworkAriaLabel}
       className="group relative mx-auto aspect-square w-full max-w-[26rem] cursor-pointer overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white lg:mx-0 disabled:cursor-default"
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={coverSrc}
         alt={`${releaseTitle} cover`}
+        fill
+        sizes="(max-width: 1024px) 100vw, 26rem"
         className={`h-full w-full object-cover transition duration-300 ease-out ${
           hasPreviewTrack ? "group-hover:scale-[1.035] group-hover:blur-[1.1px]" : ""
         }`}

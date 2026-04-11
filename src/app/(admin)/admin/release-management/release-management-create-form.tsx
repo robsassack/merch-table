@@ -218,7 +218,7 @@ export function ReleaseManagementCreateForm(props: {
 
             {newCoverPreviewSrc ? (
               <div className="mt-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                {/* eslint-disable-next-line @next/next/no-img-element -- local preview can be blob/data URL during unsaved uploads */}
                 <img
                   src={toCoverDisplaySrc(newCoverPreviewSrc)}
                   alt="New release cover preview"

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
@@ -375,12 +376,13 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                 <div className="mt-4 rounded-xl border border-zinc-200 bg-white p-4">
                   <div className="flex items-start gap-3">
                     {artistImageUrl ? (
-                      <span className="inline-flex h-12 w-12 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
+                      <span className="relative inline-flex h-12 w-12 shrink-0 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+                        <Image
                           src={artistImageUrl}
                           alt={`${release.artist.name} profile`}
-                          className="h-full w-full object-cover"
+                          fill
+                          sizes="48px"
+                          className="object-cover"
                         />
                       </span>
                     ) : (

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
 
@@ -25,7 +26,12 @@ function resolveArtistAvatarSrc(input: {
     return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
   }
 
-  return resolveOptionalImageUrl(input.ownerImageUrl);
+  const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
+  if (!ownerImageUrl) {
+    return null;
+  }
+
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
 }
 
 function resolveInitials(name: string) {
@@ -51,12 +57,13 @@ function ArtistAvatar({
 }) {
   if (artistImageUrl) {
     return (
-      <span className="inline-flex h-12 w-12 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+      <span className="relative inline-flex h-12 w-12 overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+        <Image
           src={artistImageUrl}
           alt={`${artistName} profile`}
-          className="h-full w-full object-cover"
+          fill
+          sizes="48px"
+          className="object-cover"
         />
       </span>
     );

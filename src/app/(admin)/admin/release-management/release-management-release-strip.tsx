@@ -63,7 +63,7 @@ export function ReleaseManagementReleaseStrip(props: {
                 aria-label={`Select release ${release.title}`}
               >
                 {cardDisplaySrc ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+                  // eslint-disable-next-line @next/next/no-img-element -- strip previews can include blob/data URLs while editing
                   <img
                     src={cardDisplaySrc}
                     alt={`${release.title} cover`}
