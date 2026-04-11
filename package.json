@@ -19,6 +19,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "audit:currency": "node --env-file=.env --import tsx scripts/audit-currency-minor-units.ts",
+    "audit:currency:fix-sql": "node --env-file=.env --import tsx scripts/generate-currency-fix-sql.ts",
     "infra:garage:bootstrap": "bash ./scripts/bootstrap-garage.sh",
     "infra:up": "docker compose up -d postgres redis garage && npm run -s infra:garage:bootstrap",
     "infra:up:core": "npm run -s infra:up",

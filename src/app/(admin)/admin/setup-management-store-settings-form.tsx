@@ -16,6 +16,13 @@ import type {
   StoreStatus,
 } from "./setup-management-store-settings-shared";
 import { SUPPORTED_CURRENCIES } from "@/lib/setup/currencies";
+import {
+  formatMinorAmount,
+  getCurrencyScale,
+  inputModeForCurrency,
+  minorToMajorInput,
+  stepForCurrency,
+} from "@/lib/money";
 
 type StoreSettingsFormProps = {
   primaryButtonClassName: string;
@@ -358,11 +365,15 @@ export function StoreSettingsForm({
                   <input
                     type="number"
                     min="0"
-                    step="0.01"
-                    inputMode="decimal"
+                    step={stepForCurrency(currency)}
+                    inputMode={inputModeForCurrency(currency)}
                     value={defaultReleasePwywMinimum}
                     onChange={(event) => setDefaultReleasePwywMinimum(event.target.value)}
-                    placeholder={defaultReleaseAllowFreeCheckout ? "0.00" : "2.00"}
+                    placeholder={
+                      defaultReleaseAllowFreeCheckout
+                        ? minorToMajorInput(0, currency)
+                        : minorToMajorInput(2 * getCurrencyScale(currency), currency)
+                    }
                     className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-zinc-100 outline-none focus:border-emerald-600"
                   />
                 </label>
@@ -374,11 +385,11 @@ export function StoreSettingsForm({
                       const checked = event.target.checked;
                       setDefaultReleaseAllowFreeCheckout(checked);
                       if (checked && defaultReleasePwywMinimum.trim().length === 0) {
-                        setDefaultReleasePwywMinimum("0.00");
+                        setDefaultReleasePwywMinimum(minorToMajorInput(0, currency));
                       }
                     }}
                   />
-                  Allow free checkout ($0)
+                  {`Allow free checkout (${formatMinorAmount(0, currency)})`}
                 </label>
               </div>
             ) : null}

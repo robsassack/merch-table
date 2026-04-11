@@ -6,9 +6,11 @@ type ReleaseCheckoutDialogProps = {
   pricingMode: PricingMode;
   currency: string;
   fixedPriceCents: number | null;
-  minimumPriceCents: number | null;
   pwywMinimumDisplay: string;
   pwywCurrencyPrefix: string;
+  pwywInputMin: string;
+  pwywInputStep: string;
+  pwywInputMode: "numeric" | "decimal";
   pwywAmount: string;
   checkoutEmail: string;
   confirmEmail: string;
@@ -34,9 +36,11 @@ export default function ReleaseCheckoutDialog({
   pricingMode,
   currency,
   fixedPriceCents,
-  minimumPriceCents,
   pwywMinimumDisplay,
   pwywCurrencyPrefix,
+  pwywInputMin,
+  pwywInputStep,
+  pwywInputMode,
   pwywAmount,
   checkoutEmail,
   confirmEmail,
@@ -126,9 +130,9 @@ export default function ReleaseCheckoutDialog({
                 <input
                   id="checkout-amount"
                   type="number"
-                  inputMode="decimal"
-                  min={Math.max(0, (minimumPriceCents ?? 0) / 100)}
-                  step="0.01"
+                  inputMode={pwywInputMode}
+                  min={pwywInputMin}
+                  step={pwywInputStep}
                   value={pwywAmount}
                   onChange={(event) => onPwywAmountChange(event.target.value)}
                   disabled={isSubmitting}

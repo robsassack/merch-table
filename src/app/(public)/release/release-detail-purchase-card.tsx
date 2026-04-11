@@ -10,6 +10,13 @@ import { useReleaseAudioPlayer } from "@/app/(public)/release/release-audio-play
 import { isReleaseOwnedInStorage } from "@/app/(public)/release/owned-release-storage";
 import ReleaseCheckoutDialog from "@/app/(public)/release/release-checkout-dialog";
 import type { PricingMode } from "@/app/(public)/release/release-detail-purchase-card-utils";
+import {
+  inputModeForCurrency,
+  majorInputToMinor,
+  minInputForCurrency,
+  minorToMajorInput,
+  stepForCurrency,
+} from "@/lib/money";
 
 type ReleaseDetailPurchaseCardProps = {
   releaseId: string;
@@ -89,6 +96,12 @@ export default function ReleaseDetailPurchaseCard({
   );
 
   const pwywCurrencyPrefix = useMemo(() => resolveCurrencyPrefix(currency), [currency]);
+  const pwywInputMode = useMemo(() => inputModeForCurrency(currency), [currency]);
+  const pwywInputStep = useMemo(() => stepForCurrency(currency), [currency]);
+  const pwywInputMin = useMemo(
+    () => minInputForCurrency(minimumPriceCents ?? 0, currency),
+    [currency, minimumPriceCents],
+  );
   const hasPreviewTrack = previewTrackId !== null;
   const checkoutErrorId = "checkout-form-error";
   const alreadyOwnedWarningId = "checkout-owned-warning";
@@ -127,7 +140,7 @@ export default function ReleaseDetailPurchaseCard({
     setCheckoutFormError(null);
     setAlreadyOwnedWarning(null);
     setConfirmAlreadyOwned(false);
-    setPwywAmount(pricingMode === "PWYW" ? (minimum / 100).toFixed(2) : "");
+    setPwywAmount(pricingMode === "PWYW" ? minorToMajorInput(minimum, currency) : "");
     setIsCheckoutDialogOpen(true);
   }
 
@@ -152,14 +165,13 @@ export default function ReleaseDetailPurchaseCard({
     let amountCents: number | undefined = undefined;
     if (pricingMode === "PWYW") {
       const minimum = minimumPriceCents ?? 0;
-      const parsed = Number.parseFloat(pwywAmount.trim());
-      if (!Number.isFinite(parsed) || parsed < 0) {
+      const parsedAmount = majorInputToMinor(pwywAmount, currency);
+      if (parsedAmount === null || parsedAmount < 0) {
         setCheckoutFormError("Enter a valid amount.");
         return;
       }
-
-      amountCents = Math.round(parsed * 100);
-      if (amountCents < minimum) {
+      amountCents = parsedAmount;
+      if (parsedAmount < minimum) {
         setCheckoutFormError(`Minimum amount is ${formatMoney(currency, minimum)}.`);
         return;
       }
@@ -398,9 +410,11 @@ export default function ReleaseDetailPurchaseCard({
         pricingMode={pricingMode}
         currency={currency}
         fixedPriceCents={fixedPriceCents}
-        minimumPriceCents={minimumPriceCents}
         pwywMinimumDisplay={pwywMinimumDisplay}
         pwywCurrencyPrefix={pwywCurrencyPrefix}
+        pwywInputMin={pwywInputMin}
+        pwywInputStep={pwywInputStep}
+        pwywInputMode={pwywInputMode}
         pwywAmount={pwywAmount}
         checkoutEmail={checkoutEmail}
         confirmEmail={confirmEmail}

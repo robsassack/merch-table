@@ -1,3 +1,5 @@
+import { majorInputToMinor, minorToMajorInput } from "@/lib/money";
+
 export type StoreStatus = "SETUP" | "PRIVATE" | "PUBLIC";
 export type ReleasePricingMode = "FREE" | "FIXED" | "PWYW";
 export type ReleaseStatus = "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -81,26 +83,19 @@ export const releaseTypeOptions: Array<{ value: ReleaseType; label: string }> = 
   { value: "OTHER", label: "Other" },
 ];
 
-export function centsToCurrencyInput(cents: number | null | undefined) {
+export function centsToCurrencyInput(
+  cents: number | null | undefined,
+  currency = "USD",
+) {
   if (typeof cents !== "number" || !Number.isFinite(cents) || cents < 0) {
     return "";
   }
 
-  return (cents / 100).toFixed(2);
+  return minorToMajorInput(cents, currency);
 }
 
-export function parseCurrencyInputToCents(value: string) {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return Math.round(parsed * 100);
+export function parseCurrencyInputToCents(value: string, currency = "USD") {
+  return majorInputToMinor(value, currency);
 }
 
 export function parsePositiveInteger(value: string) {

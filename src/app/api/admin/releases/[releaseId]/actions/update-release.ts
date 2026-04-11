@@ -69,6 +69,7 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
   }
 
   const normalizedPricing = normalizePricingForRelease({
+    currency: release.currency,
     pricingMode: parsed.pricingMode,
     fixedPriceCents: parsed.fixedPriceCents,
     minimumPriceCents: parsed.minimumPriceCents,

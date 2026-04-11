@@ -15,6 +15,13 @@ import {
   toCoverDisplaySrc,
 } from "./utils";
 import { MarkdownTextarea } from "./markdown-textarea";
+import {
+  formatMinorAmount,
+  getCurrencyScale,
+  inputModeForCurrency,
+  minorToMajorInput,
+  stepForCurrency,
+} from "@/lib/money";
 
 export function ReleaseManagementCreateForm(props: {
   controller: ReleaseManagementController;
@@ -298,8 +305,8 @@ export function ReleaseManagementCreateForm(props: {
               <input
                 type="number"
                 min="0"
-                step="0.01"
-                inputMode="decimal"
+                step={stepForCurrency(storeCurrency)}
+                inputMode={inputModeForCurrency(storeCurrency)}
                 value={newFixedPrice}
                 onChange={(event) => setNewFixedPrice(event.target.value)}
                 className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
@@ -315,12 +322,16 @@ export function ReleaseManagementCreateForm(props: {
                 <input
                   type="number"
                   min="0"
-                  step="0.01"
-                  inputMode="decimal"
+                  step={stepForCurrency(storeCurrency)}
+                  inputMode={inputModeForCurrency(storeCurrency)}
                   value={newMinimumPrice}
                   onChange={(event) => setNewMinimumPrice(event.target.value)}
                   className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                  placeholder={newAllowFreeCheckout ? "0.00" : "2.00"}
+                  placeholder={
+                    newAllowFreeCheckout
+                      ? minorToMajorInput(0, storeCurrency)
+                      : minorToMajorInput(2 * getCurrencyScale(storeCurrency), storeCurrency)
+                  }
                 />
               </label>
               <label className="inline-flex items-center gap-2 text-zinc-300">
@@ -331,11 +342,11 @@ export function ReleaseManagementCreateForm(props: {
                     const checked = event.target.checked;
                     setNewAllowFreeCheckout(checked);
                     if (checked && newMinimumPrice.trim().length === 0) {
-                      setNewMinimumPrice("0.00");
+                      setNewMinimumPrice(minorToMajorInput(0, storeCurrency));
                     }
                   }}
                 />
-                Allow free checkout ($0)
+                {`Allow free checkout (${formatMinorAmount(0, storeCurrency)})`}
               </label>
             </div>
           ) : null}

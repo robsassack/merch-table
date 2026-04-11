@@ -1,19 +1,10 @@
 import { getPurchaseConfirmationEmailHtml } from "@/lib/email/purchase-confirmation-template";
 import { readFromEmailAddress } from "@/lib/email/from-address";
 import { sendEmail } from "@/lib/email/provider";
+import { formatMinorAmount, getCurrencyMeta } from "@/lib/money";
 
 function formatAmountPaid(cents: number, currency: string) {
-  const normalizedCurrency = currency.trim().toUpperCase();
-  const amount = cents / 100;
-
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: normalizedCurrency,
-    }).format(amount);
-  } catch {
-    return `${amount.toFixed(2)} ${normalizedCurrency}`;
-  }
+  return formatMinorAmount(cents, getCurrencyMeta(currency).code);
 }
 
 export async function sendPurchaseConfirmationEmail(input: {

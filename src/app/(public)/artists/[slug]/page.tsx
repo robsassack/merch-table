@@ -7,6 +7,7 @@ import ArtistBio from "@/app/(public)/release/artist-bio";
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import { ArtistImageDialog } from "./artist-image-dialog";
 import StorefrontHeader from "@/app/(public)/storefront-header";
+import { formatMinorAmount } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
 
@@ -67,12 +68,7 @@ function formatStorefrontPrice(input: {
   minimumPriceCents: number | null;
 }) {
   const format = (cents: number) =>
-    new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: input.currency || "USD",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(cents / 100);
+    formatMinorAmount(cents, input.currency || "USD");
 
   if (input.pricingMode === "FREE") {
     return "Free";

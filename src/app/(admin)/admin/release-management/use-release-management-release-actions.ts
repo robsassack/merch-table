@@ -25,6 +25,7 @@ type ReleaseActionsInput = ReleaseManagementState & {
 
 export function createReleaseActions(input: ReleaseActionsInput) {
   const {
+    releases,
     draftsById,
     minimumPriceFloorCents,
     stripeFeeEstimateConfig,
@@ -183,7 +184,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
 
   const getPricingEstimate = (draft: ReleaseDraft, currency: string) => {
     const source = draft.pricingMode === "FIXED" ? draft.fixedPrice : draft.minimumPrice;
-    const grossCents = parseCurrencyInputToCents(source);
+    const grossCents = parseCurrencyInputToCents(source, currency);
 
     if (draft.pricingMode === "FREE" || grossCents === null || grossCents <= 0) {
       return null;
@@ -225,10 +226,12 @@ export function createReleaseActions(input: ReleaseActionsInput) {
           coverStorageKey: newCoverStorageKey,
           pricingMode: newPricingMode,
           fixedPriceCents:
-            newPricingMode === "FIXED" ? parseCurrencyInputToCents(newFixedPrice) : null,
+            newPricingMode === "FIXED"
+              ? parseCurrencyInputToCents(newFixedPrice, input.storeCurrency)
+              : null,
           minimumPriceCents:
             newPricingMode === "PWYW"
-              ? (parseCurrencyInputToCents(newMinimumPrice) ??
+              ? (parseCurrencyInputToCents(newMinimumPrice, input.storeCurrency) ??
                 (newAllowFreeCheckout ? 0 : null))
               : null,
           deliveryFormats: newDeliveryFormats,
@@ -303,6 +306,8 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     if (!draft) {
       return;
     }
+    const releaseCurrency =
+      releases.find((release) => release.id === releaseId)?.currency ?? input.storeCurrency;
 
     setError(null);
     setNotice(null);
@@ -326,11 +331,11 @@ export function createReleaseActions(input: ReleaseActionsInput) {
           pricingMode: draft.pricingMode,
           fixedPriceCents:
             draft.pricingMode === "FIXED"
-              ? parseCurrencyInputToCents(draft.fixedPrice)
+              ? parseCurrencyInputToCents(draft.fixedPrice, releaseCurrency)
               : null,
           minimumPriceCents:
             draft.pricingMode === "PWYW"
-              ? (parseCurrencyInputToCents(draft.minimumPrice) ??
+              ? (parseCurrencyInputToCents(draft.minimumPrice, releaseCurrency) ??
                 (draft.allowFreeCheckout ? 0 : null))
               : null,
           deliveryFormats: draft.deliveryFormats,

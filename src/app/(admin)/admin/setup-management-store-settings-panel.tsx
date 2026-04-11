@@ -68,7 +68,9 @@ export function StoreSettingsPanel({
     setDefaultReleasePricingMode(data.defaultReleasePricingMode ?? "");
     setDefaultReleaseStatus(data.defaultReleaseStatus ?? "");
     setDefaultReleaseType(data.defaultReleaseType ?? "");
-    setDefaultReleasePwywMinimum(centsToCurrencyInput(data.defaultReleasePwywMinimumCents));
+    setDefaultReleasePwywMinimum(
+      centsToCurrencyInput(data.defaultReleasePwywMinimumCents, data.currency),
+    );
     setDefaultReleaseAllowFreeCheckout(data.defaultReleaseAllowFreeCheckout ?? false);
     setDefaultPreviewMode(data.defaultPreviewMode ?? "CLIP");
     setDefaultPreviewSeconds(String(data.defaultPreviewSeconds ?? 30));
@@ -110,7 +112,10 @@ export function StoreSettingsPanel({
     setError(null);
     setNotice(null);
 
-    const parsedDefaultReleasePwywMinimum = parseCurrencyInputToCents(defaultReleasePwywMinimum);
+    const parsedDefaultReleasePwywMinimum = parseCurrencyInputToCents(
+      defaultReleasePwywMinimum,
+      currency,
+    );
     if (defaultReleasePricingMode === "PWYW" && defaultReleasePwywMinimum.trim().length > 0 && parsedDefaultReleasePwywMinimum === null) {
       setError("Enter a valid PWYW minimum amount.");
       return;

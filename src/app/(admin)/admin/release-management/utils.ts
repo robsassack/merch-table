@@ -8,6 +8,11 @@ import type {
   TrackDraft,
   TrackRecord,
 } from "./types";
+import {
+  formatMinorAmount,
+  majorInputToMinor,
+  minorToMajorInput,
+} from "@/lib/money";
 
 const DEFAULT_DELIVERY_FORMATS: DeliveryFormat[] = ["MP3", "M4A", "FLAC"];
 const TRACK_STATUS_CHIP_BASE_CLASS_NAME =
@@ -60,26 +65,19 @@ export function slugify(value: string) {
   return slug.length > 0 ? slug : "release";
 }
 
-export function centsToDecimalString(cents: number | null | undefined) {
+export function centsToDecimalString(
+  cents: number | null | undefined,
+  currency = "USD",
+) {
   if (!Number.isFinite(cents ?? null) || cents === null || cents === undefined) {
     return "";
   }
 
-  return (cents / 100).toFixed(2);
+  return minorToMajorInput(cents, currency);
 }
 
-export function parseCurrencyInputToCents(value: string) {
-  const trimmed = value.trim();
-  if (trimmed.length === 0) {
-    return null;
-  }
-
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return null;
-  }
-
-  return Math.round(parsed * 100);
+export function parseCurrencyInputToCents(value: string, currency = "USD") {
+  return majorInputToMinor(value, currency);
 }
 
 export function parsePositiveInteger(value: string) {
@@ -223,12 +221,7 @@ export function toCoverDisplaySrc(url: string) {
 }
 
 export function formatCurrency(cents: number, currency: string) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
+  return formatMinorAmount(cents, currency);
 }
 
 export function getReleaseUrlPreview(title: string, slug: string) {
@@ -250,8 +243,8 @@ export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
     coverStorageKey: null,
     removeCoverImage: false,
     pricingMode: release.pricingMode,
-    fixedPrice: centsToDecimalString(release.fixedPriceCents),
-    minimumPrice: centsToDecimalString(release.minimumPriceCents),
+    fixedPrice: centsToDecimalString(release.fixedPriceCents, release.currency),
+    minimumPrice: centsToDecimalString(release.minimumPriceCents, release.currency),
     deliveryFormats:
       Array.isArray(release.deliveryFormats) && release.deliveryFormats.length > 0
         ? release.deliveryFormats

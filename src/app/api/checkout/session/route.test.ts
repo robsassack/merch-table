@@ -228,4 +228,73 @@ describe("POST /api/checkout/session", () => {
         "For PWYW, enter 0 cents for a free checkout or at least 50 cents for Stripe checkout.",
     });
   });
+
+  it("enforces a paid PWYW minimum that covers Stripe fees plus one cent", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+    const previousFloor = process.env.MINIMUM_PRICE_FLOOR_CENTS;
+
+    try {
+      process.env.MINIMUM_PRICE_FLOOR_CENTS = "1";
+      const { prisma } = await import("@/lib/prisma");
+
+      restore.push(
+        patchMethod(
+          prisma.setupWizardState as unknown as AnyRecord,
+          "findUnique",
+          async () => null,
+        ),
+      );
+      restore.push(
+        patchMethod(
+          prisma.storeSettings as unknown as AnyRecord,
+          "findFirst",
+          async () => ({
+            setupComplete: true,
+            organizationId: "org-1",
+            currency: "USD",
+          }),
+        ),
+      );
+      restore.push(
+        patchMethod(prisma.release as unknown as AnyRecord, "findFirst", async () => ({
+          id: "release-1",
+          title: "Zero Minimum PWYW",
+          pricingMode: "PWYW",
+          priceCents: 0,
+          fixedPriceCents: null,
+          minimumPriceCents: 0,
+        })),
+      );
+
+      const { POST } = await import("@/app/api/checkout/session/route");
+
+      const response = await POST(
+        new Request("http://localhost:3000/api/checkout/session", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            releaseId: "release-1",
+            amountCents: 31,
+            successUrl: "http://localhost:3000/success",
+            cancelUrl: "http://localhost:3000/cancel",
+          }),
+        }),
+      );
+
+      assert.equal(response.status, 400);
+      assert.deepEqual(await response.json(), {
+        ok: false,
+        error:
+          "For PWYW, enter 0 cents for a free checkout or at least 32 cents for Stripe checkout.",
+      });
+    } finally {
+      if (previousFloor === undefined) {
+        delete process.env.MINIMUM_PRICE_FLOOR_CENTS;
+      } else {
+        process.env.MINIMUM_PRICE_FLOOR_CENTS = previousFloor;
+      }
+    }
+  });
 });

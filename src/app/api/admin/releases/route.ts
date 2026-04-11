@@ -14,7 +14,9 @@ import {
 import {
   normalizePricingForRelease,
   readMinimumPriceFloorCentsFromEnv,
-  readStripeFeeEstimateConfigFromEnv,
+  readStripeFeeEstimateConfigForCurrencyFromEnv,
+  resolveMinimumChargeCentsForPositiveNet,
+  resolveMinimumPriceFloorMinorForCurrency,
 } from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
@@ -126,9 +128,6 @@ export async function GET() {
       ? adminReleaseLegacySelect
       : adminReleaseLegacyNoDeliveryFormatsSelect;
 
-  const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
-  const stripeFeeEstimate = readStripeFeeEstimateConfigFromEnv();
-
   const [artists, releases, settings, organization] = await Promise.all([
     prisma.artist.findMany({
       where: { organizationId: auth.context.organizationId },
@@ -167,6 +166,17 @@ export async function GET() {
       select: { name: true },
     }),
   ]);
+  const storeCurrency = settings?.currency ?? "USD";
+  const [minimumPriceFloorCentsRaw, stripeFeeEstimate] = await Promise.all([
+    resolveMinimumPriceFloorMinorForCurrency(storeCurrency).catch(() =>
+      readMinimumPriceFloorCentsFromEnv(),
+    ),
+    Promise.resolve(readStripeFeeEstimateConfigForCurrencyFromEnv(storeCurrency)),
+  ]);
+  const minimumPriceFloorCents = Math.max(
+    minimumPriceFloorCentsRaw,
+    resolveMinimumChargeCentsForPositiveNet(stripeFeeEstimate),
+  );
 
   return NextResponse.json(
     {
@@ -174,7 +184,7 @@ export async function GET() {
       orgName: organization?.name ?? null,
       minimumPriceFloorCents,
       stripeFeeEstimate,
-      storeCurrency: settings?.currency ?? "USD",
+      storeCurrency,
       featuredReleaseId: settings?.featuredReleaseId ?? null,
       releaseDefaults: {
         artistId: settings?.defaultReleaseArtistId ?? null,
@@ -212,7 +222,6 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
   const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
   const releaseSelect = releaseDateSupported
@@ -293,6 +302,16 @@ export async function POST(request: Request) {
     }
 
     const resolvedPricingMode = parsed.pricingMode ?? settings?.defaultReleasePricingMode ?? "FREE";
+    const minimumPriceFloorCentsRaw = await resolveMinimumPriceFloorMinorForCurrency(
+      settings?.currency ?? "USD",
+    ).catch(() => readMinimumPriceFloorCentsFromEnv());
+    const stripeFeeEstimate = readStripeFeeEstimateConfigForCurrencyFromEnv(
+      settings?.currency ?? "USD",
+    );
+    const minimumPriceFloorCents = Math.max(
+      minimumPriceFloorCentsRaw,
+      resolveMinimumChargeCentsForPositiveNet(stripeFeeEstimate),
+    );
     const resolvedStatus = parsed.status ?? settings?.defaultReleaseStatus ?? "PUBLISHED";
     const resolvedReleaseType = parsed.releaseType ?? settings?.defaultReleaseType ?? "ALBUM";
     const resolvedAllowFreeCheckout =
@@ -306,6 +325,7 @@ export async function POST(request: Request) {
         : null);
 
     const normalizedPricing = normalizePricingForRelease({
+      currency: settings?.currency ?? "USD",
       pricingMode: resolvedPricingMode,
       fixedPriceCents: parsed.fixedPriceCents,
       minimumPriceCents: resolvedMinimumPriceCents,

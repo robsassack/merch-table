@@ -135,6 +135,7 @@ export type ReleaseTrackState = {
 
 export type ReleaseForActionState = {
   id: string;
+  currency: string;
   artistId: string;
   featuredTrackId?: string | null;
   title: string;

@@ -1,27 +1,17 @@
 import { isReleaseOwnedInStorage } from "@/app/(public)/release/owned-release-storage";
+import {
+  formatMinorAmount,
+  resolveCurrencyPrefix as resolveCurrencyPrefixFromMoney,
+} from "@/lib/money";
 
 export type PricingMode = "FREE" | "FIXED" | "PWYW";
 
 export function formatMoney(currency: string, cents: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: currency || "USD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(cents / 100);
+  return formatMinorAmount(cents, currency);
 }
 
 export function resolveCurrencyPrefix(currency: string) {
-  const normalizedCurrency = currency || "USD";
-  const parts = new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: normalizedCurrency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).formatToParts(0);
-
-  const currencyPart = parts.find((part) => part.type === "currency")?.value?.trim();
-  return currencyPart && currencyPart.length > 0 ? currencyPart : normalizedCurrency;
+  return resolveCurrencyPrefixFromMoney(currency);
 }
 
 export function resolveBuyLabel(input: {

@@ -1,6 +1,8 @@
 import type { PricingMode } from "@/generated/prisma/enums";
+import { formatMinorUnitCount, resolveMinorUnitLabel } from "@/lib/money";
 
 type ResolveCheckoutAmountInput = {
+  currency: string;
   pricingMode: PricingMode;
   floorCents: number;
   priceCents: number;
@@ -30,6 +32,7 @@ function parseInteger(value: number | null | undefined) {
 export function resolveCheckoutAmountCents(
   input: ResolveCheckoutAmountInput,
 ): ResolveCheckoutAmountResult {
+  const floorLabel = formatMinorUnitCount(input.floorCents, input.currency);
   if (input.pricingMode === "FREE") {
     return {
       ok: false,
@@ -50,7 +53,7 @@ export function resolveCheckoutAmountCents(
     if (fixedCents < input.floorCents) {
       return {
         ok: false,
-        error: `Fixed price must be at least ${input.floorCents} cents.`,
+        error: `Fixed price must be at least ${floorLabel}.`,
       };
     }
 
@@ -78,14 +81,17 @@ export function resolveCheckoutAmountCents(
   if (parseInteger(selectedAmount) === null || selectedAmount < 0) {
     return {
       ok: false,
-      error: "Provide a valid PWYW amount in cents.",
+      error: `Provide a valid PWYW amount in ${resolveMinorUnitLabel(input.currency, 2)}.`,
     };
   }
 
   if (selectedAmount < configuredMinimum) {
     return {
       ok: false,
-      error: `PWYW amount must be at least ${configuredMinimum} cents.`,
+      error: `PWYW amount must be at least ${formatMinorUnitCount(
+        configuredMinimum,
+        input.currency,
+      )}.`,
     };
   }
 
@@ -96,14 +102,17 @@ export function resolveCheckoutAmountCents(
   ) {
     return {
       ok: false,
-      error: `For PWYW, enter 0 cents for a free checkout or at least ${input.floorCents} cents for Stripe checkout.`,
+      error: `For PWYW, enter ${formatMinorUnitCount(
+        0,
+        input.currency,
+      )} for a free checkout or at least ${floorLabel} for Stripe checkout.`,
     };
   }
 
   if (configuredMinimum !== 0 && selectedAmount < input.floorCents) {
     return {
       ok: false,
-      error: `PWYW amount must be at least ${input.floorCents} cents.`,
+      error: `PWYW amount must be at least ${floorLabel}.`,
     };
   }
 

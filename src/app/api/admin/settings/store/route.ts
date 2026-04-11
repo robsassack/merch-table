@@ -5,11 +5,16 @@ import { requireAdminRequestContext } from "@/lib/admin/request-context";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { prisma } from "@/lib/prisma";
 import { SUPPORTED_CURRENCY_CODES } from "@/lib/setup/currencies";
+import { convertMinorAmount, fetchExchangeRate } from "@/lib/currency/exchange-rates";
 import {
   isValidCoverStorageKey,
   resolveCoverImageUrlFromStorageKey,
 } from "@/lib/storage/cover-art";
-import { readMinimumPriceFloorCentsFromEnv } from "@/lib/pricing/pricing-rules";
+import {
+  resolveMinimumPriceFloorMinorForCurrency,
+  readStripeFeeEstimateConfigForCurrencyFromEnv,
+  resolveMinimumChargeCentsForPositiveNet,
+} from "@/lib/pricing/pricing-rules";
 import { buildStoreSettingsResponseData } from "./store-settings-response";
 
 export const runtime = "nodejs";
@@ -72,7 +77,6 @@ const updateStoreSettingsSchema = z.object({
   );
 
 const ADMIN_EMAIL_VERIFICATION_WINDOW_MS = 10 * 60 * 1_000;
-const DEFAULT_EXCHANGE_RATE_API_BASE_URL = "https://api.frankfurter.app";
 
 function isUniqueConstraintError(error: unknown) {
   return (
@@ -96,45 +100,6 @@ async function hasRecentAdminAuthVerification(input: {
   }
 
   return Date.now() - session.createdAt.getTime() <= ADMIN_EMAIL_VERIFICATION_WINDOW_MS;
-}
-
-function resolveExchangeRateApiBaseUrl() {
-  return (
-    process.env.EXCHANGE_RATE_API_BASE_URL?.trim() ||
-    DEFAULT_EXCHANGE_RATE_API_BASE_URL
-  );
-}
-
-async function fetchExchangeRate(input: { from: string; to: string }) {
-  if (input.from === input.to) {
-    return 1;
-  }
-
-  const apiBaseUrl = resolveExchangeRateApiBaseUrl().replace(/\/+$/, "");
-  const url = `${apiBaseUrl}/latest?from=${encodeURIComponent(input.from)}&to=${encodeURIComponent(input.to)}`;
-  const response = await fetch(url, {
-    method: "GET",
-    cache: "no-store",
-    signal: AbortSignal.timeout(6_000),
-  });
-
-  if (!response.ok) {
-    throw new Error("Currency conversion rates are unavailable.");
-  }
-
-  const body = (await response.json().catch(() => null)) as
-    | { rates?: Record<string, number> }
-    | null;
-  const rate = body?.rates?.[input.to];
-  if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) {
-    throw new Error("Currency conversion rate is invalid.");
-  }
-
-  return rate;
-}
-
-function convertAmountCents(input: { cents: number; rate: number }) {
-  return Math.max(0, Math.round(input.cents * input.rate));
 }
 
 export async function GET() {
@@ -172,8 +137,6 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const parsed = updateStoreSettingsSchema.parse(payload);
-    const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
-
     if (typeof parsed.featuredReleaseId === "string") {
       const featuredRelease = await prisma.release.findFirst({
         where: {
@@ -255,6 +218,19 @@ export async function POST(request: Request) {
           to: parsed.currency as string,
         })
       : null;
+    const minimumPriceFloorMinorRaw =
+      shouldConvertReleaseCurrencies && typeof parsed.currency === "string"
+        ? await resolveMinimumPriceFloorMinorForCurrency(parsed.currency)
+        : null;
+    const minimumPriceFloorMinor =
+      shouldConvertReleaseCurrencies && typeof parsed.currency === "string"
+        ? Math.max(
+            minimumPriceFloorMinorRaw ?? 0,
+            resolveMinimumChargeCentsForPositiveNet(
+              readStripeFeeEstimateConfigForCurrencyFromEnv(parsed.currency),
+            ),
+          )
+        : null;
 
     let nextOrganizationLogoUrl: string | null | undefined = undefined;
     if (parsed.organizationLogoStorageKey !== undefined) {
@@ -354,8 +330,13 @@ export async function POST(request: Request) {
           if (release.pricingMode === "FIXED") {
             const sourceFixed = release.fixedPriceCents ?? release.priceCents;
             const convertedFixed = Math.max(
-              minimumPriceFloorCents,
-              convertAmountCents({ cents: sourceFixed, rate: exchangeRate }),
+              minimumPriceFloorMinor ?? 0,
+              convertMinorAmount({
+                amountMinor: sourceFixed,
+                fromCurrency: existingSettings?.currency ?? "USD",
+                toCurrency: parsed.currency,
+                rate: exchangeRate,
+              }),
             );
 
             await tx.release.update({
@@ -371,14 +352,16 @@ export async function POST(request: Request) {
           }
 
           const sourceMinimum = release.minimumPriceCents ?? release.priceCents;
-          const convertedMinimumRaw = convertAmountCents({
-            cents: sourceMinimum,
+          const convertedMinimumRaw = convertMinorAmount({
+            amountMinor: sourceMinimum,
+            fromCurrency: existingSettings?.currency ?? "USD",
+            toCurrency: parsed.currency,
             rate: exchangeRate,
           });
           const convertedMinimum =
             sourceMinimum <= 0
               ? 0
-              : Math.max(minimumPriceFloorCents, convertedMinimumRaw);
+              : Math.max(minimumPriceFloorMinor ?? 0, convertedMinimumRaw);
 
           await tx.release.update({
             where: { id: release.id },

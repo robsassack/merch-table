@@ -1,6 +1,11 @@
 import type { PricingMode } from "@/generated/prisma/enums";
+import { fetchExchangeRate } from "@/lib/currency/exchange-rates";
+import { convertMinorAmount } from "@/lib/currency/exchange-rates";
+import { getCurrencyMeta } from "@/lib/money";
+import { type SupportedCurrencyCode } from "@/lib/setup/currencies";
 
 export const DEFAULT_MINIMUM_PRICE_FLOOR_CENTS = 50;
+export const DEFAULT_MINIMUM_PRICE_FLOOR_BASE_CURRENCY = "USD";
 
 export const DEFAULT_STRIPE_FEE_ESTIMATE_PERCENT_BPS = 290;
 export const DEFAULT_STRIPE_FEE_ESTIMATE_FIXED_CENTS = 30;
@@ -38,11 +43,72 @@ function readPositiveIntegerEnv(name: string, fallback: number) {
   return parsed;
 }
 
+function readCurrencyCodeEnv(name: string, fallback: SupportedCurrencyCode) {
+  const raw = process.env[name]?.trim().toUpperCase();
+  if (!raw || raw.length !== 3) {
+    return fallback;
+  }
+
+  return getCurrencyMeta(raw).code;
+}
+
 export function readMinimumPriceFloorCentsFromEnv() {
   return readPositiveIntegerEnv(
     "MINIMUM_PRICE_FLOOR_CENTS",
     DEFAULT_MINIMUM_PRICE_FLOOR_CENTS,
   );
+}
+
+export function readMinimumPriceFloorBaseCurrencyFromEnv() {
+  return readCurrencyCodeEnv(
+    "MINIMUM_PRICE_FLOOR_BASE_CURRENCY",
+    DEFAULT_MINIMUM_PRICE_FLOOR_BASE_CURRENCY,
+  );
+}
+
+export async function resolveMinimumPriceFloorMinorForCurrency(currency: string) {
+  const normalizedCurrency = getCurrencyMeta(currency).code;
+  const baseFloorMinor = readMinimumPriceFloorCentsFromEnv();
+  const baseCurrency = readMinimumPriceFloorBaseCurrencyFromEnv();
+
+  if (normalizedCurrency === baseCurrency) {
+    return baseFloorMinor;
+  }
+
+  const rate = await fetchExchangeRate({
+    from: baseCurrency,
+    to: normalizedCurrency,
+  });
+
+  return Math.max(
+    1,
+    convertMinorAmount({
+      amountMinor: baseFloorMinor,
+      fromCurrency: baseCurrency,
+      toCurrency: normalizedCurrency,
+      rate,
+      rounding: "ceil",
+    }),
+  );
+}
+
+function readCurrencyFeeOverride(input: {
+  currency: string;
+  suffix: "PERCENT_BPS" | "FIXED_MINOR";
+}) {
+  const normalizedCurrency = getCurrencyMeta(input.currency).code;
+  const key = `STRIPE_FEE_ESTIMATE_${input.suffix}_${normalizedCurrency}`;
+  const raw = process.env[key]?.trim();
+  if (!raw) {
+    return null;
+  }
+
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    return null;
+  }
+
+  return parsed;
 }
 
 export function readStripeFeeEstimateConfigFromEnv(): StripeFeeEstimateConfig {
@@ -55,6 +121,25 @@ export function readStripeFeeEstimateConfigFromEnv(): StripeFeeEstimateConfig {
       "STRIPE_FEE_ESTIMATE_FIXED_CENTS",
       DEFAULT_STRIPE_FEE_ESTIMATE_FIXED_CENTS,
     ),
+  };
+}
+
+export function readStripeFeeEstimateConfigForCurrencyFromEnv(
+  currency: string,
+): StripeFeeEstimateConfig {
+  const defaultConfig = readStripeFeeEstimateConfigFromEnv();
+  const fixedMinorOverride = readCurrencyFeeOverride({
+    currency,
+    suffix: "FIXED_MINOR",
+  });
+  const percentOverride = readCurrencyFeeOverride({
+    currency,
+    suffix: "PERCENT_BPS",
+  });
+
+  return {
+    percentBps: percentOverride ?? defaultConfig.percentBps,
+    fixedFeeCents: fixedMinorOverride ?? defaultConfig.fixedFeeCents,
   };
 }
 
@@ -81,7 +166,23 @@ export function estimateNetPayoutCents(
   return Math.max(0, grossCents - estimateStripeFeeCents(grossCents, config));
 }
 
+export function resolveMinimumChargeCentsForPositiveNet(
+  config: StripeFeeEstimateConfig,
+) {
+  const start = Math.max(1, config.fixedFeeCents + 1);
+  const cap = 1_000_000;
+
+  for (let gross = start; gross <= cap; gross += 1) {
+    if (estimateNetPayoutCents(gross, config) >= 1) {
+      return gross;
+    }
+  }
+
+  return start;
+}
+
 export function normalizePricingForRelease(input: {
+  currency: string;
   pricingMode: PricingMode;
   fixedPriceCents: number | null | undefined;
   minimumPriceCents: number | null | undefined;

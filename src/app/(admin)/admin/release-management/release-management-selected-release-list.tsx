@@ -17,6 +17,13 @@ import {
   toCoverDisplaySrc,
   toReleaseDraft,
 } from "./utils";
+import {
+  formatMinorAmount,
+  getCurrencyScale,
+  inputModeForCurrency,
+  minorToMajorInput,
+  stepForCurrency,
+} from "@/lib/money";
 
 export function ReleaseManagementSelectedReleaseList(props: {
   controller: ReleaseManagementController;
@@ -339,8 +346,8 @@ export function ReleaseManagementSelectedReleaseList(props: {
                       <input
                         type="number"
                         min="0"
-                        step="0.01"
-                        inputMode="decimal"
+                        step={stepForCurrency(release.currency)}
+                        inputMode={inputModeForCurrency(release.currency)}
                         value={draft.fixedPrice}
                         onChange={(event) =>
                           setDraftsById((previous) => ({
@@ -363,8 +370,8 @@ export function ReleaseManagementSelectedReleaseList(props: {
                         <input
                           type="number"
                           min="0"
-                          step="0.01"
-                          inputMode="decimal"
+                          step={stepForCurrency(release.currency)}
+                          inputMode={inputModeForCurrency(release.currency)}
                           value={draft.minimumPrice}
                           onChange={(event) =>
                             setDraftsById((previous) => ({
@@ -376,7 +383,14 @@ export function ReleaseManagementSelectedReleaseList(props: {
                             }))
                           }
                           className="rounded-lg border border-slate-600 bg-slate-900 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-slate-400"
-                          placeholder={draft.allowFreeCheckout ? "0.00" : "2.00"}
+                          placeholder={
+                            draft.allowFreeCheckout
+                              ? minorToMajorInput(0, release.currency)
+                              : minorToMajorInput(
+                                  2 * getCurrencyScale(release.currency),
+                                  release.currency,
+                                )
+                          }
                         />
                       </label>
                       <label className="inline-flex items-center gap-2 text-zinc-300">
@@ -391,13 +405,13 @@ export function ReleaseManagementSelectedReleaseList(props: {
                                 allowFreeCheckout: event.target.checked,
                                 minimumPrice:
                                   event.target.checked && draft.minimumPrice.trim().length === 0
-                                    ? "0.00"
+                                    ? minorToMajorInput(0, release.currency)
                                     : draft.minimumPrice,
                               },
                             }))
                           }
                         />
-                        Allow free checkout ($0)
+                        {`Allow free checkout (${formatMinorAmount(0, release.currency)})`}
                       </label>
                     </div>
                   ) : null}

@@ -9,7 +9,12 @@ import {
 import { resolveCheckoutAmountCents } from "@/lib/checkout/session-pricing";
 import { decryptSecret } from "@/lib/crypto/secret-box";
 import { prisma } from "@/lib/prisma";
-import { readMinimumPriceFloorCentsFromEnv } from "@/lib/pricing/pricing-rules";
+import {
+  readMinimumPriceFloorCentsFromEnv,
+  readStripeFeeEstimateConfigForCurrencyFromEnv,
+  resolveMinimumChargeCentsForPositiveNet,
+  resolveMinimumPriceFloorMinorForCurrency,
+} from "@/lib/pricing/pricing-rules";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { checkoutRateLimitPolicies } from "@/lib/security/checkout-policies";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -127,8 +132,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const floorCents = readMinimumPriceFloorCentsFromEnv();
+    const floorCentsBase = await resolveMinimumPriceFloorMinorForCurrency(
+      settings.currency,
+    ).catch(() => readMinimumPriceFloorCentsFromEnv());
+    const feeConfig = readStripeFeeEstimateConfigForCurrencyFromEnv(settings.currency);
+    const stripeNetFloorCents = resolveMinimumChargeCentsForPositiveNet(feeConfig);
+    const floorCents = Math.max(floorCentsBase, stripeNetFloorCents);
     const resolvedAmount = resolveCheckoutAmountCents({
+      currency: settings.currency,
       pricingMode: release.pricingMode,
       floorCents,
       priceCents: release.priceCents,

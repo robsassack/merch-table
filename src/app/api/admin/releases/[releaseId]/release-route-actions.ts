@@ -1,6 +1,11 @@
 import { z } from "zod";
 
-import { readMinimumPriceFloorCentsFromEnv } from "@/lib/pricing/pricing-rules";
+import {
+  readMinimumPriceFloorCentsFromEnv,
+  readStripeFeeEstimateConfigForCurrencyFromEnv,
+  resolveMinimumChargeCentsForPositiveNet,
+  resolveMinimumPriceFloorMinorForCurrency,
+} from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
 import { prismaReleaseSupportsField } from "@/lib/admin/release-management";
 
@@ -37,7 +42,6 @@ export async function handleReleasePatchAction(input: {
   organizationId: string;
 }) {
   const { request, releaseId, organizationId } = input;
-  const minimumPriceFloorCents = readMinimumPriceFloorCentsFromEnv();
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
   const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
 
@@ -67,6 +71,16 @@ export async function handleReleasePatchAction(input: {
     }
 
     if (parsed.action === "update") {
+      const minimumPriceFloorCentsRaw = await resolveMinimumPriceFloorMinorForCurrency(
+        release.currency,
+      ).catch(() => readMinimumPriceFloorCentsFromEnv());
+      const stripeFeeEstimate = readStripeFeeEstimateConfigForCurrencyFromEnv(
+        release.currency,
+      );
+      const minimumPriceFloorCents = Math.max(
+        minimumPriceFloorCentsRaw,
+        resolveMinimumChargeCentsForPositiveNet(stripeFeeEstimate),
+      );
       return handleUpdateReleaseAction({
         parsed,
         release,

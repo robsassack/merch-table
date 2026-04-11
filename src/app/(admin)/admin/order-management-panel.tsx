@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import type { Prisma } from "@/generated/prisma/client";
 import type { EmailStatus, OrderStatus } from "@/generated/prisma/enums";
+import { formatMinorAmount, getCurrencyMeta } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { formatIsoTimestampForDisplay } from "@/lib/time/format-display";
 import {
@@ -22,15 +23,8 @@ export type OrderManagementSearchParams = {
 };
 
 function formatAmount(cents: number, currency: string) {
-  const normalizedCurrency = currency.trim().toUpperCase() || "USD";
-  try {
-    return new Intl.NumberFormat("en-US", {
-      style: "currency",
-      currency: normalizedCurrency,
-    }).format(cents / 100);
-  } catch {
-    return `${(cents / 100).toFixed(2)} ${normalizedCurrency}`;
-  }
+  const code = getCurrencyMeta(currency).code;
+  return `${formatMinorAmount(cents, code)} (${code})`;
 }
 
 function formatDate(value: Date | null) {

@@ -6,6 +6,7 @@ import { resolveCheckoutAmountCents } from "@/lib/checkout/session-pricing";
 describe("checkout session pricing", () => {
   it("returns fixed release amount when valid", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "FIXED",
       floorCents: 50,
       priceCents: 400,
@@ -18,6 +19,7 @@ describe("checkout session pricing", () => {
 
   it("rejects fixed price below system floor", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "FIXED",
       floorCents: 50,
       priceCents: 40,
@@ -31,6 +33,7 @@ describe("checkout session pricing", () => {
 
   it("rejects PWYW amount below release minimum", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "PWYW",
       floorCents: 50,
       priceCents: 200,
@@ -45,6 +48,7 @@ describe("checkout session pricing", () => {
 
   it("rejects PWYW amounts between zero and floor when release minimum is zero", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "PWYW",
       floorCents: 50,
       priceCents: 0,
@@ -62,6 +66,7 @@ describe("checkout session pricing", () => {
 
   it("allows a zero-dollar PWYW checkout when release minimum is zero", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "PWYW",
       floorCents: 50,
       priceCents: 0,
@@ -75,6 +80,7 @@ describe("checkout session pricing", () => {
 
   it("allows PWYW amounts at or above floor when release minimum is zero", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "PWYW",
       floorCents: 50,
       priceCents: 0,
@@ -88,6 +94,7 @@ describe("checkout session pricing", () => {
 
   it("defaults PWYW amount to release minimum when omitted", () => {
     const result = resolveCheckoutAmountCents({
+      currency: "USD",
       pricingMode: "PWYW",
       floorCents: 50,
       priceCents: 200,
@@ -96,5 +103,23 @@ describe("checkout session pricing", () => {
     });
 
     assert.deepEqual(result, { ok: true, amountCents: 200 });
+  });
+
+  it("uses currency subdenomination wording in zero-minimum PWYW errors", () => {
+    const result = resolveCheckoutAmountCents({
+      currency: "JPY",
+      pricingMode: "PWYW",
+      floorCents: 50,
+      priceCents: 0,
+      fixedPriceCents: null,
+      minimumPriceCents: 0,
+      pwywAmountCents: 25,
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(
+      result.error,
+      "For PWYW, enter 0 yen for a free checkout or at least 50 yen for Stripe checkout.",
+    );
   });
 });

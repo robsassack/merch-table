@@ -159,10 +159,15 @@ export function useReleaseManagementController() {
         body.releaseDefaults?.allowFreeCheckout === true && defaultPricingMode === "PWYW";
       const defaultPwywMinimum = (() => {
         if (typeof body.releaseDefaults?.pwywMinimumCents === "number") {
-          return centsToDecimalString(body.releaseDefaults.pwywMinimumCents);
+          return centsToDecimalString(
+            body.releaseDefaults.pwywMinimumCents,
+            body.storeCurrency ?? "USD",
+          );
         }
 
-        return defaultAllowFreeCheckout ? "0.00" : "";
+        return defaultAllowFreeCheckout
+          ? centsToDecimalString(0, body.storeCurrency ?? "USD")
+          : "";
       })();
       const defaultPreviewMode = body.releaseDefaults?.previewMode ?? "CLIP";
       const defaultPreviewSeconds = String(body.releaseDefaults?.previewSeconds ?? 30);
