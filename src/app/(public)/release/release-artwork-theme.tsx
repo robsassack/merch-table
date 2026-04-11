@@ -112,20 +112,6 @@ function hslToRgb(input: { h: number; s: number; l: number }): RgbColor {
   };
 }
 
-function normalizeAccent(color: RgbColor): RgbColor {
-  const hsl = rgbToHsl(color);
-  return hslToRgb({
-    h: hsl.h,
-    s: clamp(Math.max(hsl.s, 0.3), 0.3, 0.62),
-    l: clamp(hsl.l, 0.36, 0.5),
-  });
-}
-
-function resolveTextContrast(color: RgbColor): string {
-  const luminance = (0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b) / 255;
-  return luminance > 0.55 ? "rgb(17 24 39)" : "rgb(255 255 255)";
-}
-
 function resolveRelativeLuminance(color: RgbColor): number {
   const toLinear = (channel: number) => {
     const normalized = clamp(channel / 255, 0, 1);
