@@ -170,6 +170,31 @@ describe("POST /api/checkout/session", () => {
     });
   });
 
+  it("rejects checkout payloads without an email", async () => {
+    process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
+    process.env.DATABASE_URL ??=
+      "postgresql://postgres:postgres@localhost:5432/merch_table_test";
+
+    const { POST } = await import("@/app/api/checkout/session/route");
+
+    const response = await POST(
+      new Request("http://localhost:3000/api/checkout/session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          releaseId: "release-1",
+          successUrl: "http://localhost:3000/success",
+          cancelUrl: "http://localhost:3000/cancel",
+        }),
+      }),
+    );
+
+    assert.equal(response.status, 400);
+    const payload = (await response.json()) as { ok: boolean; error: string };
+    assert.equal(payload.ok, false);
+    assert.equal(payload.error, "Invalid checkout payload.");
+  });
+
   it("rejects PWYW amounts between zero and Stripe floor for zero-minimum releases", async () => {
     process.env.STRIPE_SECRET_KEY = "sk_test_dummy";
     process.env.DATABASE_URL ??=
@@ -214,6 +239,7 @@ describe("POST /api/checkout/session", () => {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           releaseId: "release-1",
+          email: "buyer@example.com",
           amountCents: 25,
           successUrl: "http://localhost:3000/success",
           cancelUrl: "http://localhost:3000/cancel",
@@ -276,6 +302,7 @@ describe("POST /api/checkout/session", () => {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             releaseId: "release-1",
+            email: "buyer@example.com",
             amountCents: 31,
             successUrl: "http://localhost:3000/success",
             cancelUrl: "http://localhost:3000/cancel",

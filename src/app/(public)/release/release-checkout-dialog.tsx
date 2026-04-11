@@ -145,9 +145,7 @@ export default function ReleaseCheckoutDialog({
           ) : null}
 
           <label className="block">
-            <span className="mb-1.5 block text-sm font-medium text-zinc-700">
-              Email {pricingMode === "FREE" ? "" : "(optional)"}
-            </span>
+            <span className="mb-1.5 block text-sm font-medium text-zinc-700">Email</span>
             <input
               id="checkout-email"
               type="email"
@@ -155,6 +153,7 @@ export default function ReleaseCheckoutDialog({
               value={checkoutEmail}
               onChange={(event) => onCheckoutEmailChange(event.target.value)}
               disabled={isSubmitting}
+              required
               className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
               placeholder="you@example.com"
               aria-invalid={Boolean(checkoutFormError)}
@@ -180,6 +179,7 @@ export default function ReleaseCheckoutDialog({
               value={confirmEmail}
               onChange={(event) => onConfirmEmailChange(event.target.value)}
               disabled={isSubmitting}
+              required
               className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 outline-none transition focus:border-[var(--release-accent)] focus:ring-2 focus:ring-[var(--release-accent-soft)] disabled:cursor-not-allowed disabled:bg-zinc-100"
               placeholder="Re-enter your email"
               aria-invalid={Boolean(checkoutFormError)}

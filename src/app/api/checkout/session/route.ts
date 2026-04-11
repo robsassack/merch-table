@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 const createCheckoutSessionSchema = z.object({
   releaseId: z.string().trim().min(1),
   amountCents: z.number().int().nonnegative().optional(),
-  email: z.email().max(320).optional(),
+  email: z.email().max(320),
   confirmAlreadyOwned: z.boolean().optional(),
   successUrl: z.string().trim().min(1),
   cancelUrl: z.string().trim().min(1),
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
   try {
     const payload = await request.json();
     const parsed = createCheckoutSessionSchema.parse(payload);
-    const normalizedEmail = parsed.email?.trim().toLowerCase();
+    const normalizedEmail = parsed.email.trim().toLowerCase();
 
     const [settings, stripeState] = await Promise.all([
       prisma.storeSettings.findFirst({
@@ -155,11 +155,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (
-      normalizedEmail &&
-      resolvedAmount.amountCents > 0 &&
-      parsed.confirmAlreadyOwned !== true
-    ) {
+    if (resolvedAmount.amountCents > 0 && parsed.confirmAlreadyOwned !== true) {
       const alreadyOwned = await hasExistingReleaseOwnership({
         organizationId: settings.organizationId,
         releaseId: release.id,

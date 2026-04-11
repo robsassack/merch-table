@@ -153,12 +153,17 @@ export default function ReleaseDetailPurchaseCard({
     const normalizedConfirmEmail = confirmEmail.trim().toLowerCase();
     const hasEmail = normalizedEmail.length > 0;
 
-    if (hasEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    if (!hasEmail) {
+      setCheckoutFormError("Email is required.");
+      return;
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
       setCheckoutFormError("Enter a valid email address.");
       return;
     }
 
-    if (hasEmail && normalizedEmail !== normalizedConfirmEmail) {
+    if (normalizedEmail !== normalizedConfirmEmail) {
       setCheckoutFormError("Email addresses do not match.");
       return;
     }
@@ -178,11 +183,6 @@ export default function ReleaseDetailPurchaseCard({
     }
     const shouldUseFreeCheckout =
       pricingMode === "FREE" || (pricingMode === "PWYW" && amountCents === 0);
-
-    if (shouldUseFreeCheckout && !hasEmail) {
-      setCheckoutFormError("Email is required for the free library link.");
-      return;
-    }
 
     if (!shouldUseFreeCheckout && alreadyOwnedWarning && !confirmAlreadyOwned) {
       setCheckoutFormError("Please confirm to continue with a repeat purchase.");
@@ -232,7 +232,7 @@ export default function ReleaseDetailPurchaseCard({
         body: JSON.stringify({
           releaseId,
           amountCents,
-          email: normalizedEmail.length > 0 ? normalizedEmail : undefined,
+          email: normalizedEmail,
           confirmAlreadyOwned,
           successUrl: `${window.location.origin}/purchase-complete?session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: window.location.href,
