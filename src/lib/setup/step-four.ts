@@ -27,6 +27,8 @@ export type StepFourState = {
   lastError: string | null;
 };
 
+const DEFAULT_STRIPE_VERIFY_TIMEOUT_MS = 15_000;
+
 function getWebhookUrl() {
   const baseUrl = process.env.APP_BASE_URL ?? "http://localhost:3000";
   const normalizedBaseUrl = baseUrl.endsWith("/")
@@ -112,7 +114,19 @@ export async function verifyStripeConnection() {
     throw new Error("Stripe API key is missing.");
   }
 
-  const stripe = new Stripe(stripeSecretKey);
+  const stripeVerifyTimeoutMs = Number.parseInt(
+    process.env.STRIPE_VERIFY_TIMEOUT_MS ?? "",
+    10,
+  );
+  const effectiveTimeoutMs =
+    Number.isInteger(stripeVerifyTimeoutMs) && stripeVerifyTimeoutMs > 0
+      ? stripeVerifyTimeoutMs
+      : DEFAULT_STRIPE_VERIFY_TIMEOUT_MS;
+
+  const stripe = new Stripe(stripeSecretKey, {
+    timeout: effectiveTimeoutMs,
+    maxNetworkRetries: 0,
+  });
   await stripe.balance.retrieve();
 
   const now = new Date();

@@ -367,12 +367,12 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: Single `docker compose up` gets a working stack.
 
-- [ ] Docker Compose profile: `web`, `postgres`, `garage`, `redis`, `worker` with named volumes
-- [ ] Container entrypoint runs `prisma migrate deploy`; exits non-zero on failure
-- [ ] Storage adapter works with both bundled Garage and external S3 via env config
-- [ ] Worker processes transcode jobs via FFmpeg
-- [ ] Dockerfile builds and runs cleanly
-- [ ] `docker compose up` from scratch → bootstrap token in logs → setup wizard → working store
+- [x] Docker Compose profile: `web`, `postgres`, `garage`, `redis`, `worker` with named volumes
+- [x] Container entrypoint runs `prisma migrate deploy`; exits non-zero on failure
+- [x] Storage adapter works with both bundled Garage and external S3 via env config
+- [x] Worker processes transcode jobs via FFmpeg
+- [x] Dockerfile builds and runs cleanly
+- [x] `docker compose up` from scratch → bootstrap token in logs → setup wizard → working store
 
 ---
 

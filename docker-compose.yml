@@ -1,24 +1,41 @@
 services:
   web:
-    image: node:22-alpine
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+      network: host
+    image: merchtable-web:local
     container_name: merchtable-web
-    working_dir: /app
-    command: ["sh", "-c", "npm install && npm run -s dev -- --hostname 0.0.0.0 --port 3000"]
-    volumes:
-      - ./:/app
+    network_mode: host
+    restart: unless-stopped
     environment:
-      NODE_ENV: development
-      STORAGE_MODE: GARAGE
-      STORAGE_REGION: us-east-1
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
-      REDIS_URL: redis://redis:6379
-      STORAGE_ENDPOINT: http://garage:3900
-      STORAGE_BUCKET: media
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_TELEMETRY_DISABLED: 1
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://localhost:6379}
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
+      AUTH_SECRET: ${AUTH_SECRET:-dev-insecure-auth-secret-change-me}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
+      STORE_ORG_SLUG: ${STORE_ORG_SLUG:-main-store}
+      EMAIL_PROVIDER: ${EMAIL_PROVIDER:-mock}
+      SMTP_FROM: ${SMTP_FROM:-no-reply@example.com}
+      SMTP_HOST: ${SMTP_HOST:-localhost}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      STORAGE_MODE: ${STORAGE_MODE:-GARAGE}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
+      STORAGE_ENDPOINT: ${DOCKER_STORAGE_ENDPOINT:-http://localhost:3900}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-media}
       STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
       STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-secret-access-key}
-      STORAGE_USE_PATH_STYLE: "true"
-    ports:
-      - "3000:3000"
+      STORAGE_USE_PATH_STYLE: ${STORAGE_USE_PATH_STYLE:-true}
+      STORAGE_PUBLIC_BASE_URL: ${STORAGE_PUBLIC_BASE_URL:-http://localhost:3900/media}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY:-}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:-}
+      STRIPE_CURRENCY: ${STRIPE_CURRENCY:-USD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -27,36 +44,40 @@ services:
       garage:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/api/health/live >/dev/null 2>&1 || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"fetch('http://127.0.0.1:3000/api/health/live').then((response)=>process.exit(response.ok?0:1)).catch(()=>process.exit(1))\"",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 25s
 
   worker:
     build:
       context: .
       dockerfile: infra/docker/worker.Dockerfile
+      network: host
     image: merchtable-worker:local
     container_name: merchtable-worker
-    working_dir: /app
-    command: ["sh", "-c", "npm run -s worker"]
-    volumes:
-      - ./:/app
+    network_mode: host
+    restart: unless-stopped
+
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/merchtable?schema=public
-      REDIS_URL: redis://redis:6379
-      STORAGE_MODE: GARAGE
-      STORAGE_ENDPOINT: http://garage:3900
-      STORAGE_BUCKET: media
-      STORAGE_REGION: us-east-1
+      NODE_ENV: production
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://localhost:6379}
+      STORAGE_MODE: ${STORAGE_MODE:-GARAGE}
+      STORAGE_ENDPOINT: ${DOCKER_STORAGE_ENDPOINT:-http://localhost:3900}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-media}
+      STORAGE_REGION: ${STORAGE_REGION:-us-east-1}
       STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
       STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-secret-access-key}
-      STORAGE_USE_PATH_STYLE: "true"
-      TRANSCODE_CONCURRENCY: "1"
-      TRANSCODE_SOURCE_ROOT: /tmp/merch-table/source
-      TRANSCODE_OUTPUT_ROOT: /tmp/merch-table/output
+      STORAGE_USE_PATH_STYLE: ${STORAGE_USE_PATH_STYLE:-true}
+      TRANSCODE_CONCURRENCY: ${TRANSCODE_CONCURRENCY:-1}
+      TRANSCODE_SOURCE_ROOT: ${TRANSCODE_SOURCE_ROOT:-/tmp/merch-table/source}
+      TRANSCODE_OUTPUT_ROOT: ${TRANSCODE_OUTPUT_ROOT:-/tmp/merch-table/output}
     depends_on:
       postgres:
         condition: service_healthy
@@ -68,6 +89,7 @@ services:
   postgres:
     image: postgres:16
     container_name: merchtable-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -86,6 +108,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: merchtable-redis
+    restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "6379:6379"
@@ -101,6 +124,7 @@ services:
   garage:
     image: dxflrs/garage:v2.2.0
     container_name: merchtable-garage
+    restart: unless-stopped
     environment:
       STORAGE_BUCKET: ${STORAGE_BUCKET:-media}
       STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-access-key-id}
@@ -116,7 +140,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
+      start_period: 15s
 
 volumes:
   postgres_data:

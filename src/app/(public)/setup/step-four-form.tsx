@@ -24,6 +24,8 @@ type StepFourFormProps = {
   initialValues: StepFourInitialValues;
 };
 
+const STRIPE_VERIFY_REQUEST_TIMEOUT_MS = 20_000;
+
 export function StepFourForm({ initialValues }: StepFourFormProps) {
   const router = useRouter();
   const [stripeSecretKey, setStripeSecretKey] = useState("");
@@ -103,7 +105,15 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
       await saveSettings();
       setStripeSecretKey("");
 
-      const response = await fetch("/api/setup/step-4/verify", { method: "POST" });
+      const abortController = new AbortController();
+      const verifyTimeoutId = setTimeout(
+        () => abortController.abort(),
+        STRIPE_VERIFY_REQUEST_TIMEOUT_MS,
+      );
+      const response = await fetch("/api/setup/step-4/verify", {
+        method: "POST",
+        signal: abortController.signal,
+      }).finally(() => clearTimeout(verifyTimeoutId));
       const body = (await response.json().catch(() => null)) as
         | { ok?: boolean; error?: string; verifiedAt?: string; message?: string }
         | null;
@@ -117,6 +127,18 @@ export function StepFourForm({ initialValues }: StepFourFormProps) {
       setLastError(null);
       setNotice(body.message ?? "Stripe verification succeeded.");
     } catch (verifyError) {
+      if (
+        verifyError instanceof DOMException &&
+        verifyError.name === "AbortError"
+      ) {
+        setVerified(false);
+        const timeoutMessage =
+          "Stripe verification timed out. Check network egress and try again.";
+        setLastError(timeoutMessage);
+        setError(timeoutMessage);
+        return;
+      }
+
       const message =
         verifyError instanceof Error
           ? verifyError.message

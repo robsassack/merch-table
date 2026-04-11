@@ -23,13 +23,24 @@ npm install
 cp .env.example .env
 ```
 
-3. Copy local Garage config from template:
+3. Choose storage mode:
+
+- Bundled Garage (default): copy local Garage config from template:
 
 ```bash
 cp infra/garage/garage.toml.example infra/garage/garage.toml
 ```
 
-4. Generate Garage secrets/tokens (recommended before first run):
+- External S3-compatible storage: skip `garage.toml` and set these in `.env`:
+  - `STORAGE_MODE="S3"`
+  - `STORAGE_BUCKET`
+  - `STORAGE_REGION`
+  - `STORAGE_ENDPOINT` (optional for AWS S3, required for S3-compatible providers)
+  - `STORAGE_ACCESS_KEY_ID`
+  - `STORAGE_SECRET_ACCESS_KEY`
+  - `STORAGE_USE_PATH_STYLE` (`false` for AWS S3, often `true` for some compatible providers)
+
+4. If using bundled Garage, generate Garage secrets/tokens (recommended before first run):
 
 ```bash
 RPC_SECRET="$(openssl rand -hex 32)"
@@ -43,7 +54,10 @@ sed -i \
   infra/garage/garage.toml
 ```
 
-5. (Recommended) set storage credentials in `.env` (must match what bootstrap will import):
+5. Set storage credentials in `.env`:
+
+- For bundled Garage, credentials must match what Garage bootstrap imports.
+- For external S3-compatible storage, credentials must match your bucket provider.
 
 ```bash
 sed -i \
@@ -63,21 +77,35 @@ This project is Docker-first. Start with Docker Postgres unless you already run 
 
 ### Option A: Docker Compose (recommended)
 
+Fastest path for a fresh/full stack startup:
+
 ```bash
-docker compose up -d postgres redis garage
+npm run infra:up:all
 ```
 
-Equivalent npm script:
+Manual equivalent:
+
+```bash
+docker compose up -d
+npm run infra:garage:bootstrap
+```
+
+First-run timing note:
+- A cold first build (image pulls + dependency install + app build) commonly takes 8-20 minutes.
+- On slower hardware or networks, first startup can take 20-35 minutes.
+- Subsequent rebuilds are usually much faster due to Docker layer caching.
+
+Core services only (without `web`/`worker`, plus Garage bootstrap):
 
 ```bash
 npm run infra:up
 ```
 
-If you start services with plain `docker compose` commands, run this once after `garage` is up:
+`docker compose up` boots all services (`web`, `worker`, `postgres`, `redis`, `garage`), while `npm run infra:garage:bootstrap` initializes Garage layout/key/bucket.
 
-```bash
-npm run infra:garage:bootstrap
-```
+Compose networking note:
+- Keep host-run app values like `DATABASE_URL=...localhost...` and `REDIS_URL=...localhost...` for `npm run dev`.
+- Containers use service-name URLs by default (`postgres`, `redis`, `garage`) via `DOCKER_DATABASE_URL`, `DOCKER_REDIS_URL`, and `DOCKER_STORAGE_ENDPOINT`.
 
 Use this URL in `.env`:
 
@@ -91,19 +119,14 @@ Check service status:
 docker compose ps
 ```
 
-To start all services (including the `web` stub and transcode `worker`):
-
-```bash
-npm run infra:up:all
-```
-
 ## Primary Scripts
 
 ```bash
 npm run dev             # Next.js app
 npm run worker          # transcode worker (uses .env)
 npm run infra:up        # postgres + redis + garage + garage bootstrap
-npm run infra:up:web    # web stub + worker container
+npm run infra:up:web    # web + worker containers
+npm run infra:up:all    # full compose build/up + garage bootstrap
 npm run infra:down      # stop/remove compose stack
 npm run infra:ps        # compose service status
 npm run check           # db validate + lint + typecheck + tests
@@ -143,7 +166,8 @@ npm run stripe:trigger:checkout-complete
 - Docker Compose runs Garage from `infra/garage/garage.toml`.
 - A template is tracked at `infra/garage/garage.toml.example`; your local `garage.toml` is ignored by git.
 - The template intentionally uses placeholder token values; replace them before use.
-- `npm run infra:up`, `npm run infra:up:core`, and `npm run infra:up:all` automatically run `scripts/bootstrap-garage.sh` after containers start.
+- Run `npm run infra:garage:bootstrap` after Garage starts to initialize layout, key, and bucket.
+- `npm run infra:garage:bootstrap` is still available as a manual recovery utility.
 - The bootstrap script initializes a single-node layout, imports the S3 API key from `STORAGE_ACCESS_KEY_ID` / `STORAGE_SECRET_ACCESS_KEY`, creates `STORAGE_BUCKET`, and grants key access to that bucket.
 - If you override the default key pair, use a Garage-compatible key ID + secret pair.
 
@@ -181,6 +205,10 @@ If you only want to apply existing migrations (without creating new ones), use:
 ```bash
 npx prisma migrate deploy
 ```
+
+Docker deployment note:
+- The `web` container entrypoint runs `prisma migrate deploy` before `next start`.
+- If migrations fail, the `web` container exits non-zero.
 
 ## Verify DB Connectivity
 
@@ -232,6 +260,17 @@ After app startup, complete setup at `/setup`.
 - If no admin exists yet, the server logs a bootstrap setup link and token:
   - `[bootstrap] SETUP LINK: ...`
   - `[bootstrap] SETUP TOKEN: ...`
+- To view recent setup token logs from Docker:
+
+```bash
+docker compose logs --tail=200 web
+```
+
+- To stream logs while waiting for the token/link:
+
+```bash
+docker compose logs -f web
+```
 - Use the link (or paste the token on `/setup`) to unlock the wizard.
 - Token is single-use and expires after 30 minutes.
 
@@ -285,6 +324,11 @@ npx prisma generate
 ```
 
 ## Stripe Local Webhook Testing
+
+Required webhook events:
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+- `checkout.session.async_payment_failed`
 
 Run Stripe CLI forwarding in a second terminal while `npm run dev` is running:
 

@@ -61,7 +61,9 @@ export async function POST(request: Request) {
   try {
     const result = await verifyStripeConnection();
     return NextResponse.json({ ok: true, ...result });
-  } catch {
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown Stripe verify error.";
+    console.warn(`[setup] stripe verification failed: ${reason}`);
     const message = SAFE_EXTERNAL_ERROR_MESSAGES.stripeVerification;
     await markStripeVerificationFailed(message);
     return NextResponse.json({ ok: false, error: message }, { status: 400 });

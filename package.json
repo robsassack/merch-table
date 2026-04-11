@@ -8,7 +8,7 @@
     "build": "npm run -s db:generate && next build",
     "prestart": "npm run -s db:generate",
     "start": "next start",
-    "worker": "node --env-file=.env --import tsx src/worker/transcode-worker.ts",
+    "worker": "node --env-file-if-exists=.env --import tsx src/worker/transcode-worker.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\"",
     "lint": "eslint",
     "typecheck": "npm run -s db:generate && next typegen && tsc --noEmit",

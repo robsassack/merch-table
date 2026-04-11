@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
+import { GetObjectCommand } from "@aws-sdk/client-s3";
 
 import { prisma } from "@/lib/prisma";
+import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
+import { extractStorageKeyFromCoverImageUrl } from "@/lib/storage/cover-art";
 
 export const runtime = "nodejs";
+
+type BodyWithWebStream = {
+  transformToWebStream?: () => ReadableStream;
+};
 
 function resolveOptionalImageUrl(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -46,13 +53,38 @@ export async function GET(request: Request) {
       return createNoStoreRedirect(fallbackUrl);
     }
 
-    const logoProxyUrl = new URL("/api/cover", requestUrl);
-    logoProxyUrl.searchParams.set("url", organizationLogoUrl);
-    if (settings?.updatedAt) {
-      logoProxyUrl.searchParams.set("v", String(settings.updatedAt.getTime()));
+    const storageKey = extractStorageKeyFromCoverImageUrl(organizationLogoUrl);
+    if (!storageKey) {
+      return createNoStoreRedirect(fallbackUrl);
     }
 
-    return createNoStoreRedirect(logoProxyUrl);
+    const storage = getStorageAdapterFromEnv();
+    const object = await storage.getClient().send(
+      new GetObjectCommand({
+        Bucket: storage.bucket,
+        Key: storageKey,
+      }),
+    );
+
+    const body = object.Body as BodyWithWebStream | undefined;
+    const webStream = body?.transformToWebStream?.();
+    if (!webStream) {
+      return createNoStoreRedirect(fallbackUrl);
+    }
+
+    const response = new NextResponse(webStream, {
+      status: 200,
+      headers: {
+        "content-type": object.ContentType ?? "image/png",
+        "cache-control": "no-store, max-age=0, must-revalidate",
+      },
+    });
+
+    if (settings?.updatedAt) {
+      response.headers.set("x-favicon-version", String(settings.updatedAt.getTime()));
+    }
+
+    return response;
   } catch {
     return createNoStoreRedirect(fallbackUrl);
   }
