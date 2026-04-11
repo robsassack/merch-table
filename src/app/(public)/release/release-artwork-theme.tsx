@@ -3,33 +3,17 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
+import {
+  BRAND_FALLBACK_PALETTE,
+  DEFAULT_PALETTE,
+  type ReleasePalette,
+} from "@/lib/release-artwork-palette-shared";
+
 type ReleaseArtworkThemeProps = {
   coverSrc: string;
   hasArtwork: boolean;
+  initialPalette?: ReleasePalette | null;
   children: ReactNode;
-};
-
-type RgbColor = {
-  r: number;
-  g: number;
-  b: number;
-};
-
-type HslColor = {
-  h: number;
-  s: number;
-  l: number;
-};
-
-type ReleasePalette = {
-  accent: string;
-  accentHover: string;
-  accentSoft: string;
-  accentContrast: string;
-  accentText: string;
-  bgStart: string;
-  bgMid: string;
-  bgEnd: string;
 };
 
 const RELEASE_THEME_VARIABLE_ENTRIES: Array<[`--release-${string}`, keyof ReleasePalette]> = [
@@ -43,36 +27,10 @@ const RELEASE_THEME_VARIABLE_ENTRIES: Array<[`--release-${string}`, keyof Releas
   ["--release-bg-end", "bgEnd"],
 ];
 
-const DEFAULT_PALETTE: ReleasePalette = {
-  accent: "rgb(51 65 85)",
-  accentHover: "rgb(30 41 59)",
-  accentSoft: "rgb(203 213 225)",
-  accentContrast: "rgb(255 255 255)",
-  accentText: "rgb(30 41 59)",
-  bgStart: "rgb(232 238 247)",
-  bgMid: "rgb(226 236 255)",
-  bgEnd: "rgb(245 248 252)",
-};
-
-const BRAND_FALLBACK_PALETTE: ReleasePalette = {
-  accent: "rgb(16 185 129)",
-  accentHover: "rgb(5 150 105)",
-  accentSoft: "rgb(110 231 183)",
-  accentContrast: "rgb(255 255 255)",
-  accentText: "rgb(5 150 105)",
-  bgStart: "rgb(221 245 234)",
-  bgMid: "rgb(226 236 255)",
-  bgEnd: "rgb(248 251 250)",
-};
-
-const PALETTE_CACHE_KEY_PREFIX = "mt:release-palette:";
+type RgbColor = { r: number; g: number; b: number };
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
-}
-
-function rgbToCss(color: RgbColor) {
-  return `rgb(${color.r} ${color.g} ${color.b})`;
 }
 
 function mixColor(a: RgbColor, b: RgbColor, amount: number): RgbColor {
@@ -84,7 +42,11 @@ function mixColor(a: RgbColor, b: RgbColor, amount: number): RgbColor {
   };
 }
 
-function rgbToHsl(color: RgbColor): HslColor {
+function rgbToCss(color: RgbColor) {
+  return `rgb(${color.r} ${color.g} ${color.b})`;
+}
+
+function rgbToHsl(color: RgbColor) {
   const r = color.r / 255;
   const g = color.g / 255;
   const b = color.b / 255;
@@ -97,7 +59,6 @@ function rgbToHsl(color: RgbColor): HslColor {
   if (max !== min) {
     const delta = max - min;
     s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
-
     switch (max) {
       case r:
         h = (g - b) / delta + (g < b ? 6 : 0);
@@ -109,7 +70,6 @@ function rgbToHsl(color: RgbColor): HslColor {
         h = (r - g) / delta + 4;
         break;
     }
-
     h /= 6;
   }
 
@@ -135,16 +95,14 @@ function hueToRgb(p: number, q: number, t: number) {
   return p;
 }
 
-function hslToRgb(color: HslColor): RgbColor {
-  const h = color.h;
-  const s = clamp(color.s, 0, 1);
-  const l = clamp(color.l, 0, 1);
-
+function hslToRgb(input: { h: number; s: number; l: number }): RgbColor {
+  const h = input.h;
+  const s = clamp(input.s, 0, 1);
+  const l = clamp(input.l, 0, 1);
   if (s === 0) {
     const value = Math.round(l * 255);
     return { r: value, g: value, b: value };
   }
-
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
   return {
@@ -152,6 +110,15 @@ function hslToRgb(color: HslColor): RgbColor {
     g: Math.round(hueToRgb(p, q, h) * 255),
     b: Math.round(hueToRgb(p, q, h - 1 / 3) * 255),
   };
+}
+
+function normalizeAccent(color: RgbColor): RgbColor {
+  const hsl = rgbToHsl(color);
+  return hslToRgb({
+    h: hsl.h,
+    s: clamp(Math.max(hsl.s, 0.3), 0.3, 0.62),
+    l: clamp(hsl.l, 0.36, 0.5),
+  });
 }
 
 function resolveTextContrast(color: RgbColor): string {
@@ -167,7 +134,6 @@ function resolveRelativeLuminance(color: RgbColor): number {
     }
     return ((normalized + 0.055) / 1.055) ** 2.4;
   };
-
   const red = toLinear(color.r);
   const green = toLinear(color.g);
   const blue = toLinear(color.b);
@@ -182,193 +148,67 @@ function resolveContrastRatio(foreground: RgbColor, background: RgbColor): numbe
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function ensureMinimumTextContrast(
-  foreground: RgbColor,
-  background: RgbColor,
-  minimumContrastRatio = 4.5,
-): RgbColor {
-  if (resolveContrastRatio(foreground, background) >= minimumContrastRatio) {
-    return foreground;
+function ensureAccentContrast(
+  accent: RgbColor,
+  minContrast = 4.5,
+): { accent: RgbColor; contrastText: RgbColor } {
+  const white = { r: 255, g: 255, b: 255 };
+  const dark = { r: 17, g: 24, b: 39 };
+
+  const whiteContrast = resolveContrastRatio(white, accent);
+  const darkContrast = resolveContrastRatio(dark, accent);
+  const initialText = whiteContrast >= darkContrast ? white : dark;
+  if (Math.max(whiteContrast, darkContrast) >= minContrast) {
+    return { accent, contrastText: initialText };
   }
 
-  for (let step = 1; step <= 10; step += 1) {
-    const candidate = mixColor(foreground, { r: 0, g: 0, b: 0 }, step * 0.1);
-    if (resolveContrastRatio(candidate, background) >= minimumContrastRatio) {
-      return candidate;
+  // Nudge lightness only when needed to satisfy contrast.
+  const accentHsl = rgbToHsl(accent);
+  const shouldDarken = initialText === white;
+  for (let step = 1; step <= 8; step += 1) {
+    const candidate = hslToRgb({
+      h: accentHsl.h,
+      s: accentHsl.s,
+      l: clamp(accentHsl.l + (shouldDarken ? -1 : 1) * step * 0.04, 0.2, 0.8),
+    });
+    const nextWhite = resolveContrastRatio(white, candidate);
+    const nextDark = resolveContrastRatio(dark, candidate);
+    const nextText = nextWhite >= nextDark ? white : dark;
+    if (Math.max(nextWhite, nextDark) >= minContrast) {
+      return { accent: candidate, contrastText: nextText };
     }
   }
 
-  return mixColor(foreground, { r: 0, g: 0, b: 0 }, 1);
+  return { accent, contrastText: initialText };
 }
 
-function normalizeAccentColor(candidate: RgbColor) {
-  const hsl = rgbToHsl(candidate);
-  return hslToRgb({
-    h: hsl.h,
-    s: Math.max(hsl.s, 0.45),
-    l: clamp(hsl.l, 0.36, 0.56),
-  });
-}
+function buildPaletteFromDominant(dominant: RgbColor): ReleasePalette {
+  const { accent, contrastText } = ensureAccentContrast(dominant);
+  const accentHover = mixColor(accent, { r: 0, g: 0, b: 0 }, 0.16);
+  const accentSoft = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.46);
+  const bgStart = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.84);
+  const bgMid = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.9);
+  const bgEnd = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.95);
 
-function extractPaletteFromImage(image: HTMLImageElement): ReleasePalette {
-  try {
-    const canvas = document.createElement("canvas");
-    const sampleSize = 48;
-    canvas.width = sampleSize;
-    canvas.height = sampleSize;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-    if (!context) {
-      return DEFAULT_PALETTE;
-    }
-
-    context.drawImage(image, 0, 0, sampleSize, sampleSize);
-    const { data } = context.getImageData(0, 0, sampleSize, sampleSize);
-
-    let totalRed = 0;
-    let totalGreen = 0;
-    let totalBlue = 0;
-    let totalWeight = 0;
-    let selectedAccent: RgbColor | null = null;
-    let selectedAccentScore = Number.NEGATIVE_INFINITY;
-
-    for (let index = 0; index < data.length; index += 4) {
-      const alpha = data[index + 3] ?? 0;
-      if (alpha < 80) {
-        continue;
-      }
-
-      const red = data[index] ?? 0;
-      const green = data[index + 1] ?? 0;
-      const blue = data[index + 2] ?? 0;
-      const color = { r: red, g: green, b: blue };
-      const hsl = rgbToHsl(color);
-      const saturationWeight = 0.5 + hsl.s;
-
-      totalRed += red * saturationWeight;
-      totalGreen += green * saturationWeight;
-      totalBlue += blue * saturationWeight;
-      totalWeight += saturationWeight;
-
-      const chroma = Math.max(red, green, blue) - Math.min(red, green, blue);
-      const score = hsl.s * 1.7 - Math.abs(hsl.l - 0.47) * 0.8 + chroma / 255;
-      if (score > selectedAccentScore) {
-        selectedAccentScore = score;
-        selectedAccent = color;
-      }
-    }
-
-    if (!selectedAccent || totalWeight <= 0) {
-      return DEFAULT_PALETTE;
-    }
-
-    const averageColor: RgbColor = {
-      r: Math.round(totalRed / totalWeight),
-      g: Math.round(totalGreen / totalWeight),
-      b: Math.round(totalBlue / totalWeight),
-    };
-
-    const accent = normalizeAccentColor(selectedAccent);
-    const accentHover = mixColor(accent, { r: 0, g: 0, b: 0 }, 0.16);
-    const accentSoft = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.46);
-    const bgStart = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.78);
-    const bgMid = mixColor(averageColor, { r: 255, g: 255, b: 255 }, 0.84);
-    const bgEnd = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.93);
-    const accentText = ensureMinimumTextContrast(accentHover, bgEnd);
-
-    return {
-      accent: rgbToCss(accent),
-      accentHover: rgbToCss(accentHover),
-      accentSoft: rgbToCss(accentSoft),
-      accentContrast: resolveTextContrast(accent),
-      accentText: rgbToCss(accentText),
-      bgStart: rgbToCss(bgStart),
-      bgMid: rgbToCss(bgMid),
-      bgEnd: rgbToCss(bgEnd),
-    };
-  } catch {
-    return DEFAULT_PALETTE;
-  }
-}
-
-function isPalette(value: unknown): value is ReleasePalette {
-  if (!value || typeof value !== "object") {
-    return false;
-  }
-
-  const candidate = value as Partial<ReleasePalette>;
-  return (
-    typeof candidate.accent === "string" &&
-    typeof candidate.accentHover === "string" &&
-    typeof candidate.accentSoft === "string" &&
-    typeof candidate.accentContrast === "string" &&
-    typeof candidate.accentText === "string" &&
-    typeof candidate.bgStart === "string" &&
-    typeof candidate.bgMid === "string" &&
-    typeof candidate.bgEnd === "string"
-  );
-}
-
-function readCachedPalette(coverSrc: string) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    const raw = window.localStorage.getItem(`${PALETTE_CACHE_KEY_PREFIX}${coverSrc}`);
-    if (!raw) {
-      return null;
-    }
-
-    const parsed = JSON.parse(raw) as unknown;
-    return isPalette(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeCachedPalette(coverSrc: string, palette: ReleasePalette) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.setItem(`${PALETTE_CACHE_KEY_PREFIX}${coverSrc}`, JSON.stringify(palette));
-  } catch {
-    // Ignore storage failures; palette extraction still works without cache.
-  }
-}
-
-function clearCachedPalette(coverSrc: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.localStorage.removeItem(`${PALETTE_CACHE_KEY_PREFIX}${coverSrc}`);
-  } catch {
-    // Ignore storage failures.
-  }
-}
-
-function isSamePalette(a: ReleasePalette, b: ReleasePalette) {
-  return (
-    a.accent === b.accent &&
-    a.accentHover === b.accentHover &&
-    a.accentSoft === b.accentSoft &&
-    a.accentContrast === b.accentContrast &&
-    a.accentText === b.accentText &&
-    a.bgStart === b.bgStart &&
-    a.bgMid === b.bgMid &&
-    a.bgEnd === b.bgEnd
-  );
+  return {
+    accent: rgbToCss(accent),
+    accentHover: rgbToCss(accentHover),
+    accentSoft: rgbToCss(accentSoft),
+    accentContrast: rgbToCss(contrastText),
+    accentText: rgbToCss(accentHover),
+    bgStart: rgbToCss(bgStart),
+    bgMid: rgbToCss(bgMid),
+    bgEnd: rgbToCss(bgEnd),
+  };
 }
 
 export default function ReleaseArtworkTheme({
   coverSrc,
   hasArtwork,
+  initialPalette,
   children,
 }: ReleaseArtworkThemeProps) {
-  const [palette, setPalette] = useState<ReleasePalette>(DEFAULT_PALETTE);
+  const [palette, setPalette] = useState<ReleasePalette>(initialPalette ?? DEFAULT_PALETTE);
 
   useEffect(() => {
     if (!hasArtwork) {
@@ -376,63 +216,43 @@ export default function ReleaseArtworkTheme({
     }
 
     let active = true;
-    let frameId = 0;
-    const schedulePaletteUpdate = (nextPalette: ReleasePalette) => {
-      frameId = window.requestAnimationFrame(() => {
+    const image = new Image();
+    image.crossOrigin = "anonymous";
+    image.decoding = "async";
+    image.onload = async () => {
+      if (!active) {
+        return;
+      }
+
+      try {
+        const colorThief = await import("colorthief");
+        const color = await colorThief.getColor(image, { quality: 10 });
+        const rgb = color?.rgb();
+        if (!rgb) {
+          setPalette(initialPalette ?? DEFAULT_PALETTE);
+          return;
+        }
         if (!active) {
           return;
         }
-        setPalette(nextPalette);
-      });
-    };
-
-    const cachedPalette = readCachedPalette(coverSrc);
-    if (cachedPalette) {
-      schedulePaletteUpdate(cachedPalette);
-    } else {
-      schedulePaletteUpdate(DEFAULT_PALETTE);
-    }
-
-    const image = new Image();
-    image.decoding = "async";
-    image.src = coverSrc;
-
-    const applyPalette = () => {
-      if (!active) {
-        return;
-      }
-      const nextPalette = extractPaletteFromImage(image);
-      schedulePaletteUpdate(nextPalette);
-      if (!isSamePalette(nextPalette, DEFAULT_PALETTE)) {
-        writeCachedPalette(coverSrc, nextPalette);
-      } else {
-        clearCachedPalette(coverSrc);
+        setPalette(buildPaletteFromDominant({ r: rgb.r, g: rgb.g, b: rgb.b }));
+      } catch {
+        if (active) {
+          setPalette(initialPalette ?? DEFAULT_PALETTE);
+        }
       }
     };
-
     image.onerror = () => {
-      if (!active) {
-        return;
+      if (active) {
+        setPalette(initialPalette ?? DEFAULT_PALETTE);
       }
-      schedulePaletteUpdate(DEFAULT_PALETTE);
-      clearCachedPalette(coverSrc);
     };
-
-    image.onload = applyPalette;
-    image.crossOrigin = "anonymous";
     image.src = coverSrc;
-
-    if (image.complete && image.naturalWidth > 0 && image.naturalHeight > 0) {
-      applyPalette();
-    }
 
     return () => {
       active = false;
-      if (frameId) {
-        window.cancelAnimationFrame(frameId);
-      }
     };
-  }, [coverSrc, hasArtwork]);
+  }, [coverSrc, hasArtwork, initialPalette]);
 
   const activePalette = hasArtwork ? palette : BRAND_FALLBACK_PALETTE;
 
@@ -452,11 +272,10 @@ export default function ReleaseArtworkTheme({
           rootStyle.setProperty(variableName, previousValue);
           continue;
         }
-
         rootStyle.removeProperty(variableName);
       }
     };
-  }, [activePalette]);
+  }, [activePalette, coverSrc]);
 
   const style = useMemo(
     () =>
