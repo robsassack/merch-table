@@ -10,6 +10,7 @@ import {
 import { sendPurchaseConfirmationEmail } from "@/lib/checkout/purchase-confirmation-email";
 import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { decryptSecret } from "@/lib/crypto/secret-box";
+import { logEvent } from "@/lib/logging";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -457,6 +458,12 @@ export async function POST(request: Request) {
     );
   }
 
+  logEvent("info", "webhook.received", {
+    provider: "stripe",
+    eventType: event.type,
+    eventId: event.id,
+  });
+
   if (event.type === "charge.refunded" || event.type === "refund.updated") {
     const refundSynced = await handleRefundWebhookEvent(event);
     if (!refundSynced) {
@@ -507,6 +514,10 @@ export async function POST(request: Request) {
           emailStatus: "FAILED",
           emailSentAt: null,
         },
+      });
+      logEvent("warn", "email.failed", {
+        channel: "purchase_confirmation",
+        orderId: finalized.orderId,
       });
 
       return NextResponse.json(

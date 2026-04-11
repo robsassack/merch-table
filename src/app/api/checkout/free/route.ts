@@ -8,6 +8,7 @@ import {
   createBuyerLibraryTokenExpiresAt,
 } from "@/lib/checkout/buyer-library-link";
 import { sendFreeLibraryLinkEmail } from "@/lib/checkout/free-library-link-email";
+import { logEvent } from "@/lib/logging";
 import { ensureReleaseFilesForCheckout } from "@/lib/checkout/release-files";
 import { prisma } from "@/lib/prisma";
 import { checkoutRateLimitPolicies } from "@/lib/security/checkout-policies";
@@ -232,6 +233,10 @@ export async function POST(request: Request) {
           emailStatus: "FAILED",
           emailSentAt: null,
         },
+      });
+      logEvent("warn", "email.failed", {
+        channel: "free_library_link",
+        orderId: creationResult.orderId,
       });
 
       return NextResponse.json(

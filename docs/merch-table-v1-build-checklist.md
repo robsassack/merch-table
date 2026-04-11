@@ -358,8 +358,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Logging
 
-- [ ] Structured logs with event type tags (`webhook.received`, `email.failed`, `transcode.completed`, `download.served`)
-- [ ] Configurable log level via env var
+- [x] Structured logs with event type tags (`webhook.received`, `email.failed`, `transcode.completed`, `download.served`)
+- [x] Configurable log level via env var
 
 ---
 

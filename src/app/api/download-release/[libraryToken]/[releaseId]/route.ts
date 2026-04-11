@@ -21,6 +21,7 @@ import {
   type DownloadFormat,
   resolveReleaseFileFormat,
 } from "@/lib/checkout/download-format";
+import { logEvent } from "@/lib/logging";
 import { libraryRateLimitPolicies } from "@/lib/security/library-policies";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
@@ -254,6 +255,14 @@ export async function GET(request: Request, context: RouteContext) {
       reason: error instanceof Error ? error.message : "unknown_error",
     });
     output.destroy(error instanceof Error ? error : new Error("Could not build ZIP."));
+  });
+
+  logEvent("info", "download.served", {
+    kind: "release-zip",
+    releaseId,
+    requestedFormat,
+    zipMode,
+    fileCount: downloads.length,
   });
 
   return new NextResponse(output as unknown as BodyInit, {

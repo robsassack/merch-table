@@ -3,6 +3,7 @@ import path from "node:path";
 
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 
+import { logEvent } from "@/lib/logging";
 import { prisma } from "@/lib/prisma";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 
@@ -226,6 +227,13 @@ export async function processTranscodeQueueMessage(message: TranscodeQueueMessag
     if (markedSucceeded.count === 0) {
       return;
     }
+
+    logEvent("info", "transcode.completed", {
+      jobId: job.id,
+      kind: effectiveKind,
+      trackId: job.trackId,
+      sourceAssetId: job.sourceAssetId,
+    });
 
     if (effectiveKind === "DELIVERY_FORMATS") {
       await maybeQueueDeliveryReconcileJob({
