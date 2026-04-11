@@ -341,20 +341,20 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Rate limiting (Redis-backed, IP-based)
 
-- [ ] `POST /api/checkout/free` — strict limit
-- [ ] `GET /api/download/:entitlementToken/:releaseFileId` — moderate limit
-- [ ] `GET /api/download-release/:libraryToken/:releaseId` — moderate limit
-- [ ] `POST /api/admin/upload/upload-url` — moderate limit
-- [ ] `POST /api/checkout/session` — moderate limit
-- [ ] Thresholds configurable via env vars
-- [ ] 429 response with `Retry-After` header on exceeded limits
-- [ ] Stripe webhook explicitly excluded from rate limiting
+- [x] `POST /api/checkout/free` — strict limit
+- [x] `GET /api/download/:entitlementToken/:releaseFileId` — moderate limit
+- [x] `GET /api/download-release/:libraryToken/:releaseId` — moderate limit
+- [x] `POST /api/admin/upload/upload-url` — moderate limit
+- [x] `POST /api/checkout/session` — moderate limit
+- [x] Thresholds configurable via env vars
+- [x] 429 response with `Retry-After` header on exceeded limits
+- [x] Stripe webhook explicitly excluded from rate limiting
 
 ### Health endpoints
 
-- [ ] `GET /api/health/live` — app is running
-- [ ] `GET /api/health/ready` — app + all dependencies reachable; component-level status JSON
-- [ ] Suitable for Docker healthchecks
+- [x] `GET /api/health/live` — app is running
+- [x] `GET /api/health/ready` — app + all dependencies reachable; component-level status JSON
+- [x] Suitable for Docker healthchecks
 
 ### Logging
 
