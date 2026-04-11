@@ -38,6 +38,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
+      - name: Tool Versions
+        run: |
+          node -v
+          npm -v
+          npx prisma -v
+          npm ls prisma @prisma/client --depth=0
+
       - name: Prisma Validate
         run: npm run db:validate
 
