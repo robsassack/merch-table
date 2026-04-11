@@ -343,7 +343,6 @@ export default function ArtistBio({
 
   useEffect(() => {
     if (!collapsible) {
-      setCanCollapse(false);
       return;
     }
 
