@@ -331,14 +331,19 @@ export function OrderRowActions({ order }: { order: OrderRowActionData }) {
             className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
             role="dialog"
             aria-modal="true"
-            aria-label={`Order actions for ${orderState.orderNumber}`}
+            aria-labelledby="order-actions-dialog-title"
+            aria-describedby="order-actions-dialog-description"
           >
             <div className="flex min-h-full items-center justify-center p-4">
               <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-lg font-semibold text-zinc-100">Order Actions</h3>
-                    <p className="mt-1 text-sm text-zinc-400">{orderState.orderNumber}</p>
+                    <h3 id="order-actions-dialog-title" className="text-lg font-semibold text-zinc-100">
+                      Order Actions
+                    </h3>
+                    <p id="order-actions-dialog-description" className="mt-1 text-sm text-zinc-400">
+                      {orderState.orderNumber}
+                    </p>
                   </div>
                   <button
                     type="button"

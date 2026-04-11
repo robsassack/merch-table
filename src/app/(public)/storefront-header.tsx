@@ -103,7 +103,7 @@ export default async function StorefrontHeader({
           )}
           <p className="text-lg font-semibold tracking-tight">{brandLabel}</p>
         </Link>
-        <nav className={buyerTheme.nav}>
+        <nav className={buyerTheme.nav} aria-label="Primary">
           {showArtists ? (
             <Link
               href="/artists"

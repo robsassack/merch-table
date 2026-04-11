@@ -25,12 +25,15 @@ export function ReleaseManagementPurgeDialog(props: {
         className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
         role="dialog"
         aria-modal="true"
-        aria-label="Confirm release asset purge"
+        aria-labelledby="release-purge-dialog-title"
+        aria-describedby="release-purge-dialog-description"
       >
         <div className="flex min-h-full items-center justify-center p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-            <h3 className="text-lg font-semibold text-zinc-100">Confirm destructive action</h3>
-            <p className="mt-2 text-sm text-zinc-400">
+            <h3 id="release-purge-dialog-title" className="text-lg font-semibold text-zinc-100">
+              Confirm destructive action
+            </h3>
+            <p id="release-purge-dialog-description" className="mt-2 text-sm text-zinc-400">
               This permanently removes stored assets for{" "}
               <span className="font-semibold">{purgeDialogRelease.title}</span>. The release record
               remains for history and can no longer serve those files.

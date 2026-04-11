@@ -84,7 +84,8 @@ export function AdminSignOutButton() {
             className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
             role="dialog"
             aria-modal="true"
-            aria-label="Confirm admin sign out"
+            aria-labelledby="admin-signout-dialog-title"
+            aria-describedby="admin-signout-dialog-description"
             onClick={() => {
               if (isSubmitting) {
                 return;
@@ -97,8 +98,16 @@ export function AdminSignOutButton() {
                 className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
                 onClick={(event) => event.stopPropagation()}
               >
-                <h3 className="text-lg font-semibold text-zinc-100">Sign out of admin?</h3>
-                <p className="mt-2 text-sm text-zinc-400">
+                <h3
+                  id="admin-signout-dialog-title"
+                  className="text-lg font-semibold text-zinc-100"
+                >
+                  Sign out of admin?
+                </h3>
+                <p
+                  id="admin-signout-dialog-description"
+                  className="mt-2 text-sm text-zinc-400"
+                >
                   You will be returned to the admin sign-in page.
                 </p>
 

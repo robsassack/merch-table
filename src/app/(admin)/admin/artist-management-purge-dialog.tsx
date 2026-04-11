@@ -30,12 +30,15 @@ export function ArtistManagementPurgeDialog(props: ArtistManagementPurgeDialogPr
         className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/75"
         role="dialog"
         aria-modal="true"
-        aria-label="Confirm permanent artist purge"
+        aria-labelledby="artist-purge-dialog-title"
+        aria-describedby="artist-purge-dialog-description"
       >
         <div className="flex min-h-full items-center justify-center p-4">
           <div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-            <h3 className="text-lg font-semibold text-zinc-100">Confirm permanent purge</h3>
-            <p className="mt-2 text-sm text-zinc-400">
+            <h3 id="artist-purge-dialog-title" className="text-lg font-semibold text-zinc-100">
+              Confirm permanent purge
+            </h3>
+            <p id="artist-purge-dialog-description" className="mt-2 text-sm text-zinc-400">
               This will permanently remove <span className="font-semibold">{artist.name}</span>.
               Type the artist name to confirm.
             </p>
