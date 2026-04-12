@@ -153,6 +153,28 @@ npx prisma migrate status
 
 If this command succeeds and shows your migration state, your database connection is working.
 
+## SMTP Provider Recommendations
+
+Use a transactional email provider for production delivery.
+
+- Some options: Resend, Postmark, Amazon SES, Gmail
+
+For this project:
+
+- Set `EMAIL_PROVIDER="resend"` in `.env`
+- Configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL`
+- Keep SMTP credentials configured if you want the setup wizard SMTP test flow and/or SMTP-based sending paths
+
+## SPF And DKIM (Deliverability)
+
+Before going live, configure SPF and DKIM for your sender domain in DNS.
+
+- SPF authorizes your email provider to send mail for your domain.
+- DKIM signs outgoing mail so receiving servers can verify authenticity.
+
+Without SPF/DKIM, delivery quality is often poor (spam placement, throttling, or rejection).
+Follow your provider's domain-authentication guide (Resend/Postmark/Amazon SES) and verify domain status before production sends.
+
 ## Testing & CI
 
 Run local checks:

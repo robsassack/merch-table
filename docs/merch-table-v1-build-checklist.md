@@ -382,8 +382,8 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 - [x] `README` with project overview, prerequisites, quickstart
 - [x] `.env.example` with every variable, defaults, and commentary
-- [ ] Setup wizard walkthrough
-- [ ] SMTP provider recommendations (Resend primary, Postmark/SES alternatives, Gmail discouraged)
+- [x] Setup wizard walkthrough
+- [x] SMTP provider recommendations (Resend primary, Postmark/SES alternatives)
 - [ ] SPF/DKIM note for email deliverability
 - [ ] Postgres backup instructions (scheduled `pg_dump` example)
 - [ ] Garage asset backup (`mc mirror` example)
