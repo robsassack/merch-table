@@ -73,9 +73,9 @@ sed -i \
 
 This project is Docker-first. Start with Docker Postgres unless you already run Postgres locally.
 
-### Option A: Docker Compose (recommended)
+### Option A: Docker Compose
 
-Fastest path for a fresh/full stack startup:
+Fastest path for a full container startup (runtime/integration validation):
 
 ```bash
 npm run infra:up:all
@@ -182,8 +182,16 @@ docker rm -f merchtable-postgres merchtable-redis merchtable-garage
 
 ## Run the App
 
+For active development (recommended), run the app on the host for hot reload:
+
 ```bash
 npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+For full container validation instead, run:
+
+```bash
+npm run infra:up:all
+```
