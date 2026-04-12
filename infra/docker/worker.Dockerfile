@@ -10,6 +10,7 @@ ARG DATABASE_URL=postgresql://postgres:postgres@postgres:5432/merchtable?schema=
 ENV DATABASE_URL=$DATABASE_URL
 ENV NPM_CONFIG_UPDATE_NOTIFIER=false
 ENV NPM_CONFIG_PROGRESS=false
+RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,id=merchtable-worker-npm,target=/root/.npm,sharing=locked \

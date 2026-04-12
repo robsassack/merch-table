@@ -2,26 +2,22 @@
 
 ## Prerequisites
 
-- Node.js 22+
-- npm 10+
-- Docker 24+ (recommended for local Postgres + Garage)
-- PostgreSQL 15+ (local install or Docker)
+- Docker 24+
+- Node.js 22+ (needed for host dev commands)
+- npm 10+ (needed for host dev commands)
+- PostgreSQL 15+ (only if you are not using Docker Postgres)
 
-## Initial Setup
+## Quickstart (Docker-First)
 
-1. Install dependencies:
+This is the recommended path for first boot and demos.
 
-```bash
-npm install
-```
-
-2. Copy env file:
+1. Copy env file:
 
 ```bash
 cp .env.example .env
 ```
 
-3. Choose storage mode:
+2. Choose storage mode:
 
 - Bundled Garage (default): copy local Garage config from template:
 
@@ -38,7 +34,7 @@ cp infra/garage/garage.toml.example infra/garage/garage.toml
   - `STORAGE_SECRET_ACCESS_KEY`
   - `STORAGE_USE_PATH_STYLE` (`false` for AWS S3, often `true` for some compatible providers)
 
-4. If using bundled Garage, generate Garage secrets/tokens (recommended before first run):
+3. If using bundled Garage, generate Garage secrets/tokens (recommended before first run):
 
 ```bash
 RPC_SECRET="$(openssl rand -hex 32)"
@@ -52,10 +48,35 @@ sed -i \
   infra/garage/garage.toml
 ```
 
-5. Set storage credentials in `.env`:
+4. Set storage credentials in `.env`:
 
 - For bundled Garage, credentials must match what Garage bootstrap imports.
 - For external S3-compatible storage, credentials must match your bucket provider.
+- `admin_token` and `metrics_token` in `garage.toml` are **not** the S3 app credentials used by this app.
+- In this project, Garage S3 credentials come from `.env` values `STORAGE_ACCESS_KEY_ID` and `STORAGE_SECRET_ACCESS_KEY`, and the Garage bootstrap step imports them as key `merchtable-app-key`.
+- If you do nothing, defaults are:
+  - `STORAGE_ACCESS_KEY_ID="access-key-id"`
+  - `STORAGE_SECRET_ACCESS_KEY="secret-access-key"`
+- Recommended: generate your own values for local/shared environments:
+
+```bash
+STORAGE_ACCESS_KEY_ID_VALUE="merchtable-$(openssl rand -hex 4)"
+STORAGE_SECRET_ACCESS_KEY_VALUE="$(openssl rand -base64 48 | tr -d '\n')"
+
+sed -i \
+  -e "s|^STORAGE_ACCESS_KEY_ID=.*|STORAGE_ACCESS_KEY_ID=\"$STORAGE_ACCESS_KEY_ID_VALUE\"|" \
+  -e "s|^STORAGE_SECRET_ACCESS_KEY=.*|STORAGE_SECRET_ACCESS_KEY=\"$STORAGE_SECRET_ACCESS_KEY_VALUE\"|" \
+  .env
+```
+
+- For bundled Garage, set these values (and keep them aligned with Garage):
+  - `STORAGE_MODE="GARAGE"`
+  - `STORAGE_ENDPOINT="http://localhost:3900"` (matches Garage `[s3_api].api_bind_addr`)
+  - `STORAGE_REGION="us-east-1"` (matches Garage `[s3_api].s3_region`)
+  - `STORAGE_ACCESS_KEY_ID="<your-garage-key-id>"` (this is your S3 access key id for Garage, from `.env`)
+  - `STORAGE_SECRET_ACCESS_KEY="<your-garage-secret-key>"` (this is your S3 secret key for Garage, from `.env`)
+  - `STORAGE_BUCKET="media"` (or your chosen bucket name created in Garage bootstrap)
+  - `STORAGE_USE_PATH_STYLE="true"` (recommended for local Garage)
 
 ```bash
 sed -i \
@@ -64,28 +85,69 @@ sed -i \
   .env
 ```
 
-6. Update at least these values in `.env`:
+After setting/updating these values, import them into Garage:
+
+```bash
+bash ./scripts/bootstrap-garage.sh
+```
+
+Optional npm wrapper (same action):
+
+```bash
+npm run infra:garage:bootstrap
+```
+
+Optional verification:
+
+```bash
+docker compose exec -T garage /garage -c /etc/garage.toml key info merchtable-app-key
+```
+
+5. Update at least these values in `.env`:
 - `DATABASE_URL`
+- `APP_BASE_URL` (set this to your public app URL, for example `https://store.example.com`)
 - `AUTH_SECRET` (generate one with `openssl rand -base64 32`)
 - `APP_ENCRYPTION_KEY` (generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`)
 
-## Database Quickstart
+For hosted deployments, also review these URL/domain-related values:
 
-This project is Docker-first. Start with Docker Postgres unless you already run Postgres locally.
+- `STORAGE_PUBLIC_BASE_URL` (public media URL base; do not leave `localhost` in production)
+- `STORAGE_ENDPOINT` (S3 API endpoint for external object storage; keep local Garage endpoint only for local/dev)
+- `DOCKER_STORAGE_ENDPOINT` (container-network override for storage endpoint, if used)
+- `REDIS_URL` and `DATABASE_URL` hostnames (production infra hostnames instead of `localhost`)
+- `RESEND_FROM_EMAIL` (use a sender address on your verified domain)
 
-### Option A: Docker Compose
+Example command block:
 
-Fastest path for a full container startup (runtime/integration validation):
+```bash
+AUTH_SECRET_VALUE="$(openssl rand -base64 32 | tr -d '\n')"
+APP_ENCRYPTION_KEY_VALUE="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+DATABASE_URL_VALUE="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+APP_BASE_URL_VALUE="https://store.example.com"
+STORAGE_PUBLIC_BASE_URL_VALUE="https://media.example.com"
+RESEND_FROM_EMAIL_VALUE="no-reply@example.com"
+
+sed -i \
+  -e "s|^DATABASE_URL=.*|DATABASE_URL=\"$DATABASE_URL_VALUE\"|" \
+  -e "s|^APP_BASE_URL=.*|APP_BASE_URL=\"$APP_BASE_URL_VALUE\"|" \
+  -e "s|^STORAGE_PUBLIC_BASE_URL=.*|STORAGE_PUBLIC_BASE_URL=\"$STORAGE_PUBLIC_BASE_URL_VALUE\"|" \
+  -e "s|^RESEND_FROM_EMAIL=.*|RESEND_FROM_EMAIL=\"$RESEND_FROM_EMAIL_VALUE\"|" \
+  -e "s|^AUTH_SECRET=.*|AUTH_SECRET=\"$AUTH_SECRET_VALUE\"|" \
+  -e "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=\"$APP_ENCRYPTION_KEY_VALUE\"|" \
+  .env
+```
+
+6. Start the full stack:
+
+```bash
+docker compose up -d --build
+bash ./scripts/bootstrap-garage.sh
+```
+
+Optional npm wrapper (same action):
 
 ```bash
 npm run infra:up:all
-```
-
-Manual equivalent:
-
-```bash
-docker compose up -d
-npm run infra:garage:bootstrap
 ```
 
 First-run timing note:
@@ -96,8 +158,52 @@ First-run timing note:
 Core services only (without `web`/`worker`, plus Garage bootstrap):
 
 ```bash
+docker compose up -d postgres redis garage
+bash ./scripts/bootstrap-garage.sh
+```
+
+Optional npm wrapper (same action):
+
+```bash
 npm run infra:up
 ```
+
+7. Verify services:
+
+```bash
+docker compose ps
+```
+
+After services are up, continue with the setup wizard walkthrough in [`docs/setup-wizard.md`](./setup-wizard.md).
+
+## Host Dev Workflow (Optional)
+
+Use this when you want local hot reload with `npm run dev`.
+
+1. Install dependencies:
+
+```bash
+npm install
+```
+
+2. Start infrastructure only:
+
+```bash
+docker compose up -d postgres redis garage
+bash ./scripts/bootstrap-garage.sh
+```
+
+3. Run the app on host:
+
+```bash
+npm run dev
+```
+
+Open `http://localhost:3000`.
+
+## Database Setup Notes
+
+### Docker Postgres (recommended)
 
 Use this URL in `.env`:
 
@@ -105,13 +211,7 @@ Use this URL in `.env`:
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
 ```
 
-Check service status:
-
-```bash
-docker compose ps
-```
-
-### Option B: Local Postgres
+### Local Postgres (optional)
 
 1. Create database:
 
@@ -205,7 +305,7 @@ docker rm -f merchtable-postgres merchtable-redis merchtable-garage
 
 ## Run the App
 
-For active development (recommended), run the app on the host for hot reload:
+For active development, run the app on the host for hot reload:
 
 ```bash
 npm run dev
@@ -213,8 +313,9 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-For full container validation instead, run:
+For full container validation, run:
 
 ```bash
-npm run infra:up:all
+docker compose up -d --build
+bash ./scripts/bootstrap-garage.sh
 ```

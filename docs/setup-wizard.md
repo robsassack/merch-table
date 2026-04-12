@@ -35,6 +35,13 @@ This walkthrough assumes a fresh local stack and no existing admin account.
 ### 0) Start services
 
 ```bash
+docker compose up -d --build
+bash ./scripts/bootstrap-garage.sh
+```
+
+Optional npm wrapper (same action):
+
+```bash
 npm run infra:up:all
 ```
 

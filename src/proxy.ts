@@ -10,9 +10,20 @@ type AdminAuthStatusResponse = {
   authenticated: boolean;
 };
 
+function resolveProxyBaseUrl(request: NextRequest) {
+  const configured = process.env.APP_BASE_URL?.trim();
+  if (!configured) {
+    return request.nextUrl.origin;
+  }
+
+  return configured.replace(/\/+$/, "");
+}
+
 async function isSetupComplete(request: NextRequest) {
+  const baseUrl = resolveProxyBaseUrl(request);
+
   try {
-    const response = await fetch(`${request.nextUrl.origin}/api/setup/status`, {
+    const response = await fetch(`${baseUrl}/api/setup/status`, {
       method: "GET",
       cache: "no-store",
       headers: {
@@ -41,11 +52,13 @@ async function isSetupComplete(request: NextRequest) {
 }
 
 async function isAdminAuthenticated(request: NextRequest) {
+  const baseUrl = resolveProxyBaseUrl(request);
+
   try {
     const forwardedHeaders = new Headers(request.headers);
     forwardedHeaders.set("x-merch-table-proxy", "admin-auth-gate");
 
-    const response = await fetch(`${request.nextUrl.origin}/api/admin/auth/status`, {
+    const response = await fetch(`${baseUrl}/api/admin/auth/status`, {
       method: "GET",
       cache: "no-store",
       headers: forwardedHeaders,
