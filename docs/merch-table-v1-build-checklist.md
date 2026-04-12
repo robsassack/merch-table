@@ -380,7 +380,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 > Goal: A self-hoster can deploy and operate without asking you questions.
 
-- [ ] `README` with project overview, prerequisites, quickstart
+- [x] `README` with project overview, prerequisites, quickstart
 - [ ] `.env.example` with every variable, defaults, and commentary
 - [ ] Setup wizard walkthrough
 - [ ] SMTP provider recommendations (Resend primary, Postmark/SES alternatives, Gmail discouraged)
