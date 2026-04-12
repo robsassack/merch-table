@@ -26,6 +26,131 @@ docker compose logs -f web
 - Step 3: Storage (Bundled Garage or External S3-compatible provider, with validation gate for external)
 - Step 4: Stripe (secret key + webhook secret + verify connection)
 - Step 5: Admin account (admin email + send first one-time magic-link via Step 2 SMTP; opening the link finalizes setup and redirects to `/admin`)
+- Step 6: Confirmation (marks setup complete and sets store status to `PRIVATE`)
+
+## Setup Wizard Walkthrough
+
+This walkthrough assumes a fresh local stack and no existing admin account.
+
+### 0) Start services
+
+```bash
+npm run infra:up:all
+```
+
+Wait until `web`, `postgres`, `redis`, and `garage` are up.
+
+### 1) Get bootstrap token/link
+
+```bash
+docker compose logs --tail=200 web
+```
+
+Look for:
+
+- `[bootstrap] SETUP LINK: ...`
+- `[bootstrap] SETUP TOKEN: ...`
+
+Open the setup link. You can also open `/setup` and paste the token manually.
+
+### 2) Step 1: Store basics
+
+Enter:
+
+- Organization name
+- Store name
+- Contact email
+- Currency (ISO code)
+
+Click continue.
+
+Expected result:
+
+- Step saves successfully
+- Wizard advances to Step 2
+
+### 3) Step 2: Email (SMTP) + test gate
+
+Enter SMTP settings and run the test email action.
+
+Required to continue:
+
+- Test email succeeds
+
+Common failures:
+
+- Auth error: verify username/password
+- TLS/port mismatch: check `SMTP_SECURE` and SMTP port pairing
+- Sender rejected: validate `SMTP_FROM`
+
+### 4) Step 3: Storage
+
+Choose one:
+
+- Bundled Garage (default local setup)
+- External S3-compatible storage
+
+If external S3 is selected, storage validation must pass before continuing.
+
+### 5) Step 4: Stripe
+
+Enter:
+
+- Stripe secret key
+- Stripe webhook secret
+
+Run the verify connection action.
+
+Required to continue:
+
+- Stripe verification succeeds
+
+### 6) Step 5: Admin account
+
+Enter admin email and send the first magic-link. Open the email link to finalize account bootstrap.
+
+Fallback:
+
+- If SMTP is unavailable, use the bootstrap-token fallback path in the wizard.
+
+### 7) Step 6: Confirmation and finish
+
+Confirm setup to finalize:
+
+- `setupComplete = true`
+- `storeStatus = PRIVATE`
+
+Expected result:
+
+- Redirect to `/admin`
+
+## Post-Setup Verification
+
+Run these checks after finishing the wizard:
+
+1. Admin login works at `/admin/auth`.
+2. Public routes show coming-soon behavior while store is `PRIVATE`.
+3. `GET /api/health/ready` reports dependencies as healthy.
+4. Admin upload URL flow succeeds.
+
+## Step-Specific Troubleshooting
+
+### Step 2 (SMTP) fails
+
+- Re-check `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, username, and password.
+- Confirm your provider allows your sender/domain configuration.
+
+### Step 3 (Storage) fails
+
+- Verify bucket exists and credentials can read/write.
+- For S3-compatible providers, try `STORAGE_USE_PATH_STYLE=true` if virtual-host mode fails.
+- Confirm endpoint and region are correct.
+
+### Step 4 (Stripe) fails
+
+- Confirm key type/environment (test vs live) matches your expectation.
+- Confirm network egress to Stripe API.
+- Increase `STRIPE_VERIFY_TIMEOUT_MS` if verification times out.
 
 Setup secret handling:
 - SMTP password, storage secret access key, Stripe secret key, and Stripe webhook secret are encrypted at rest in `SetupWizardState`.
