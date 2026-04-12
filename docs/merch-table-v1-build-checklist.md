@@ -385,9 +385,9 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] Setup wizard walkthrough
 - [x] SMTP provider recommendations (Resend primary, Postmark/SES alternatives)
 - [x] SPF/DKIM note for email deliverability
-- [ ] Postgres backup instructions (scheduled `pg_dump` example)
-- [ ] Garage asset backup (`mc mirror` example)
-- [ ] Migration from bundled Garage to external S3
+- [x] Postgres backup instructions (scheduled `pg_dump` example)
+- [x] Garage asset backup (`mc mirror` example)
+- [x] Migration from bundled Garage to external S3
 - [ ] Upgrading section: `docker compose pull && up -d`, snapshot before upgrade, rollback instructions
 - [ ] What must survive a container wipe (Postgres volume, Garage volume / S3 bucket, `.env`)
 - [ ] Auth secret rotation note (invalidates sessions/magic links)

@@ -157,7 +157,8 @@ If this command succeeds and shows your migration state, your database connectio
 
 Use a transactional email provider for production delivery.
 
-- Some options: Resend, Postmark, Amazon SES, Gmail
+- Primary recommendation: Resend
+- Good alternatives: Postmark, Amazon SES
 
 For this project:
 

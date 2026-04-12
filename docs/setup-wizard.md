@@ -133,26 +133,10 @@ Run these checks after finishing the wizard:
 3. `GET /api/health/ready` reports dependencies as healthy.
 4. Admin upload URL flow succeeds.
 
-## SMTP Provider Recommendations
+Email provider and deliverability guidance lives in [`docs/setup.md`](./setup.md):
 
-For production email delivery, use a transactional provider.
-
-- Some options: Resend, Postmark, Amazon SES, Gmail
-
-If you use Resend, configure:
-
-- `EMAIL_PROVIDER="resend"`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
-
-## SPF And DKIM (Deliverability)
-
-For reliable inbox delivery, configure SPF and DKIM for your sender domain before production use.
-
-- SPF authorizes the sending provider for your domain.
-- DKIM adds a verifiable cryptographic signature to outgoing messages.
-
-Set these records based on your provider's instructions (Resend/Postmark/Amazon SES), then confirm the domain is verified in the provider dashboard.
+- [SMTP Provider Recommendations](./setup.md#smtp-provider-recommendations)
+- [SPF And DKIM (Deliverability)](./setup.md#spf-and-dkim-deliverability)
 
 ## Step-Specific Troubleshooting
 
