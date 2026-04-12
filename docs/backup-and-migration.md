@@ -5,6 +5,7 @@ Operational runbook for:
 - Scheduled Postgres backups (`pg_dump`)
 - Garage asset backups (`mc mirror`)
 - Migration from bundled Garage to external S3
+- Application upgrades with pre-upgrade snapshots and rollback
 
 Assumptions:
 
@@ -158,3 +159,193 @@ docker compose up -d web worker
 ```
 
 Because object keys are unchanged, rollback is config-only if Garage data remains intact.
+
+## 4) Upgrading (Images Or Source) With Rollback
+
+Use this section for routine upgrades. It covers both:
+
+- Docker image refresh (`docker compose pull && up -d`)
+- Source-code update (`git pull`) followed by rebuild/restart
+
+### Pre-upgrade snapshot checklist
+
+1. Create a Postgres backup:
+
+```bash
+mkdir -p backups/postgres
+docker compose exec -T postgres \
+  pg_dump -U postgres -d merchtable -F c -Z 9 \
+  > "backups/postgres/pre-upgrade-$(date +%F-%H%M%S).dump"
+```
+
+2. Snapshot assets (incremental mirror):
+
+```bash
+mc mirror --overwrite garage/media backup/merchtable-media-backup
+```
+
+3. Record currently running revision (if using git checkout deploys):
+
+```bash
+git rev-parse HEAD
+```
+
+### Path A: Upgrade by pulling published images
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Validate:
+
+```bash
+docker compose ps
+curl -sS -I http://localhost:3000/api/health/live
+curl -sS -I http://localhost:3000/api/health/ready
+```
+
+### Path B: Upgrade by pulling latest code (`git pull`)
+
+```bash
+git fetch --all --prune
+git pull --ff-only
+docker compose up -d --build
+```
+
+Validate:
+
+```bash
+docker compose ps
+curl -sS -I http://localhost:3000/api/health/live
+curl -sS -I http://localhost:3000/api/health/ready
+```
+
+### Rollback
+
+Choose rollback method based on how you upgraded.
+
+Image-based rollback:
+
+1. Pin the previous known-good image tags in `docker-compose.yml` (or restore previous compose file).
+2. Restart services:
+
+```bash
+docker compose up -d
+```
+
+Git/source rollback:
+
+1. Return to previous commit:
+
+```bash
+git checkout <previous-commit-sha>
+```
+
+2. Rebuild and restart:
+
+```bash
+docker compose up -d --build
+```
+
+If a DB migration caused the regression:
+
+1. Stop app services (`web` and `worker`).
+2. Restore the pre-upgrade Postgres dump to the target database.
+3. Restart services and re-check health endpoints.
+
+## 5) What Must Survive A Container Wipe
+
+If containers are recreated or removed, the following state must survive to avoid data loss:
+
+- Postgres data: Docker volume `postgres_data` (or external managed Postgres data)
+- Asset data:
+  - bundled Garage mode: Docker volume `garage_data`
+  - external storage mode: external S3 bucket objects
+- App secrets/config: `.env` (or equivalent secret manager values)
+
+### Safe vs unsafe compose commands
+
+Safe for data volumes:
+
+```bash
+docker compose down
+```
+
+Destructive for named volumes:
+
+```bash
+docker compose down -v
+```
+
+`down -v` deletes `postgres_data`, `redis_data`, and `garage_data`. If used, restore from backups before returning to production traffic.
+
+### Recovery checklist after a wipe
+
+1. Restore `.env` with correct production values.
+2. Restore Postgres data:
+   - either attach original `postgres_data` volume
+   - or restore from the latest `pg_dump` backup
+3. Restore asset data:
+   - Garage mode: restore `garage_data` or mirror objects back into Garage bucket
+   - S3 mode: verify external bucket objects are intact and credentials are valid
+4. Start services:
+
+```bash
+docker compose up -d
+```
+
+5. Verify system state:
+   - `GET /api/health/live`
+   - `GET /api/health/ready`
+   - admin login
+   - sample upload + download flow
+
+## 6) Auth Secret Rotation
+
+`AUTH_SECRET` signs auth/session-related tokens. Rotation is a manual operational change.
+
+Impact of rotation:
+
+- Existing authenticated sessions become invalid.
+- Outstanding magic-link tokens signed with the previous secret stop working.
+- Users/admins may need to sign in again.
+
+### When to rotate
+
+- Suspected secret exposure
+- Scheduled security rotation policy
+- Team/security event requiring credential turnover
+
+### Rotation procedure
+
+1. Schedule a maintenance window and notify admins that sign-in sessions will be reset.
+2. Generate a new secret value (example):
+
+```bash
+openssl rand -base64 32
+```
+
+3. Update `AUTH_SECRET` in `.env` (or your secret manager/deploy environment).
+4. Restart services so all instances use the new secret:
+
+```bash
+docker compose up -d web worker
+```
+
+5. Validate:
+   - `GET /api/health/ready`
+   - new admin magic-link login at `/admin/auth`
+   - existing session cookies are expected to be invalidated
+
+### Rollback
+
+If rotation causes an incident, restore the previous `AUTH_SECRET` and restart services:
+
+```bash
+docker compose up -d web worker
+```
+
+Rollback note:
+
+- Any tokens issued after rotation with the new secret will become invalid once you roll back to the old secret.
