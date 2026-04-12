@@ -30,6 +30,7 @@ Merch Table is a Next.js + Prisma app for running a digital music storefront for
 
 ## Documentation
 
+- [Environment Variables Reference](docs/env.md): canonical env var list, defaults, and behavior notes
 - [Setup Guide](docs/setup.md): prerequisites, environment, local stack startup, migrations, tests, troubleshooting
 - [Worker and Storage](docs/worker-and-storage.md): transcode worker behavior, Garage notes, networking
 - [Setup Wizard](docs/setup-wizard.md): bootstrap flow, wizard steps, security behavior, env flags
