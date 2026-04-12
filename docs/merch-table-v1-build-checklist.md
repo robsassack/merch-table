@@ -384,7 +384,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 - [x] `.env.example` with every variable, defaults, and commentary
 - [x] Setup wizard walkthrough
 - [x] SMTP provider recommendations (Resend primary, Postmark/SES alternatives)
-- [ ] SPF/DKIM note for email deliverability
+- [x] SPF/DKIM note for email deliverability
 - [ ] Postgres backup instructions (scheduled `pg_dump` example)
 - [ ] Garage asset backup (`mc mirror` example)
 - [ ] Migration from bundled Garage to external S3
