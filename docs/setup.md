@@ -57,11 +57,17 @@ sed -i \
 - If you do nothing, defaults are:
   - `STORAGE_ACCESS_KEY_ID="access-key-id"`
   - `STORAGE_SECRET_ACCESS_KEY="secret-access-key"`
-- Recommended: generate your own values for local/shared environments:
+- For Garage v2.x, credentials must follow Garage's expected format:
+  - `STORAGE_ACCESS_KEY_ID`: starts with `GK` followed by 24 hex chars (26 chars total)
+  - `STORAGE_SECRET_ACCESS_KEY`: 64 hex chars (32 bytes)
+- Recommended: generate Garage-compatible values:
 
 ```bash
-STORAGE_ACCESS_KEY_ID_VALUE="merchtable-$(openssl rand -hex 4)"
-STORAGE_SECRET_ACCESS_KEY_VALUE="$(openssl rand -base64 48 | tr -d '\n')"
+STORAGE_ACCESS_KEY_ID_VALUE="GK$(openssl rand -hex 12)"
+STORAGE_SECRET_ACCESS_KEY_VALUE="$(openssl rand -hex 32)"
+
+echo "KEY_ID_LEN=${#STORAGE_ACCESS_KEY_ID_VALUE}"         # expected: 26
+echo "SECRET_KEY_LEN=${#STORAGE_SECRET_ACCESS_KEY_VALUE}" # expected: 64
 
 sed -i \
   -e "s|^STORAGE_ACCESS_KEY_ID=.*|STORAGE_ACCESS_KEY_ID=\"$STORAGE_ACCESS_KEY_ID_VALUE\"|" \
@@ -101,6 +107,15 @@ Optional verification:
 
 ```bash
 docker compose exec -T garage /garage -c /etc/garage.toml key info merchtable-app-key
+docker compose exec -T garage /garage -c /etc/garage.toml bucket list
+```
+
+If bootstrap/import fails with layout errors, inspect and apply the next layout version:
+
+```bash
+docker compose exec -T garage /garage -c /etc/garage.toml layout show
+# If current is N, apply N+1
+docker compose exec -T garage /garage -c /etc/garage.toml layout apply --version <NEXT_VERSION>
 ```
 
 5. Update at least these values in `.env`:
@@ -109,11 +124,15 @@ docker compose exec -T garage /garage -c /etc/garage.toml key info merchtable-ap
 - `AUTH_SECRET` (generate one with `openssl rand -base64 32`)
 - `APP_ENCRYPTION_KEY` (generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`)
 
+Production note:
+
+- Do not keep the default Postgres password (`postgres`). Use a strong password and set it consistently in both Postgres and `DATABASE_URL`.
+
 For hosted deployments, also review these URL/domain-related values:
 
 - `STORAGE_PUBLIC_BASE_URL` (public media URL base; do not leave `localhost` in production)
-- `STORAGE_ENDPOINT` (S3 API endpoint for external object storage; keep local Garage endpoint only for local/dev)
-- `DOCKER_STORAGE_ENDPOINT` (container-network override for storage endpoint, if used)
+- `STORAGE_ENDPOINT` (used by host-run app; keep local Garage endpoint only for local/dev)
+- `DOCKER_STORAGE_ENDPOINT` (used by Docker Compose runtime for `web`/`worker`; this overrides container `STORAGE_ENDPOINT`)
 - `REDIS_URL` and `DATABASE_URL` hostnames (production infra hostnames instead of `localhost`)
 - `RESEND_FROM_EMAIL` (use a sender address on your verified domain)
 
@@ -124,17 +143,25 @@ AUTH_SECRET_VALUE="$(openssl rand -base64 32 | tr -d '\n')"
 APP_ENCRYPTION_KEY_VALUE="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
 DATABASE_URL_VALUE="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
 APP_BASE_URL_VALUE="https://store.example.com"
-STORAGE_PUBLIC_BASE_URL_VALUE="https://media.example.com"
+DOCKER_STORAGE_ENDPOINT_VALUE="https://store.example.com"
+STORAGE_PUBLIC_BASE_URL_VALUE="https://store.example.com/media"
 RESEND_FROM_EMAIL_VALUE="no-reply@example.com"
 
 sed -i \
   -e "s|^DATABASE_URL=.*|DATABASE_URL=\"$DATABASE_URL_VALUE\"|" \
   -e "s|^APP_BASE_URL=.*|APP_BASE_URL=\"$APP_BASE_URL_VALUE\"|" \
+  -e "s|^DOCKER_STORAGE_ENDPOINT=.*|DOCKER_STORAGE_ENDPOINT=\"$DOCKER_STORAGE_ENDPOINT_VALUE\"|" \
   -e "s|^STORAGE_PUBLIC_BASE_URL=.*|STORAGE_PUBLIC_BASE_URL=\"$STORAGE_PUBLIC_BASE_URL_VALUE\"|" \
   -e "s|^RESEND_FROM_EMAIL=.*|RESEND_FROM_EMAIL=\"$RESEND_FROM_EMAIL_VALUE\"|" \
   -e "s|^AUTH_SECRET=.*|AUTH_SECRET=\"$AUTH_SECRET_VALUE\"|" \
   -e "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=\"$APP_ENCRYPTION_KEY_VALUE\"|" \
   .env
+```
+
+For same-domain Garage uploads behind Caddy, also set:
+
+```bash
+sed -i -e 's|^STORAGE_USE_PATH_STYLE=.*|STORAGE_USE_PATH_STYLE="true"|' .env
 ```
 
 6. Start the full stack:

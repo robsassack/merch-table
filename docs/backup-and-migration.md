@@ -13,6 +13,8 @@ Assumptions:
 - `.env` contains current runtime credentials
 - You run commands from repository root
 
+For targeted Garage outage/storage incident steps, see [`docs/worker-and-storage.md`](./worker-and-storage.md) and its "Recovery Playbook (Garage)" section.
+
 ## 1) Postgres Backup (Scheduled `pg_dump`)
 
 ### One-off backup
@@ -349,3 +351,39 @@ docker compose up -d web worker
 Rollback note:
 
 - Any tokens issued after rotation with the new secret will become invalid once you roll back to the old secret.
+
+## 7) Postgres Password Rotation
+
+Rotate Postgres credentials in a single coordinated change to avoid app outages.
+
+Impact of rotation:
+
+- If `DATABASE_URL` and the actual DB user password diverge, web/worker will fail with Prisma `P1000` authentication errors.
+
+### Rotation procedure
+
+1. Pick a new strong password.
+2. Update Postgres user password in the running database:
+
+```bash
+docker compose exec -T postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '<new-password>';"
+```
+
+3. Update `.env` `DATABASE_URL` with the same password.
+4. Recreate app containers so runtime env is refreshed:
+
+```bash
+docker compose up -d --force-recreate web worker
+```
+
+5. Validate:
+   - `curl -s http://127.0.0.1:3000/api/health/ready`
+   - `docker compose logs --tail=120 web` (no `P1000` auth errors)
+
+### Rollback
+
+If auth fails after rotation:
+
+1. Set DB password back to previous value with `ALTER USER`.
+2. Restore prior `DATABASE_URL` in `.env`.
+3. Recreate `web` and `worker` containers.

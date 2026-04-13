@@ -141,7 +141,14 @@ These are optional commented values in `.env.example` for container-to-container
 
 - `DOCKER_DATABASE_URL`
 - `DOCKER_REDIS_URL`
-- `DOCKER_STORAGE_ENDPOINT`
+- `DOCKER_STORAGE_ENDPOINT` (in Docker Compose, container `STORAGE_ENDPOINT` is sourced from this value)
+
+Hosted same-domain Garage note:
+
+- If your app runs at `https://<domain>` and Garage is reverse-proxied on `https://<domain>/media/...`, set:
+  - `DOCKER_STORAGE_ENDPOINT="https://<domain>"`
+  - `STORAGE_USE_PATH_STYLE="true"`
+  - `STORAGE_PUBLIC_BASE_URL="https://<domain>/media"`
 
 ## Notes
 
