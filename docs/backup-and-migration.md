@@ -164,10 +164,9 @@ Because object keys are unchanged, rollback is config-only if Garage data remain
 
 ## 4) Upgrading (Images Or Source) With Rollback
 
-Use this section for routine upgrades. It covers both:
-
-- Docker image refresh (`docker compose pull && up -d`)
-- Source-code update (`git pull`) followed by rebuild/restart
+Use this section for routine upgrades of this repository's default Docker Compose setup.
+By default, `web` and `worker` are built from local Dockerfiles, so routine upgrades are
+source-code updates (`git pull`) followed by rebuild/restart.
 
 ### Pre-upgrade snapshot checklist
 
@@ -192,22 +191,7 @@ mc mirror --overwrite garage/media backup/merchtable-media-backup
 git rev-parse HEAD
 ```
 
-### Path A: Upgrade by pulling published images
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-Validate:
-
-```bash
-docker compose ps
-curl -sS -I http://localhost:3000/api/health/live
-curl -sS -I http://localhost:3000/api/health/ready
-```
-
-### Path B: Upgrade by pulling latest code (`git pull`)
+### Upgrade by pulling latest code (`git pull`) and rebuilding
 
 ```bash
 git fetch --all --prune
@@ -224,19 +208,6 @@ curl -sS -I http://localhost:3000/api/health/ready
 ```
 
 ### Rollback
-
-Choose rollback method based on how you upgraded.
-
-Image-based rollback:
-
-1. Pin the previous known-good image tags in `docker-compose.yml` (or restore previous compose file).
-2. Restart services:
-
-```bash
-docker compose up -d
-```
-
-Git/source rollback:
 
 1. Return to previous commit:
 
@@ -255,6 +226,13 @@ If a DB migration caused the regression:
 1. Stop app services (`web` and `worker`).
 2. Restore the pre-upgrade Postgres dump to the target database.
 3. Restart services and re-check health endpoints.
+
+Optional registry-based upgrade path (only if you publish and pin `web`/`worker` images):
+
+```bash
+docker compose pull
+docker compose up -d
+```
 
 ## 5) What Must Survive A Container Wipe
 
