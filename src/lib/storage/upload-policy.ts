@@ -6,6 +6,8 @@ export const ALLOWED_UPLOAD_AUDIO_CONTENT_TYPES = new Set([
   "audio/wav",
   "audio/x-wav",
   "audio/wave",
+  "audio/vnd.wave",
+  "audio/x-pn-wav",
   "audio/flac",
   "audio/x-flac",
   "audio/aac",

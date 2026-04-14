@@ -39,6 +39,7 @@ export function moveItemInArray<T>(items: T[], fromIndex: number, toIndex: numbe
 const AUDIO_EXTENSION_TO_MIME: Record<string, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
+  wave: "audio/wav",
   flac: "audio/flac",
   aac: "audio/aac",
   m4a: "audio/mp4",
@@ -144,6 +145,36 @@ export function uploadViaSignedPut(input: {
   requiredHeaders: Record<string, string>;
   onProgress: (percent: number) => void;
 }) {
+  const extractUploadErrorDetail = (rawResponseText: string) => {
+    const responseText = rawResponseText.trim();
+    if (responseText.length === 0) {
+      return null;
+    }
+
+    try {
+      const parsed = JSON.parse(responseText) as { error?: unknown; message?: unknown };
+      if (typeof parsed.error === "string" && parsed.error.trim().length > 0) {
+        return parsed.error.trim();
+      }
+
+      if (typeof parsed.message === "string" && parsed.message.trim().length > 0) {
+        return parsed.message.trim();
+      }
+    } catch {
+      // Continue to XML/plain-text extraction below.
+    }
+
+    const xmlMessageMatch = responseText.match(/<Message>([\s\S]*?)<\/Message>/i);
+    if (xmlMessageMatch?.[1]) {
+      const xmlMessage = xmlMessageMatch[1].trim();
+      if (xmlMessage.length > 0) {
+        return xmlMessage;
+      }
+    }
+
+    return responseText.slice(0, 240);
+  };
+
   return new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", input.uploadUrl);
@@ -172,11 +203,22 @@ export function uploadViaSignedPut(input: {
         return;
       }
 
-      reject(new Error(`Upload failed with status ${xhr.status}.`));
+      const detail = extractUploadErrorDetail(xhr.responseText ?? "");
+      reject(
+        new Error(
+          detail
+            ? `Upload failed with status ${xhr.status}: ${detail}`
+            : `Upload failed with status ${xhr.status}.`,
+        ),
+      );
     };
 
     xhr.onerror = () => {
-      reject(new Error("Upload failed due to a network error."));
+      reject(
+        new Error(
+          "Upload failed due to a network error. Check storage CORS and upload URL expiry.",
+        ),
+      );
     };
 
     xhr.send(input.file);

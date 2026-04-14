@@ -70,6 +70,8 @@ export const ALLOWED_AUDIO_MIME_TYPES = new Set([
   "audio/wav",
   "audio/x-wav",
   "audio/wave",
+  "audio/vnd.wave",
+  "audio/x-pn-wav",
   "audio/flac",
   "audio/x-flac",
   "audio/aac",

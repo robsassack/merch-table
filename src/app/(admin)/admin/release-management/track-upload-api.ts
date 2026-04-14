@@ -91,18 +91,27 @@ export async function uploadTrackAsset(input: {
     !uploadUrlBody.bucket ||
     !uploadUrlBody.storageProvider
   ) {
-    throw new Error(uploadUrlBody?.error ?? "Could not create upload URL.");
+    throw new Error(
+      uploadUrlBody?.error ??
+        `Could not create upload URL for "${input.file.name}" (${input.contentType || "unknown type"}).`,
+    );
   }
 
-  await uploadViaSignedPut({
-    uploadUrl: uploadUrlBody.uploadUrl,
-    file: input.file,
-    contentType: input.contentType,
-    requiredHeaders: uploadUrlBody.requiredHeaders ?? {},
-    onProgress: (percent) => {
-      input.onProgress?.(percent);
-    },
-  });
+  try {
+    await uploadViaSignedPut({
+      uploadUrl: uploadUrlBody.uploadUrl,
+      file: input.file,
+      contentType: input.contentType,
+      requiredHeaders: uploadUrlBody.requiredHeaders ?? {},
+      onProgress: (percent) => {
+        input.onProgress?.(percent);
+      },
+    });
+  } catch (error) {
+    throw new Error(
+      `Could not upload "${input.file.name}" to storage: ${error instanceof Error ? error.message : "Unknown upload error."}`,
+    );
+  }
 
   const commitResponse = await fetch("/api/admin/upload/track-assets", {
     method: "POST",
@@ -121,7 +130,10 @@ export async function uploadTrackAsset(input: {
     .json()
     .catch(() => null)) as TrackAssetCommitResponse | null;
   if (!commitResponse.ok || !commitBody?.ok) {
-    throw new Error(commitBody?.error ?? "Could not attach uploaded asset to this track.");
+    throw new Error(
+      commitBody?.error ??
+        `Upload succeeded but attaching "${input.file.name}" to the track failed.`,
+    );
   }
 
   return commitBody;

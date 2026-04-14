@@ -177,7 +177,7 @@ export function ReleaseManagementTrackRowDetails(props: ReleaseManagementTrackRo
         <label className={buttonClassName}>
           <input
             type="file"
-            accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/flac,audio/x-flac,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/webm,audio/aiff,audio/x-aiff"
+            accept=".wav,.wave,audio/mpeg,audio/mp3,audio/wav,audio/x-wav,audio/wave,audio/vnd.wave,audio/x-pn-wav,audio/flac,audio/x-flac,audio/aac,audio/mp4,audio/x-m4a,audio/ogg,audio/webm,audio/aiff,audio/x-aiff"
             className="hidden"
             onChange={(event) => void controller.onInlineTrackFileChange(release.id, track, event)}
             disabled={disabled}

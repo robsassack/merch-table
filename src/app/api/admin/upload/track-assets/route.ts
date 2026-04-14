@@ -36,6 +36,8 @@ const MIME_TO_FORMAT: Record<string, string> = {
   "audio/wav": "wav",
   "audio/x-wav": "wav",
   "audio/wave": "wav",
+  "audio/vnd.wave": "wav",
+  "audio/x-pn-wav": "wav",
   "audio/flac": "flac",
   "audio/x-flac": "flac",
   "audio/aac": "aac",
@@ -50,11 +52,25 @@ const MIME_TO_FORMAT: Record<string, string> = {
 const LOSSLESS_FORMATS = new Set(["flac", "wav", "aiff", "aif", "alac"]);
 
 function isValidUploadedAudioStorageKey(storageKey: string) {
-  if (storageKey.includes("..")) {
+  const trimmed = storageKey.trim();
+  if (trimmed.length === 0 || trimmed.includes("\\")) {
     return false;
   }
 
-  return storageKey.startsWith("admin/uploads/");
+  const normalized = path.posix.normalize(trimmed);
+  if (normalized !== trimmed) {
+    return false;
+  }
+
+  if (
+    normalized === ".." ||
+    normalized.startsWith("../") ||
+    normalized.startsWith("/")
+  ) {
+    return false;
+  }
+
+  return normalized.startsWith("admin/uploads/");
 }
 
 function inferFormatFromFileName(fileName: string) {

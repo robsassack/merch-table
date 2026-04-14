@@ -197,6 +197,7 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       let failed = 0;
       let previewQueuedCount = 0;
       let deliveryQueuedCount = 0;
+      const failedImports: Array<{ fileName: string; error: string }> = [];
 
       for (const plannedImport of plannedImports) {
         try {
@@ -237,12 +238,18 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
           setTrackImportJobStatus(release.id, plannedImport.id, "uploaded");
           completed += 1;
         } catch (importError) {
+          const resolvedError =
+            importError instanceof Error ? importError.message : "Import failed.";
           setTrackImportJobStatus(
             release.id,
             plannedImport.id,
             "failed",
-            importError instanceof Error ? importError.message : "Import failed.",
+            resolvedError,
           );
+          failedImports.push({
+            fileName: plannedImport.fileName,
+            error: resolvedError,
+          });
           failed += 1;
         }
       }
@@ -255,7 +262,12 @@ export function createTrackImportUploadActions(input: TrackImportUploadActionsIn
       );
 
       if (failed > 0) {
-        setError(`${failed} import job${failed === 1 ? "" : "s"} failed. See status list below.`);
+        const firstFailure = failedImports[0];
+        setError(
+          firstFailure
+            ? `${failed} import job${failed === 1 ? "" : "s"} failed. First failure (${firstFailure.fileName}): ${firstFailure.error}`
+            : `${failed} import job${failed === 1 ? "" : "s"} failed. See status list below.`,
+        );
       }
     } catch (importError) {
       setError(importError instanceof Error ? importError.message : "Could not import tracks.");
