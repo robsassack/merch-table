@@ -22,6 +22,7 @@ function createReleaseRecord(input: {
     slug: `release-${input.id}`,
     description: null,
     coverImageUrl: null,
+    artworkPaletteJson: null,
     pricingMode: "FREE",
     fixedPriceCents: null,
     minimumPriceCents: null,
