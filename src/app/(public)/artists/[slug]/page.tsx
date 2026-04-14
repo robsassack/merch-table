@@ -10,14 +10,31 @@ import StorefrontHeader from "@/app/(public)/storefront-header";
 import { formatMinorAmount } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 const DEFAULT_COVER_SRC = "/default-artwork.png";
 
-function resolveCoverSrc(coverImageUrl: string | null) {
+function resolveVersionSearchParam(version: string | number | null | undefined) {
+  if (version === null || version === undefined) {
+    return "";
+  }
+
+  const normalized = String(version).trim();
+  if (normalized.length === 0) {
+    return "";
+  }
+
+  return `&v=${encodeURIComponent(normalized)}`;
+}
+
+function resolveCoverSrc(
+  coverImageUrl: string | null,
+  version?: string | number | null,
+) {
   if (!coverImageUrl) {
     return DEFAULT_COVER_SRC;
   }
-  return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
+  return `/api/cover?url=${encodeURIComponent(coverImageUrl)}${resolveVersionSearchParam(version)}`;
 }
 
 function resolveOptionalImageUrl(value: string | null | undefined) {
@@ -32,10 +49,12 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
 function resolveArtistAvatarSrc(input: {
   artistImageUrl: string | null | undefined;
   ownerImageUrl: string | null | undefined;
+  version?: string | number | null;
 }) {
+  const versionSearchParam = resolveVersionSearchParam(input.version);
   const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
   if (artistImageUrl) {
-    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}${versionSearchParam}`;
   }
 
   const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
@@ -43,7 +62,7 @@ function resolveArtistAvatarSrc(input: {
     return null;
   }
 
-  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}${versionSearchParam}`;
 }
 
 function resolveInitials(name: string) {
@@ -188,6 +207,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
       slug: true,
       name: true,
       imageUrl: true,
+      updatedAt: true,
       location: true,
       bio: true,
       owner: {
@@ -207,6 +227,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
           title: true,
           slug: true,
           coverImageUrl: true,
+          updatedAt: true,
           pricingMode: true,
           priceCents: true,
           fixedPriceCents: true,
@@ -230,6 +251,7 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
   const artistImageUrl = resolveArtistAvatarSrc({
     artistImageUrl: artist.imageUrl,
     ownerImageUrl: artist.owner?.image,
+    version: artist.updatedAt.getTime(),
   });
 
   return (
@@ -291,10 +313,12 @@ export default async function ArtistDetailPage({ params }: ArtistDetailPageProps
                     className="group relative block aspect-square w-full overflow-hidden border-b border-zinc-200 bg-zinc-100"
                   >
                     <Image
-                      src={resolveCoverSrc(release.coverImageUrl)}
+                      src={resolveCoverSrc(release.coverImageUrl, release.updatedAt.getTime())}
                       alt={`${release.title} cover`}
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                      placeholder="blur"
+                      blurDataURL={IMAGE_BLUR_DATA_URL}
                       className="object-cover transition-transform duration-300 ease-out group-hover:scale-[1.04]"
                     />
                   </Link>

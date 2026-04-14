@@ -1,11 +1,10 @@
-import Image from "next/image";
 import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { buyerTheme, resolveBrandGlyph } from "@/app/(public)/buyer-theme";
+import StorefrontBrandLogo from "@/app/(public)/storefront-brand-logo";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
-import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 export type StorefrontActivePage = "home" | "artists" | "find-my-purchases";
 
@@ -91,30 +90,11 @@ export default async function StorefrontHeader({
           className="flex items-center gap-3 rounded-md transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700"
           aria-current={activePage === "home" ? "page" : undefined}
         >
-          {organizationLogoUrl ? (
-            <Image
-              src={organizationLogoUrl}
-              alt={`${brandLabel} logo`}
-              width={320}
-              height={80}
-              sizes="(max-width: 768px) 56vw, 18rem"
-              priority
-              placeholder="blur"
-              blurDataURL={IMAGE_BLUR_DATA_URL}
-              className="block h-10 w-auto max-w-[min(56vw,18rem)] shrink-0 border-0 object-contain"
-              style={{
-                border: 0,
-                borderRadius: 0,
-                clipPath: "none",
-                WebkitClipPath: "none",
-                maskImage: "none",
-                WebkitMaskImage: "none",
-                overflow: "visible",
-              }}
-            />
-          ) : (
-            <span className={buyerTheme.brandBadge}>{brandGlyph}</span>
-          )}
+          <StorefrontBrandLogo
+            logoUrl={organizationLogoUrl}
+            brandLabel={brandLabel}
+            brandGlyph={brandGlyph}
+          />
           <p className="text-lg font-semibold tracking-tight">{brandLabel}</p>
         </Link>
         <nav className={buyerTheme.nav} aria-label="Primary">

@@ -7,6 +7,7 @@ import { buyerTheme } from "@/app/(public)/buyer-theme";
 import StorefrontHeader from "@/app/(public)/storefront-header";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 function resolveOptionalImageUrl(value: string | null | undefined) {
   if (typeof value !== "string") {
@@ -17,13 +18,28 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+function resolveVersionSearchParam(version: string | number | null | undefined) {
+  if (version === null || version === undefined) {
+    return "";
+  }
+
+  const normalized = String(version).trim();
+  if (normalized.length === 0) {
+    return "";
+  }
+
+  return `&v=${encodeURIComponent(normalized)}`;
+}
+
 function resolveArtistAvatarSrc(input: {
   artistImageUrl: string | null | undefined;
   ownerImageUrl: string | null | undefined;
+  version?: string | number | null;
 }) {
+  const versionSearchParam = resolveVersionSearchParam(input.version);
   const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
   if (artistImageUrl) {
-    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}${versionSearchParam}`;
   }
 
   const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
@@ -31,7 +47,7 @@ function resolveArtistAvatarSrc(input: {
     return null;
   }
 
-  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}${versionSearchParam}`;
 }
 
 function resolveInitials(name: string) {
@@ -63,6 +79,8 @@ function ArtistAvatar({
           alt={`${artistName} profile`}
           fill
           sizes="48px"
+          placeholder="blur"
+          blurDataURL={IMAGE_BLUR_DATA_URL}
           className="object-cover"
         />
       </span>
@@ -123,6 +141,7 @@ export default async function ArtistsPage() {
           slug: true,
           name: true,
           imageUrl: true,
+          updatedAt: true,
           location: true,
           bio: true,
           owner: {
@@ -185,6 +204,7 @@ export default async function ArtistsPage() {
                       artistImageUrl={resolveArtistAvatarSrc({
                         artistImageUrl: artist.imageUrl,
                         ownerImageUrl: artist.owner?.image,
+                        version: artist.updatedAt.getTime(),
                       })}
                     />
                     <div className="min-w-0">

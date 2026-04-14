@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 type ArtistImageDialogProps = {
   artistName: string;
@@ -56,6 +57,8 @@ export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogPro
           alt={`${artistName} profile`}
           width={64}
           height={64}
+          placeholder="blur"
+          blurDataURL={IMAGE_BLUR_DATA_URL}
           className="h-full w-full object-cover"
         />
       </button>
@@ -94,6 +97,8 @@ export function ArtistImageDialog({ artistName, imageUrl }: ArtistImageDialogPro
                     width={1600}
                     height={1600}
                     sizes="92vw"
+                    placeholder="blur"
+                    blurDataURL={IMAGE_BLUR_DATA_URL}
                     className="max-h-[calc(92vh-110px)] w-auto max-w-full rounded-xl border border-white/15 bg-white object-contain shadow-xl"
                   />
                 </div>
