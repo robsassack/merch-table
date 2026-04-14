@@ -52,8 +52,12 @@ export default function ReleaseDetailPurchaseCard({
   hasDownloadableTracks,
   hasOnlyLossyDownloads,
 }: ReleaseDetailPurchaseCardProps) {
+  const primaryActionStyle = {
+    backgroundColor: "var(--release-accent, rgb(51 65 85))",
+    color: "var(--release-accent-contrast, rgb(255 255 255))",
+  } as const;
   const primaryActionButtonClass =
-    "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-[var(--release-accent)] px-4 py-1.5 text-sm font-semibold text-[var(--release-accent-contrast)] transition hover:bg-[var(--release-accent-hover)]";
+    "inline-flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-emerald-600 bg-[var(--release-accent)] text-[var(--release-accent-contrast)] hover:bg-[var(--release-accent-hover)]";
   const { activeTrackId, isPlaybackVisuallyActive, playTrack } =
     useReleaseAudioPlayer();
 
@@ -327,6 +331,7 @@ export default function ReleaseDetailPurchaseCard({
           <button
             type="button"
             className={primaryActionButtonClass}
+            style={primaryActionStyle}
             onClick={() => {
               if (activeTrackId && playablePreviewTrackIds.includes(activeTrackId)) {
                 playTrack(activeTrackId);
@@ -362,7 +367,8 @@ export default function ReleaseDetailPurchaseCard({
           type="button"
           disabled={isSubmitting}
           onClick={openCheckoutDialog}
-          className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900`}
+          className={`${primaryActionButtonClass} disabled:cursor-not-allowed disabled:bg-emerald-200 disabled:bg-[var(--release-accent-soft)] disabled:text-zinc-900`}
+          style={primaryActionStyle}
         >
           {isSubmitting ? "Working..." : buyLabel}
         </button>

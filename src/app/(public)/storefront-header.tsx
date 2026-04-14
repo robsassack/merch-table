@@ -5,6 +5,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { buyerTheme, resolveBrandGlyph } from "@/app/(public)/buyer-theme";
 import { prisma } from "@/lib/prisma";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 export type StorefrontActivePage = "home" | "artists" | "find-my-purchases";
 
@@ -21,13 +22,20 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function resolveCoverProxySrc(value: string | null | undefined) {
+function resolveCoverProxySrc(
+  value: string | null | undefined,
+  version?: string | number | null,
+) {
   const imageUrl = resolveOptionalImageUrl(value);
   if (!imageUrl) {
     return null;
   }
 
-  return `/api/cover?url=${encodeURIComponent(imageUrl)}`;
+  const normalizedVersion =
+    version === null || version === undefined ? "" : String(version).trim();
+  const versionSearchParam =
+    normalizedVersion.length > 0 ? `&v=${encodeURIComponent(normalizedVersion)}` : "";
+  return `/api/cover?url=${encodeURIComponent(imageUrl)}${versionSearchParam}`;
 }
 
 export default async function StorefrontHeader({
@@ -44,6 +52,7 @@ export default async function StorefrontHeader({
       storeName: true,
       brandName: true,
       organizationLogoUrl: true,
+      updatedAt: true,
       organization: {
         select: {
           name: true,
@@ -66,7 +75,10 @@ export default async function StorefrontHeader({
     organizationName: settings?.organization?.name ?? null,
   });
   const brandGlyph = resolveBrandGlyph(brandLabel);
-  const organizationLogoUrl = resolveCoverProxySrc(settings?.organizationLogoUrl);
+  const organizationLogoUrl = resolveCoverProxySrc(
+    settings?.organizationLogoUrl,
+    settings?.updatedAt?.getTime() ?? null,
+  );
   const showArtists = artistCount > 1;
   const activeNavLinkClassName =
     "rounded-md px-1.5 py-0.5 font-semibold text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-700";
@@ -86,6 +98,9 @@ export default async function StorefrontHeader({
               width={320}
               height={80}
               sizes="(max-width: 768px) 56vw, 18rem"
+              priority
+              placeholder="blur"
+              blurDataURL={IMAGE_BLUR_DATA_URL}
               className="block h-10 w-auto max-w-[min(56vw,18rem)] shrink-0 border-0 object-contain"
               style={{
                 border: 0,
@@ -95,7 +110,6 @@ export default async function StorefrontHeader({
                 maskImage: "none",
                 WebkitMaskImage: "none",
                 overflow: "visible",
-                background: "transparent",
               }}
             />
           ) : (

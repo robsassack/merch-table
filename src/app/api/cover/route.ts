@@ -10,8 +10,21 @@ type BodyWithWebStream = {
   transformToWebStream?: () => ReadableStream;
 };
 
+function resolveRequestVersion(requestUrl: URL) {
+  const version = requestUrl.searchParams.get("v")?.trim();
+  return version && version.length > 0 ? version : null;
+}
+
+function resolveCacheControlHeader(requestUrl: URL) {
+  return resolveRequestVersion(requestUrl)
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=300, stale-while-revalidate=300";
+}
+
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const requestUrl = new URL(request.url);
+  const { searchParams } = requestUrl;
+  const cacheControl = resolveCacheControlHeader(requestUrl);
   const rawUrl = searchParams.get("url")?.trim();
   if (!rawUrl) {
     return NextResponse.json(
@@ -46,11 +59,23 @@ export async function GET(request: Request) {
       );
     }
 
+    const ifNoneMatch = request.headers.get("if-none-match");
+    if (object.ETag && ifNoneMatch?.split(",").some((token) => token.trim() === object.ETag)) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          "cache-control": cacheControl,
+          etag: object.ETag,
+        },
+      });
+    }
+
     return new NextResponse(webStream, {
       status: 200,
       headers: {
         "content-type": object.ContentType ?? "application/octet-stream",
-        "cache-control": "public, max-age=300, stale-while-revalidate=300",
+        "cache-control": cacheControl,
+        ...(object.ETag ? { etag: object.ETag } : {}),
       },
     });
   } catch {

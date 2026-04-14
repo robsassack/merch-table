@@ -3,8 +3,13 @@
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 
+import { buildPaletteFromDominant } from "@/lib/release-artwork-palette-builder";
+import { pickDominantArtworkColor } from "@/lib/release-artwork-dominant";
 import {
-  BRAND_FALLBACK_PALETTE,
+  RELEASE_ARTWORK_PALETTE_COOKIE_NAME,
+  serializeReleaseArtworkPaletteCookie,
+} from "@/lib/release-artwork-palette-cookie";
+import {
   DEFAULT_PALETTE,
   type ReleasePalette,
 } from "@/lib/release-artwork-palette-shared";
@@ -27,165 +32,47 @@ const RELEASE_THEME_VARIABLE_ENTRIES: Array<[`--release-${string}`, keyof Releas
   ["--release-bg-end", "bgEnd"],
 ];
 
-type RgbColor = { r: number; g: number; b: number };
+async function resolvePaletteFromImageSource(src: string) {
+  const image = new Image();
+  image.crossOrigin = "anonymous";
+  image.decoding = "async";
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
+  const imageLoaded = new Promise<HTMLImageElement>((resolve, reject) => {
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not load artwork image."));
+  });
 
-function mixColor(a: RgbColor, b: RgbColor, amount: number): RgbColor {
-  const ratio = clamp(amount, 0, 1);
-  return {
-    r: Math.round(a.r + (b.r - a.r) * ratio),
-    g: Math.round(a.g + (b.g - a.g) * ratio),
-    b: Math.round(a.b + (b.b - a.b) * ratio),
-  };
-}
+  image.src = src;
 
-function rgbToCss(color: RgbColor) {
-  return `rgb(${color.r} ${color.g} ${color.b})`;
-}
-
-function rgbToHsl(color: RgbColor) {
-  const r = color.r / 255;
-  const g = color.g / 255;
-  const b = color.b / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  let h = 0;
-  let s = 0;
-  const l = (max + min) / 2;
-
-  if (max !== min) {
-    const delta = max - min;
-    s = l > 0.5 ? delta / (2 - max - min) : delta / (max + min);
-    switch (max) {
-      case r:
-        h = (g - b) / delta + (g < b ? 6 : 0);
-        break;
-      case g:
-        h = (b - r) / delta + 2;
-        break;
-      default:
-        h = (r - g) / delta + 4;
-        break;
+  try {
+    const loadedImage = await imageLoaded;
+    const colorThief = await import("colorthief");
+    const color = await colorThief.getColor(loadedImage, { quality: 10 });
+    const paletteColors = await colorThief
+      .getPalette(loadedImage, { colorCount: 8, quality: 10 })
+      .catch(() => null);
+    const swatches = [
+      color?.rgb?.(),
+      ...(Array.isArray(paletteColors) ? paletteColors.map((entry) => entry?.rgb?.()) : []),
+    ]
+      .filter(
+        (entry): entry is { r: number; g: number; b: number } =>
+          Boolean(
+            entry &&
+              Number.isFinite(entry.r) &&
+              Number.isFinite(entry.g) &&
+              Number.isFinite(entry.b),
+          ),
+      )
+      .map((entry) => ({ r: entry.r, g: entry.g, b: entry.b }));
+    const rgb = pickDominantArtworkColor(swatches);
+    if (!rgb) {
+      return null;
     }
-    h /= 6;
+    return buildPaletteFromDominant(rgb);
+  } catch {
+    return null;
   }
-
-  return { h, s, l };
-}
-
-function hueToRgb(p: number, q: number, t: number) {
-  if (t < 0) {
-    return t + 1;
-  }
-  if (t > 1) {
-    return t - 1;
-  }
-  if (t < 1 / 6) {
-    return p + (q - p) * 6 * t;
-  }
-  if (t < 1 / 2) {
-    return q;
-  }
-  if (t < 2 / 3) {
-    return p + (q - p) * (2 / 3 - t) * 6;
-  }
-  return p;
-}
-
-function hslToRgb(input: { h: number; s: number; l: number }): RgbColor {
-  const h = input.h;
-  const s = clamp(input.s, 0, 1);
-  const l = clamp(input.l, 0, 1);
-  if (s === 0) {
-    const value = Math.round(l * 255);
-    return { r: value, g: value, b: value };
-  }
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  return {
-    r: Math.round(hueToRgb(p, q, h + 1 / 3) * 255),
-    g: Math.round(hueToRgb(p, q, h) * 255),
-    b: Math.round(hueToRgb(p, q, h - 1 / 3) * 255),
-  };
-}
-
-function resolveRelativeLuminance(color: RgbColor): number {
-  const toLinear = (channel: number) => {
-    const normalized = clamp(channel / 255, 0, 1);
-    if (normalized <= 0.03928) {
-      return normalized / 12.92;
-    }
-    return ((normalized + 0.055) / 1.055) ** 2.4;
-  };
-  const red = toLinear(color.r);
-  const green = toLinear(color.g);
-  const blue = toLinear(color.b);
-  return 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-}
-
-function resolveContrastRatio(foreground: RgbColor, background: RgbColor): number {
-  const fg = resolveRelativeLuminance(foreground);
-  const bg = resolveRelativeLuminance(background);
-  const lighter = Math.max(fg, bg);
-  const darker = Math.min(fg, bg);
-  return (lighter + 0.05) / (darker + 0.05);
-}
-
-function ensureAccentContrast(
-  accent: RgbColor,
-  minContrast = 4.5,
-): { accent: RgbColor; contrastText: RgbColor } {
-  const white = { r: 255, g: 255, b: 255 };
-  const dark = { r: 17, g: 24, b: 39 };
-
-  const whiteContrast = resolveContrastRatio(white, accent);
-  const darkContrast = resolveContrastRatio(dark, accent);
-  const initialText = whiteContrast >= darkContrast ? white : dark;
-  if (Math.max(whiteContrast, darkContrast) >= minContrast) {
-    return { accent, contrastText: initialText };
-  }
-
-  // Nudge lightness only when needed to satisfy contrast.
-  const accentHsl = rgbToHsl(accent);
-  const shouldDarken = initialText === white;
-  for (let step = 1; step <= 8; step += 1) {
-    const candidate = hslToRgb({
-      h: accentHsl.h,
-      s: accentHsl.s,
-      l: clamp(accentHsl.l + (shouldDarken ? -1 : 1) * step * 0.04, 0.2, 0.8),
-    });
-    const nextWhite = resolveContrastRatio(white, candidate);
-    const nextDark = resolveContrastRatio(dark, candidate);
-    const nextText = nextWhite >= nextDark ? white : dark;
-    if (Math.max(nextWhite, nextDark) >= minContrast) {
-      return { accent: candidate, contrastText: nextText };
-    }
-  }
-
-  return { accent, contrastText: initialText };
-}
-
-function buildPaletteFromDominant(dominant: RgbColor): ReleasePalette {
-  const { accent, contrastText } = ensureAccentContrast(dominant);
-  const accentHover = mixColor(accent, { r: 0, g: 0, b: 0 }, 0.16);
-  const accentSoft = mixColor(accent, { r: 255, g: 255, b: 255 }, 0.46);
-  const bgStart = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.84);
-  const bgMid = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.9);
-  const bgEnd = mixColor(dominant, { r: 255, g: 255, b: 255 }, 0.95);
-
-  return {
-    accent: rgbToCss(accent),
-    accentHover: rgbToCss(accentHover),
-    accentSoft: rgbToCss(accentSoft),
-    accentContrast: rgbToCss(contrastText),
-    accentText: rgbToCss(accentHover),
-    bgStart: rgbToCss(bgStart),
-    bgMid: rgbToCss(bgMid),
-    bgEnd: rgbToCss(bgEnd),
-  };
 }
 
 export default function ReleaseArtworkTheme({
@@ -194,53 +81,48 @@ export default function ReleaseArtworkTheme({
   initialPalette,
   children,
 }: ReleaseArtworkThemeProps) {
-  const [palette, setPalette] = useState<ReleasePalette>(initialPalette ?? DEFAULT_PALETTE);
+  const [runtimePaletteByCoverSrc, setRuntimePaletteByCoverSrc] = useState<{
+    coverSrc: string;
+    palette: ReleasePalette;
+  } | null>(null);
 
   useEffect(() => {
     if (!hasArtwork) {
       return;
     }
 
-    let active = true;
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.decoding = "async";
-    image.onload = async () => {
-      if (!active) {
+    let disposed = false;
+    void resolvePaletteFromImageSource(coverSrc).then((resolvedPalette) => {
+      if (disposed || !resolvedPalette) {
         return;
       }
+      setRuntimePaletteByCoverSrc({ coverSrc, palette: resolvedPalette });
 
-      try {
-        const colorThief = await import("colorthief");
-        const color = await colorThief.getColor(image, { quality: 10 });
-        const rgb = color?.rgb();
-        if (!rgb) {
-          setPalette(initialPalette ?? DEFAULT_PALETTE);
-          return;
-        }
-        if (!active) {
-          return;
-        }
-        setPalette(buildPaletteFromDominant({ r: rgb.r, g: rgb.g, b: rgb.b }));
-      } catch {
-        if (active) {
-          setPalette(initialPalette ?? DEFAULT_PALETTE);
-        }
+      const serializedCookieValue = serializeReleaseArtworkPaletteCookie({
+        coverSrc,
+        palette: resolvedPalette,
+      });
+      if (serializedCookieValue) {
+        document.cookie =
+          `${RELEASE_ARTWORK_PALETTE_COOKIE_NAME}=${serializedCookieValue}; ` +
+          `Max-Age=${60 * 60 * 24 * 30}; Path=/; SameSite=Lax`;
       }
-    };
-    image.onerror = () => {
-      if (active) {
-        setPalette(initialPalette ?? DEFAULT_PALETTE);
-      }
-    };
-    image.src = coverSrc;
+    });
 
     return () => {
-      active = false;
+      disposed = true;
     };
-  }, [coverSrc, hasArtwork, initialPalette]);
+  }, [coverSrc, hasArtwork]);
 
-  const activePalette = hasArtwork ? palette : BRAND_FALLBACK_PALETTE;
+  const activePalette = useMemo(() => {
+    if (!hasArtwork) {
+      return DEFAULT_PALETTE;
+    }
+    if (runtimePaletteByCoverSrc?.coverSrc === coverSrc) {
+      return runtimePaletteByCoverSrc.palette;
+    }
+    return initialPalette ?? DEFAULT_PALETTE;
+  }, [coverSrc, hasArtwork, initialPalette, runtimePaletteByCoverSrc]);
 
   useEffect(() => {
     const rootStyle = document.documentElement.style;
@@ -261,7 +143,7 @@ export default function ReleaseArtworkTheme({
         rootStyle.removeProperty(variableName);
       }
     };
-  }, [activePalette, coverSrc]);
+  }, [activePalette]);
 
   const style = useMemo(
     () =>

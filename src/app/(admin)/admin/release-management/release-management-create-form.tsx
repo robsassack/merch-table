@@ -50,10 +50,12 @@ export function ReleaseManagementCreateForm(props: {
     coverUploadTarget,
     newCoverImageUrl,
     newCoverStorageKey,
+    newArtworkPaletteJson,
     setNewCoverImageUrl,
     setNewCoverPreviewUrl,
     revokeLocalObjectUrl,
     setNewCoverStorageKey,
+    setNewArtworkPaletteJson,
     newCoverPreviewSrc,
     newPricingMode,
     setNewPricingMode,
@@ -217,6 +219,7 @@ export function ReleaseManagementCreateForm(props: {
                     return null;
                   });
                   setNewCoverStorageKey(null);
+                  setNewArtworkPaletteJson(null);
                 }}
               >
                 Remove Cover
@@ -364,6 +367,7 @@ export function ReleaseManagementCreateForm(props: {
                 description: newDescription,
                 coverImageUrl: newCoverImageUrl,
                 coverStorageKey: newCoverStorageKey,
+                artworkPaletteJson: newArtworkPaletteJson,
                 removeCoverImage: false,
                 pricingMode: newPricingMode,
                 fixedPrice: newFixedPrice,

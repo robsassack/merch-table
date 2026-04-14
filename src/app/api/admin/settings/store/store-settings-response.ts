@@ -9,6 +9,7 @@ type BuildStoreSettingsResponseDataInput = {
 const storeSettingsSelect = {
   storeName: true,
   organizationLogoUrl: true,
+  updatedAt: true,
   contactEmail: true,
   currency: true,
   storeStatus: true,
@@ -73,6 +74,7 @@ export async function buildStoreSettingsResponseData({
     orgName: settings?.organization?.name ?? "",
     storeName: settings?.storeName ?? "",
     organizationLogoUrl: settings?.organizationLogoUrl ?? null,
+    faviconVersion: settings?.updatedAt?.getTime() ?? null,
     contactEmail: settings?.contactEmail ?? "",
     adminEmail: adminUser?.email ?? fallbackAdminEmail,
     currency: settings?.currency ?? "USD",

@@ -8,6 +8,13 @@ import {
 } from "@/lib/admin/release-management";
 import { normalizePricingForRelease } from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
+import { resolveReleasePaletteFromArtworkUrl } from "@/lib/release-artwork-palette";
+import {
+  parseReleasePaletteJson,
+  parseReleasePaletteRecord,
+  resolveReleasePaletteCoverKey,
+  serializeReleasePaletteRecord,
+} from "@/lib/release-artwork-palette-shared";
 import {
   extractStorageKeyFromCoverImageUrl,
   isValidCoverStorageKey,
@@ -34,6 +41,7 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
   minimumPriceFloorCents: number;
   releaseDateSupported: boolean;
   deliveryFormatsSupported: boolean;
+  artworkPaletteJsonSupported: boolean;
   releaseSelect: TSelect;
 }) {
   const {
@@ -43,6 +51,7 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
     minimumPriceFloorCents,
     releaseDateSupported,
     deliveryFormatsSupported,
+    artworkPaletteJsonSupported,
     releaseSelect,
   } = input;
 
@@ -147,6 +156,43 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
     }
   }
 
+  const parsedArtworkPalette = parseReleasePaletteJson(parsed.artworkPaletteJson);
+  if (
+    typeof parsed.artworkPaletteJson === "string" &&
+    parsed.artworkPaletteJson.trim().length > 0 &&
+    !parsedArtworkPalette
+  ) {
+    return errorResponse("Invalid artwork palette payload.", 400);
+  }
+
+  const nextCoverKey = resolveReleasePaletteCoverKey(coverImageUrl);
+  const coverChanged = coverImageUrl !== release.coverImageUrl;
+  const existingArtworkPaletteRecord = parseReleasePaletteRecord(
+    typeof release.artworkPaletteJson === "string" ? release.artworkPaletteJson : null,
+  );
+  const existingArtworkPalette =
+    existingArtworkPaletteRecord &&
+    (!existingArtworkPaletteRecord.coverKey ||
+      existingArtworkPaletteRecord.coverKey === nextCoverKey)
+      ? existingArtworkPaletteRecord.palette
+      : null;
+
+  let artworkPaletteJson: string | null = null;
+  if (coverImageUrl !== null) {
+    let resolvedArtworkPalette = parsedArtworkPalette;
+    if (!resolvedArtworkPalette && !coverChanged && existingArtworkPalette) {
+      resolvedArtworkPalette = existingArtworkPalette;
+    }
+    if (!resolvedArtworkPalette) {
+      resolvedArtworkPalette = await resolveReleasePaletteFromArtworkUrl(coverImageUrl);
+    }
+
+    artworkPaletteJson = serializeReleasePaletteRecord({
+      palette: resolvedArtworkPalette,
+      coverKey: nextCoverKey,
+    });
+  }
+
   const updated = await prisma.release.update({
     where: {
       id: release.id,
@@ -162,6 +208,7 @@ export async function handleUpdateReleaseAction<TSelect extends Prisma.ReleaseSe
       slug: resolvedSlug,
       description: normalizeNullableText(parsed.description),
       coverImageUrl,
+      ...(artworkPaletteJsonSupported ? { artworkPaletteJson } : {}),
       pricingMode: parsed.pricingMode,
       fixedPriceCents: normalizedPricing.value.fixedPriceCents,
       minimumPriceCents: normalizedPricing.value.minimumPriceCents,

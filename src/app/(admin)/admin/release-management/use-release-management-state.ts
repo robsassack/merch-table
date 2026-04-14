@@ -67,6 +67,9 @@ export function useReleaseManagementState() {
   const [newCoverImageUrl, setNewCoverImageUrl] = useState("");
   const [newCoverPreviewUrl, setNewCoverPreviewUrl] = useState<string | null>(null);
   const [newCoverStorageKey, setNewCoverStorageKey] = useState<string | null>(null);
+  const [newArtworkPaletteJson, setNewArtworkPaletteJson] = useState<string | null>(
+    null,
+  );
   const [localCoverPreviewById, setLocalCoverPreviewById] = useState<
     Record<string, string>
   >({});
@@ -269,6 +272,8 @@ export function useReleaseManagementState() {
     setNewCoverPreviewUrl,
     newCoverStorageKey,
     setNewCoverStorageKey,
+    newArtworkPaletteJson,
+    setNewArtworkPaletteJson,
     localCoverPreviewById,
     newPricingMode,
     setNewPricingMode,

@@ -31,6 +31,7 @@ export const updateReleaseSchema = z.object({
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
   coverStorageKey: z.string().trim().max(500).nullable().optional(),
+  artworkPaletteJson: z.string().trim().max(4_000).nullable().optional(),
   removeCoverImage: z.boolean().optional(),
   pricingMode: z.enum(["FREE", "FIXED", "PWYW"]),
   fixedPriceCents: z.number().int().nullable().optional(),
@@ -142,6 +143,7 @@ export type ReleaseForActionState = {
   label?: string | null;
   releaseType?: string;
   coverImageUrl: string | null;
+  artworkPaletteJson?: string | null;
   publishedAt: Date | null;
   createdAt: Date;
   deletedAt: Date | null;

@@ -1,8 +1,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { unstable_cache } from "next/cache";
 
 import { buyerTheme } from "@/app/(public)/buyer-theme";
 import ArtistBio from "@/app/(public)/release/artist-bio";
@@ -30,8 +31,17 @@ import { resolveReleaseFileFormat } from "@/lib/checkout/download-format";
 import { hasOwnedReleaseHintFromCookieStore } from "@/lib/checkout/owned-release-hint-cookie";
 import { resolveCurrentReleaseSourceAssets } from "@/lib/checkout/release-files";
 import StorefrontHeader from "@/app/(public)/storefront-header";
+import { prismaReleaseSupportsField } from "@/lib/admin/release-management";
 import { prisma } from "@/lib/prisma";
+import { resolveReleasePaletteFromArtworkUrl } from "@/lib/release-artwork-palette";
+import { parseReleaseArtworkPaletteCookie, RELEASE_ARTWORK_PALETTE_COOKIE_NAME } from "@/lib/release-artwork-palette-cookie";
+import {
+  parseReleasePaletteRecord,
+  resolveReleasePaletteCoverKey,
+  serializeReleasePaletteRecord,
+} from "@/lib/release-artwork-palette-shared";
 import { resolveStorefrontBrandLabel } from "@/lib/storefront-brand";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 type ReleaseDetailPageProps = {
   params: Promise<{ slug: string }>;
@@ -40,6 +50,49 @@ type ReleaseDetailPageProps = {
 const spaceMonoFontFamily = 'var(--font-space-mono), "Space Mono", monospace';
 
 export const dynamic = "force-dynamic";
+
+function resolveRequestOrigin(headerStore: Headers) {
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host");
+  if (!host) {
+    return null;
+  }
+
+  const forwardedProto = headerStore
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  const protocol =
+    forwardedProto === "http" || forwardedProto === "https"
+      ? forwardedProto
+      : host.startsWith("localhost") || host.startsWith("127.0.0.1")
+        ? "http"
+        : "https";
+
+  return `${protocol}://${host}`;
+}
+
+const getCachedReleaseArtworkPalette = unstable_cache(
+  async (
+    coverImageUrl: string | null,
+    paletteVersion: string,
+    coverProxyUrl: string | null,
+  ) => {
+    void paletteVersion;
+    const directPalette = await resolveReleasePaletteFromArtworkUrl(coverImageUrl);
+    if (directPalette) {
+      return directPalette;
+    }
+
+    if (coverProxyUrl) {
+      return resolveReleasePaletteFromArtworkUrl(coverProxyUrl);
+    }
+
+    return null;
+  },
+  ["release-artwork-palette"],
+  { revalidate: 86_400 },
+);
 
 export async function generateMetadata({
   params,
@@ -124,6 +177,11 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
     notFound();
   }
 
+  const artworkPaletteJsonSupported = prismaReleaseSupportsField(
+    prisma,
+    "artworkPaletteJson",
+  );
+
   const release = await prisma.release.findFirst({
     where: {
       organizationId: settings.organizationId,
@@ -144,6 +202,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
       slug: true,
       description: true,
       coverImageUrl: true,
+      ...(artworkPaletteJsonSupported ? { artworkPaletteJson: true } : {}),
+      updatedAt: true,
       pricingMode: true,
       priceCents: true,
       fixedPriceCents: true,
@@ -157,6 +217,7 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
           slug: true,
           name: true,
           imageUrl: true,
+          updatedAt: true,
           location: true,
           bio: true,
           owner: {
@@ -265,18 +326,88 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
   const artistImageUrl = resolveArtistAvatarSrc({
     artistImageUrl: release.artist.imageUrl,
     ownerImageUrl: release.artist.owner?.image,
+    version: release.artist.updatedAt.getTime(),
   });
   const totalDurationMs = releaseTracks.reduce((sum, track) => sum + (track.durationMs ?? 0), 0);
   const hasArtwork = resolveOptionalImageUrl(release.coverImageUrl) !== null;
-  const releaseCoverSrc = resolveCoverSrc(release.coverImageUrl);
+  const releaseCoverSrc = resolveCoverSrc(
+    release.coverImageUrl,
+    release.updatedAt.getTime(),
+  );
+  const requestHeaders = await headers();
+  const requestOrigin = resolveRequestOrigin(requestHeaders);
+  const coverProxyUrl =
+    hasArtwork && requestOrigin && releaseCoverSrc.startsWith("/api/cover?")
+      ? `${requestOrigin}${releaseCoverSrc}`
+      : null;
+  const persistedPaletteRecord = parseReleasePaletteRecord(
+    "artworkPaletteJson" in release ? release.artworkPaletteJson : null,
+  );
+  const currentCoverKey = resolveReleasePaletteCoverKey(release.coverImageUrl);
+  const persistedInitialPalette =
+    persistedPaletteRecord &&
+    (!persistedPaletteRecord.coverKey || persistedPaletteRecord.coverKey === currentCoverKey)
+      ? persistedPaletteRecord.palette
+      : null;
   const cookieStore = await cookies();
+  const browserCachedPalette = parseReleaseArtworkPaletteCookie(
+    cookieStore.get(RELEASE_ARTWORK_PALETTE_COOKIE_NAME)?.value,
+    releaseCoverSrc,
+  );
+  const cachedInitialPalette =
+    !persistedInitialPalette && hasArtwork
+      ? await getCachedReleaseArtworkPalette(
+          release.coverImageUrl,
+          `${release.id}:${release.updatedAt.getTime()}`,
+          coverProxyUrl,
+        )
+      : null;
+  const runtimeInitialPalette =
+    !persistedInitialPalette && !cachedInitialPalette && hasArtwork
+      ? await resolveReleasePaletteFromArtworkUrl(coverProxyUrl ?? release.coverImageUrl)
+      : null;
+  const initialPalette =
+    browserCachedPalette ??
+    persistedInitialPalette ??
+    cachedInitialPalette ??
+    runtimeInitialPalette;
+
+  const persistedPaletteNeedsBackfill =
+    Boolean(initialPalette) &&
+    (!persistedPaletteRecord ||
+      !persistedPaletteRecord.coverKey ||
+      persistedPaletteRecord.coverKey !== currentCoverKey);
+  if (artworkPaletteJsonSupported && persistedPaletteNeedsBackfill && initialPalette) {
+    const nextArtworkPaletteJson = serializeReleasePaletteRecord({
+      palette: initialPalette,
+      coverKey: currentCoverKey,
+    });
+    const currentArtworkPaletteJson =
+      "artworkPaletteJson" in release ? release.artworkPaletteJson : null;
+    if (nextArtworkPaletteJson && nextArtworkPaletteJson !== currentArtworkPaletteJson) {
+      await prisma.release
+        .updateMany({
+          where: {
+            id: release.id,
+          },
+          data: {
+            artworkPaletteJson: nextArtworkPaletteJson,
+          },
+        })
+        .catch(() => undefined);
+    }
+  }
   const hasOwnedReleaseHint = hasOwnedReleaseHintFromCookieStore(
     cookieStore,
     release.id,
   );
 
   return (
-    <ReleaseArtworkTheme coverSrc={releaseCoverSrc} hasArtwork={hasArtwork}>
+    <ReleaseArtworkTheme
+      coverSrc={releaseCoverSrc}
+      hasArtwork={hasArtwork}
+      initialPalette={initialPalette}
+    >
       <StorefrontHeader />
 
       <main
@@ -382,6 +513,8 @@ export default async function ReleaseDetailPage({ params }: ReleaseDetailPagePro
                           alt={`${release.artist.name} profile`}
                           fill
                           sizes="48px"
+                          placeholder="blur"
+                          blurDataURL={IMAGE_BLUR_DATA_URL}
                           className="object-cover"
                         />
                       </span>

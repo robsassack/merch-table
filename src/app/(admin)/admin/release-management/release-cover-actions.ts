@@ -1,6 +1,10 @@
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 
-import { uploadReleaseCoverFile } from "./release-cover-upload";
+import {
+  resolveArtworkPaletteJsonFromCoverFile,
+  resolveArtworkPaletteJsonFromImageSource,
+  uploadReleaseCoverFile,
+} from "./release-cover-upload";
 import type { ReleaseDraft } from "./types";
 
 type CoverUploadActionsInput = {
@@ -13,6 +17,7 @@ type CoverUploadActionsInput = {
   setCoverUploadTarget: Dispatch<SetStateAction<string | null>>;
   setNewCoverStorageKey: Dispatch<SetStateAction<string | null>>;
   setNewCoverImageUrl: Dispatch<SetStateAction<string>>;
+  setNewArtworkPaletteJson: Dispatch<SetStateAction<string | null>>;
   setLocalCoverPreviewForRelease: (releaseId: string, objectUrl: string) => void;
   setDraftsById: Dispatch<SetStateAction<Record<string, ReleaseDraft>>>;
 };
@@ -28,6 +33,7 @@ export function createReleaseCoverActions(input: CoverUploadActionsInput) {
     setCoverUploadTarget,
     setNewCoverStorageKey,
     setNewCoverImageUrl,
+    setNewArtworkPaletteJson,
     setLocalCoverPreviewForRelease,
     setDraftsById,
   } = input;
@@ -53,9 +59,15 @@ export function createReleaseCoverActions(input: CoverUploadActionsInput) {
     setCoverUploadTarget("new");
 
     try {
+      const filePaletteJsonPromise = resolveArtworkPaletteJsonFromCoverFile(file);
       const uploaded = await uploadReleaseCoverFile(file);
+      const coverPaletteJson = await resolveArtworkPaletteJsonFromImageSource(
+        `/api/cover?url=${encodeURIComponent(uploaded.publicUrl)}`,
+      );
+      const artworkPaletteJson = coverPaletteJson ?? (await filePaletteJsonPromise);
       setNewCoverStorageKey(uploaded.storageKey);
       setNewCoverImageUrl(uploaded.publicUrl);
+      setNewArtworkPaletteJson(artworkPaletteJson);
       setNotice(`Uploaded cover artwork "${file.name}".`);
     } catch (uploadError) {
       setError(
@@ -92,13 +104,19 @@ export function createReleaseCoverActions(input: CoverUploadActionsInput) {
     setCoverUploadTarget(releaseId);
 
     try {
+      const filePaletteJsonPromise = resolveArtworkPaletteJsonFromCoverFile(file);
       const uploaded = await uploadReleaseCoverFile(file);
+      const coverPaletteJson = await resolveArtworkPaletteJsonFromImageSource(
+        `/api/cover?url=${encodeURIComponent(uploaded.publicUrl)}`,
+      );
+      const artworkPaletteJson = coverPaletteJson ?? (await filePaletteJsonPromise);
       setDraftsById((previous) => ({
         ...previous,
         [releaseId]: {
-          ...draft,
+          ...(previous[releaseId] ?? draft),
           coverImageUrl: uploaded.publicUrl,
           coverStorageKey: uploaded.storageKey,
+          artworkPaletteJson,
           removeCoverImage: false,
         },
       }));

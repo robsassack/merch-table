@@ -218,6 +218,7 @@ model Release {
   slug              String
   description       String?
   coverImageUrl     String?
+  artworkPaletteJson String?
   priceCents        Int                   @default(0)
   currency          String                @default("USD")
   pricingMode       PricingMode           @default(FREE)

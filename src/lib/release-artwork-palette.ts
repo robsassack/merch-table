@@ -84,10 +84,10 @@ function rgbToHsl(color: RgbColor): HslColor {
 
 function hueToRgb(p: number, q: number, t: number) {
   if (t < 0) {
-    return t + 1;
+    t += 1;
   }
   if (t > 1) {
-    return t - 1;
+    t -= 1;
   }
   if (t < 1 / 6) {
     return p + (q - p) * 6 * t;
@@ -377,6 +377,85 @@ async function extractPaletteFromImageBuffer(imageBuffer: Buffer): Promise<Relea
   return extractPaletteFromRawPixels(data, info.channels, info.width, info.height);
 }
 
+async function resolveBufferFromAsyncIterable(
+  iterable: AsyncIterable<Uint8Array | Buffer | string>,
+) {
+  const chunks: Buffer[] = [];
+  for await (const chunk of iterable) {
+    if (typeof chunk === "string") {
+      chunks.push(Buffer.from(chunk));
+      continue;
+    }
+    chunks.push(Buffer.from(chunk));
+  }
+
+  if (chunks.length === 0) {
+    return null;
+  }
+
+  return Buffer.concat(chunks);
+}
+
+async function resolveBufferFromWebStream(stream: ReadableStream<Uint8Array>) {
+  const reader = stream.getReader();
+  const chunks: Buffer[] = [];
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (value) {
+        chunks.push(Buffer.from(value));
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  if (chunks.length === 0) {
+    return null;
+  }
+
+  return Buffer.concat(chunks);
+}
+
+async function resolveStorageBodyToBuffer(body: unknown) {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "transformToByteArray" in body &&
+    typeof body.transformToByteArray === "function"
+  ) {
+    const bytes = await body.transformToByteArray();
+    return bytes.length > 0 ? Buffer.from(bytes) : null;
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "transformToWebStream" in body &&
+    typeof body.transformToWebStream === "function"
+  ) {
+    const stream = body.transformToWebStream() as ReadableStream<Uint8Array>;
+    return resolveBufferFromWebStream(stream);
+  }
+
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    Symbol.asyncIterator in body &&
+    typeof body[Symbol.asyncIterator] === "function"
+  ) {
+    return resolveBufferFromAsyncIterable(
+      body as AsyncIterable<Uint8Array | Buffer | string>,
+    );
+  }
+
+  return null;
+}
+
 async function resolveArtworkBufferFromStorageUrl(coverImageUrl: string) {
   const storageKey = resolveStorageKeyForPalette(coverImageUrl);
   if (!storageKey) {
@@ -390,12 +469,7 @@ async function resolveArtworkBufferFromStorageUrl(coverImageUrl: string) {
       Key: storageKey,
     }),
   );
-  const body = object.Body as { transformToByteArray?: () => Promise<Uint8Array> } | undefined;
-  const bytes = await body?.transformToByteArray?.();
-  if (!bytes || bytes.length === 0) {
-    return null;
-  }
-  return Buffer.from(bytes);
+  return resolveStorageBodyToBuffer(object.Body);
 }
 
 function resolveStorageKeyForPalette(coverImageUrl: string) {

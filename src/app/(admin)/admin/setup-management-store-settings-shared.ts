@@ -31,6 +31,7 @@ export type StoreSettingsResponse = {
     orgName: string;
     storeName: string;
     organizationLogoUrl: string | null;
+    faviconVersion: number | null;
     contactEmail: string;
     adminEmail: string;
     currency: string;
@@ -112,12 +113,15 @@ export function parsePositiveInteger(value: string) {
   return Math.round(parsed);
 }
 
-export function refreshDocumentFavicon() {
+export function refreshDocumentFavicon(version?: number | null) {
   if (typeof document === "undefined") {
     return;
   }
 
-  const nextHref = `/favicon.ico?v=${Date.now()}`;
+  const nextHref =
+    typeof version === "number" && Number.isFinite(version) && version > 0
+      ? `/favicon.ico?v=${Math.round(version)}`
+      : "/favicon.ico";
   const rels = ["icon", "shortcut icon", "apple-touch-icon"] as const;
 
   for (const rel of rels) {

@@ -19,6 +19,12 @@ import {
   resolveMinimumPriceFloorMinorForCurrency,
 } from "@/lib/pricing/pricing-rules";
 import { prisma } from "@/lib/prisma";
+import { resolveReleasePaletteFromArtworkUrl } from "@/lib/release-artwork-palette";
+import {
+  parseReleasePaletteJson,
+  resolveReleasePaletteCoverKey,
+  serializeReleasePaletteRecord,
+} from "@/lib/release-artwork-palette-shared";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
 import {
@@ -51,6 +57,7 @@ const createReleaseSchema = z.object({
   description: z.string().max(4_000).nullable().optional(),
   releaseDate: z.string().trim().optional(),
   coverStorageKey: z.string().trim().max(500).nullable().optional(),
+  artworkPaletteJson: z.string().trim().max(4_000).nullable().optional(),
   pricingMode: z.enum(["FREE", "FIXED", "PWYW"]).optional(),
   fixedPriceCents: z.number().int().nullable().optional(),
   minimumPriceCents: z.number().int().nullable().optional(),
@@ -222,8 +229,12 @@ export async function POST(request: Request) {
     return auth.response;
   }
 
-  const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
-  const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+    const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
+    const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+    const artworkPaletteJsonSupported = prismaReleaseSupportsField(
+      prisma,
+      "artworkPaletteJson",
+    );
   const releaseSelect = releaseDateSupported
     ? deliveryFormatsSupported
       ? adminReleaseSelect
@@ -357,6 +368,30 @@ export async function POST(request: Request) {
 
       coverImageUrl = resolveCoverImageUrlFromStorageKey(parsed.coverStorageKey);
     }
+    const parsedArtworkPalette = parseReleasePaletteJson(parsed.artworkPaletteJson);
+    if (
+      typeof parsed.artworkPaletteJson === "string" &&
+      parsed.artworkPaletteJson.trim().length > 0 &&
+      !parsedArtworkPalette
+    ) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "Invalid artwork palette payload.",
+        },
+        { status: 400 },
+      );
+    }
+
+    const artworkPaletteJson =
+      coverImageUrl === null
+        ? null
+        : serializeReleasePaletteRecord({
+            palette:
+              parsedArtworkPalette ??
+              (await resolveReleasePaletteFromArtworkUrl(coverImageUrl)),
+            coverKey: resolveReleasePaletteCoverKey(coverImageUrl),
+          });
 
     const resolvedSlug = slugify(
       parsed.slug && parsed.slug.length > 0 ? parsed.slug : parsed.title,
@@ -388,6 +423,7 @@ export async function POST(request: Request) {
         slug: resolvedSlug,
         description: normalizeNullableText(parsed.description),
         coverImageUrl,
+        ...(artworkPaletteJsonSupported ? { artworkPaletteJson } : {}),
         pricingMode: resolvedPricingMode,
         fixedPriceCents: normalizedPricing.value.fixedPriceCents,
         minimumPriceCents: normalizedPricing.value.minimumPriceCents,

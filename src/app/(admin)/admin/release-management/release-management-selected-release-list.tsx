@@ -226,6 +226,7 @@ export function ReleaseManagementSelectedReleaseList(props: {
                               ...draft,
                               coverImageUrl: "",
                               coverStorageKey: null,
+                              artworkPaletteJson: null,
                               removeCoverImage: true,
                             },
                           }));

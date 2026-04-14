@@ -36,6 +36,7 @@ export type ReleaseRecord = {
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
+  artworkPaletteJson: string | null;
   pricingMode: PricingMode;
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
@@ -256,10 +257,54 @@ export type ReleaseDraft = {
   description: string;
   coverImageUrl: string;
   coverStorageKey: string | null;
+  artworkPaletteJson: string | null;
   removeCoverImage: boolean;
   pricingMode: PricingMode;
   fixedPrice: string;
   minimumPrice: string;
+  deliveryFormats: DeliveryFormat[];
+  allowFreeCheckout: boolean;
+  status: ReleaseStatus;
+  releaseDate: string;
+  markLossyOnly: boolean;
+  confirmLossyOnly: boolean;
+};
+
+export type CreateReleaseRequest = {
+  artistId: string;
+  title: string;
+  releaseType: ReleaseType;
+  label: string;
+  slug?: string;
+  description: string | null;
+  coverStorageKey: string | null;
+  artworkPaletteJson: string | null;
+  pricingMode: PricingMode;
+  fixedPriceCents: number | null;
+  minimumPriceCents: number | null;
+  deliveryFormats: DeliveryFormat[];
+  allowFreeCheckout: boolean;
+  status: ReleaseStatus;
+  releaseDate: string;
+  markLossyOnly: boolean;
+  confirmLossyOnly: boolean;
+};
+
+export type UpdateReleaseRequest = {
+  action: "update";
+  artistId: string;
+  featuredTrackId: string | null;
+  title: string;
+  releaseType: ReleaseType;
+  label: string;
+  slug?: string;
+  description: string | null;
+  coverStorageKey: string | null;
+  artworkPaletteJson: string | null;
+  removeCoverImage: boolean;
+  pricingMode: PricingMode;
+  fixedPriceCents: number | null;
+  minimumPriceCents: number | null;
   deliveryFormats: DeliveryFormat[];
   allowFreeCheckout: boolean;
   status: ReleaseStatus;

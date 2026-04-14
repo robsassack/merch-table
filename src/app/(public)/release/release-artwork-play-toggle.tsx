@@ -1,7 +1,9 @@
 "use client";
 
 import Image from "next/image";
+import { useState } from "react";
 import { useReleaseAudioPlayer } from "@/app/(public)/release/release-audio-player";
+import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 type ReleaseArtworkPlayToggleProps = {
   coverSrc: string;
@@ -16,6 +18,7 @@ export default function ReleaseArtworkPlayToggle({
   previewTrackId,
   playablePreviewTrackIds,
 }: ReleaseArtworkPlayToggleProps) {
+  const [loadedCoverSrc, setLoadedCoverSrc] = useState<string | null>(null);
   const { activeTrackId, isPlaybackVisuallyActive, playTrack } =
     useReleaseAudioPlayer();
   const hasPreviewTrack = previewTrackId !== null;
@@ -25,6 +28,8 @@ export default function ReleaseArtworkPlayToggle({
   const artworkAriaLabel = hasPreviewTrack
     ? `${isCurrentReleaseTrackActive && isPlaybackVisuallyActive ? "Pause" : "Play"} preview`
     : "Preview unavailable";
+
+  const isCoverLoaded = loadedCoverSrc === coverSrc;
 
   return (
     <button
@@ -47,12 +52,24 @@ export default function ReleaseArtworkPlayToggle({
       aria-label={artworkAriaLabel}
       className="group relative mx-auto aspect-square w-full max-w-[26rem] cursor-pointer overflow-hidden rounded-xl border border-zinc-200 bg-zinc-100 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--release-accent)] focus-visible:ring-offset-2 focus-visible:ring-offset-white lg:mx-0 disabled:cursor-default"
     >
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-0 bg-zinc-200 transition-opacity duration-300 ${
+          isCoverLoaded ? "opacity-0" : "opacity-100"
+        }`}
+      />
       <Image
         src={coverSrc}
         alt={`${releaseTitle} cover`}
         fill
         sizes="(max-width: 1024px) 100vw, 26rem"
+        priority
+        placeholder="blur"
+        blurDataURL={IMAGE_BLUR_DATA_URL}
+        onLoad={() => setLoadedCoverSrc(coverSrc)}
         className={`h-full w-full object-cover transition duration-300 ease-out ${
+          isCoverLoaded ? "opacity-100" : "opacity-0"
+        } ${
           hasPreviewTrack ? "group-hover:scale-[1.035] group-hover:blur-[1.1px]" : ""
         }`}
       />

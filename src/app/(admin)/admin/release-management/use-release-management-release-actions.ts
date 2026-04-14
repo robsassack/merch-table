@@ -8,7 +8,13 @@ import {
 import { createReleaseCoverActions } from "./release-cover-actions";
 import { createReleaseTranscodeActions } from "./use-release-management-release-transcode-actions";
 import type { ReleaseManagementState } from "./use-release-management-state";
-import type { ReleaseDraft, ReleaseMutationResponse, ReleaseRecord } from "./types";
+import type {
+  CreateReleaseRequest,
+  ReleaseDraft,
+  ReleaseMutationResponse,
+  ReleaseRecord,
+  UpdateReleaseRequest,
+} from "./types";
 import {
   formatCurrency,
   getMutationError,
@@ -37,6 +43,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setCoverUploadTarget,
     setNewCoverStorageKey,
     setNewCoverImageUrl,
+    setNewArtworkPaletteJson,
     setLocalCoverPreviewForRelease,
     setDraftsById,
     setCreatePending,
@@ -48,6 +55,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     newLabel,
     newDescription,
     newCoverStorageKey,
+    newArtworkPaletteJson,
     newPricingMode,
     newFixedPrice,
     newMinimumPrice,
@@ -110,6 +118,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setCoverUploadTarget,
     setNewCoverStorageKey,
     setNewCoverImageUrl,
+    setNewArtworkPaletteJson,
     setLocalCoverPreviewForRelease,
     setDraftsById,
   });
@@ -145,34 +154,36 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setCreatePending(true);
 
     try {
+      const createPayload: CreateReleaseRequest = {
+        artistId: newArtistId,
+        title: newTitle,
+        releaseType: newReleaseType,
+        label: newLabel,
+        slug: newSlug.length > 0 ? newSlug : undefined,
+        description: newDescription.length > 0 ? newDescription : null,
+        coverStorageKey: newCoverStorageKey,
+        artworkPaletteJson: newArtworkPaletteJson,
+        pricingMode: newPricingMode,
+        fixedPriceCents:
+          newPricingMode === "FIXED"
+            ? parseCurrencyInputToCents(newFixedPrice, input.storeCurrency)
+            : null,
+        minimumPriceCents:
+          newPricingMode === "PWYW"
+            ? (parseCurrencyInputToCents(newMinimumPrice, input.storeCurrency) ??
+              (newAllowFreeCheckout ? 0 : null))
+            : null,
+        deliveryFormats: newDeliveryFormats,
+        allowFreeCheckout: newPricingMode === "PWYW" ? newAllowFreeCheckout : false,
+        status: newStatus,
+        releaseDate: newReleaseDate,
+        markLossyOnly: newMarkLossyOnly,
+        confirmLossyOnly: newConfirmLossyOnly,
+      };
       const response = await fetch("/api/admin/releases", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          artistId: newArtistId,
-          title: newTitle,
-          releaseType: newReleaseType,
-          label: newLabel,
-          slug: newSlug.length > 0 ? newSlug : undefined,
-          description: newDescription.length > 0 ? newDescription : null,
-          coverStorageKey: newCoverStorageKey,
-          pricingMode: newPricingMode,
-          fixedPriceCents:
-            newPricingMode === "FIXED"
-              ? parseCurrencyInputToCents(newFixedPrice, input.storeCurrency)
-              : null,
-          minimumPriceCents:
-            newPricingMode === "PWYW"
-              ? (parseCurrencyInputToCents(newMinimumPrice, input.storeCurrency) ??
-                (newAllowFreeCheckout ? 0 : null))
-              : null,
-          deliveryFormats: newDeliveryFormats,
-          allowFreeCheckout: newPricingMode === "PWYW" ? newAllowFreeCheckout : false,
-          status: newStatus,
-          releaseDate: newReleaseDate,
-          markLossyOnly: newMarkLossyOnly,
-          confirmLossyOnly: newConfirmLossyOnly,
-        }),
+        body: JSON.stringify(createPayload),
       });
       const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
       if (!response.ok || !body?.ok || !body.release) {
@@ -200,6 +211,7 @@ export function createReleaseActions(input: ReleaseActionsInput) {
         return null;
       });
       setNewCoverStorageKey(null);
+      setNewArtworkPaletteJson(null);
       setNewArtistId(createDefaultArtistId ?? newArtistId);
       setNewPricingMode(createDefaultPricingMode);
       setNewFixedPrice("");
@@ -246,37 +258,39 @@ export function createReleaseActions(input: ReleaseActionsInput) {
     setPendingReleaseId(releaseId);
 
     try {
+      const updatePayload: UpdateReleaseRequest = {
+        action: "update",
+        artistId: draft.artistId,
+        featuredTrackId: draft.featuredTrackId,
+        title: draft.title,
+        releaseType: draft.releaseType,
+        label: draft.label,
+        slug: draft.slug.length > 0 ? draft.slug : undefined,
+        description: draft.description.length > 0 ? draft.description : null,
+        coverStorageKey: draft.coverStorageKey,
+        artworkPaletteJson: draft.artworkPaletteJson,
+        removeCoverImage: draft.removeCoverImage,
+        pricingMode: draft.pricingMode,
+        fixedPriceCents:
+          draft.pricingMode === "FIXED"
+            ? parseCurrencyInputToCents(draft.fixedPrice, releaseCurrency)
+            : null,
+        minimumPriceCents:
+          draft.pricingMode === "PWYW"
+            ? (parseCurrencyInputToCents(draft.minimumPrice, releaseCurrency) ??
+              (draft.allowFreeCheckout ? 0 : null))
+            : null,
+        deliveryFormats: draft.deliveryFormats,
+        allowFreeCheckout: draft.pricingMode === "PWYW" ? draft.allowFreeCheckout : false,
+        status: draft.status,
+        releaseDate: draft.releaseDate,
+        markLossyOnly: draft.markLossyOnly,
+        confirmLossyOnly: draft.confirmLossyOnly,
+      };
       const response = await fetch(`/api/admin/releases/${releaseId}`, {
         method: "PATCH",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: "update",
-          artistId: draft.artistId,
-          featuredTrackId: draft.featuredTrackId,
-          title: draft.title,
-          releaseType: draft.releaseType,
-          label: draft.label,
-          slug: draft.slug.length > 0 ? draft.slug : undefined,
-          description: draft.description.length > 0 ? draft.description : null,
-          coverStorageKey: draft.coverStorageKey,
-          removeCoverImage: draft.removeCoverImage,
-          pricingMode: draft.pricingMode,
-          fixedPriceCents:
-            draft.pricingMode === "FIXED"
-              ? parseCurrencyInputToCents(draft.fixedPrice, releaseCurrency)
-              : null,
-          minimumPriceCents:
-            draft.pricingMode === "PWYW"
-              ? (parseCurrencyInputToCents(draft.minimumPrice, releaseCurrency) ??
-                (draft.allowFreeCheckout ? 0 : null))
-              : null,
-          deliveryFormats: draft.deliveryFormats,
-          allowFreeCheckout: draft.pricingMode === "PWYW" ? draft.allowFreeCheckout : false,
-          status: draft.status,
-          releaseDate: draft.releaseDate,
-          markLossyOnly: draft.markLossyOnly,
-          confirmLossyOnly: draft.confirmLossyOnly,
-        }),
+        body: JSON.stringify(updatePayload),
       });
       const body = (await response.json().catch(() => null)) as ReleaseMutationResponse | null;
       if (!response.ok || !body?.ok || !body.release) {

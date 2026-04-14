@@ -2,11 +2,27 @@ import type { ReleaseAudioTrack } from "@/app/(public)/release/release-audio-pla
 
 const DEFAULT_COVER_SRC = "/default-artwork.png";
 
-export function resolveCoverSrc(coverImageUrl: string | null) {
+function resolveVersionSearchParam(version: string | number | null | undefined) {
+  if (version === null || version === undefined) {
+    return "";
+  }
+
+  const normalized = String(version).trim();
+  if (normalized.length === 0) {
+    return "";
+  }
+
+  return `&v=${encodeURIComponent(normalized)}`;
+}
+
+export function resolveCoverSrc(
+  coverImageUrl: string | null,
+  version?: string | number | null,
+) {
   if (!coverImageUrl) {
     return DEFAULT_COVER_SRC;
   }
-  return `/api/cover?url=${encodeURIComponent(coverImageUrl)}`;
+  return `/api/cover?url=${encodeURIComponent(coverImageUrl)}${resolveVersionSearchParam(version)}`;
 }
 
 export function resolveOptionalImageUrl(value: string | null | undefined) {
@@ -21,10 +37,12 @@ export function resolveOptionalImageUrl(value: string | null | undefined) {
 export function resolveArtistAvatarSrc(input: {
   artistImageUrl: string | null | undefined;
   ownerImageUrl: string | null | undefined;
+  version?: string | number | null;
 }) {
+  const versionSearchParam = resolveVersionSearchParam(input.version);
   const artistImageUrl = resolveOptionalImageUrl(input.artistImageUrl);
   if (artistImageUrl) {
-    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}`;
+    return `/api/cover?url=${encodeURIComponent(artistImageUrl)}${versionSearchParam}`;
   }
 
   const ownerImageUrl = resolveOptionalImageUrl(input.ownerImageUrl);
@@ -32,7 +50,7 @@ export function resolveArtistAvatarSrc(input: {
     return null;
   }
 
-  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}`;
+  return `/api/cover?url=${encodeURIComponent(ownerImageUrl)}${versionSearchParam}`;
 }
 
 export function resolveInitials(name: string) {

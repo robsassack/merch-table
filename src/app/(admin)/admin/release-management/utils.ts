@@ -241,6 +241,7 @@ export function toReleaseDraft(release: ReleaseRecord): ReleaseDraft {
     description: release.description ?? "",
     coverImageUrl: release.coverImageUrl ?? "",
     coverStorageKey: null,
+    artworkPaletteJson: release.artworkPaletteJson ?? null,
     removeCoverImage: false,
     pricingMode: release.pricingMode,
     fixedPrice: centsToDecimalString(release.fixedPriceCents, release.currency),

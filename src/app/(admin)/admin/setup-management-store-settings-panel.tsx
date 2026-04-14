@@ -32,6 +32,7 @@ export function StoreSettingsPanel({
   const [orgName, setOrgName] = useState("");
   const [storeName, setStoreName] = useState("");
   const [organizationLogoUrl, setOrganizationLogoUrl] = useState<string | null>(null);
+  const [faviconVersion, setFaviconVersion] = useState<number | null>(null);
   const [contactEmail, setContactEmail] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -59,6 +60,7 @@ export function StoreSettingsPanel({
     setOrgName(data.orgName);
     setStoreName(data.storeName);
     setOrganizationLogoUrl(data.organizationLogoUrl);
+    setFaviconVersion(data.faviconVersion ?? null);
     setContactEmail(data.contactEmail);
     setAdminEmail(data.adminEmail);
     setCurrency(data.currency);
@@ -85,8 +87,8 @@ export function StoreSettingsPanel({
       return;
     }
 
-    refreshDocumentFavicon();
-  }, [isHydrated, organizationLogoUrl]);
+    refreshDocumentFavicon(faviconVersion);
+  }, [faviconVersion, isHydrated, organizationLogoUrl]);
 
   useEffect(() => {
     if (!initialLoad.current) {

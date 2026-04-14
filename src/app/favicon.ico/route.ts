@@ -20,9 +20,20 @@ function resolveOptionalImageUrl(value: string | null | undefined) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-function createNoStoreRedirect(target: URL) {
+function resolveRequestVersion(requestUrl: URL) {
+  const version = requestUrl.searchParams.get("v")?.trim();
+  return version && version.length > 0 ? version : null;
+}
+
+function resolveCacheControlHeader(requestUrl: URL) {
+  return resolveRequestVersion(requestUrl)
+    ? "public, max-age=31536000, immutable"
+    : "public, max-age=300, stale-while-revalidate=86400";
+}
+
+function createCachedRedirect(target: URL, requestUrl: URL) {
   const response = NextResponse.redirect(target, { status: 307 });
-  response.headers.set("cache-control", "no-store, max-age=0");
+  response.headers.set("cache-control", resolveCacheControlHeader(requestUrl));
   return response;
 }
 
@@ -38,6 +49,7 @@ function resolveFallbackFaviconUrl(requestUrl: URL) {
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const fallbackUrl = resolveFallbackFaviconUrl(requestUrl);
+  const cacheControl = resolveCacheControlHeader(requestUrl);
 
   try {
     const settings = await prisma.storeSettings.findFirst({
@@ -50,12 +62,25 @@ export async function GET(request: Request) {
 
     const organizationLogoUrl = resolveOptionalImageUrl(settings?.organizationLogoUrl);
     if (!organizationLogoUrl) {
-      return createNoStoreRedirect(fallbackUrl);
+      return createCachedRedirect(fallbackUrl, requestUrl);
     }
 
     const storageKey = extractStorageKeyFromCoverImageUrl(organizationLogoUrl);
     if (!storageKey) {
-      return createNoStoreRedirect(fallbackUrl);
+      return createCachedRedirect(fallbackUrl, requestUrl);
+    }
+
+    const faviconVersion = settings?.updatedAt?.getTime() ?? 0;
+    const faviconEtag = `W/"favicon-${faviconVersion}-${encodeURIComponent(storageKey)}"`;
+    const ifNoneMatch = request.headers.get("if-none-match");
+    if (ifNoneMatch?.split(",").some((token) => token.trim() === faviconEtag)) {
+      return new NextResponse(null, {
+        status: 304,
+        headers: {
+          "cache-control": cacheControl,
+          etag: faviconEtag,
+        },
+      });
     }
 
     const storage = getStorageAdapterFromEnv();
@@ -69,14 +94,15 @@ export async function GET(request: Request) {
     const body = object.Body as BodyWithWebStream | undefined;
     const webStream = body?.transformToWebStream?.();
     if (!webStream) {
-      return createNoStoreRedirect(fallbackUrl);
+      return createCachedRedirect(fallbackUrl, requestUrl);
     }
 
     const response = new NextResponse(webStream, {
       status: 200,
       headers: {
         "content-type": object.ContentType ?? "image/png",
-        "cache-control": "no-store, max-age=0, must-revalidate",
+        "cache-control": cacheControl,
+        etag: faviconEtag,
       },
     });
 
@@ -86,6 +112,6 @@ export async function GET(request: Request) {
 
     return response;
   } catch {
-    return createNoStoreRedirect(fallbackUrl);
+    return createCachedRedirect(fallbackUrl, requestUrl);
   }
 }

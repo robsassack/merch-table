@@ -44,6 +44,10 @@ export async function handleReleasePatchAction(input: {
   const { request, releaseId, organizationId } = input;
   const releaseDateSupported = prismaReleaseSupportsField(prisma, "releaseDate");
   const deliveryFormatsSupported = prismaReleaseSupportsField(prisma, "deliveryFormats");
+  const artworkPaletteJsonSupported = prismaReleaseSupportsField(
+    prisma,
+    "artworkPaletteJson",
+  );
 
   const releaseSelect = resolveReleaseSelect({
     releaseDateSupported,
@@ -88,6 +92,7 @@ export async function handleReleasePatchAction(input: {
         minimumPriceFloorCents,
         releaseDateSupported,
         deliveryFormatsSupported,
+        artworkPaletteJsonSupported,
         releaseSelect,
       });
     }

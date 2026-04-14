@@ -22,6 +22,7 @@ const adminReleaseSelectSharedBase = {
   slug: true,
   description: true,
   coverImageUrl: true,
+  artworkPaletteJson: true,
   pricingMode: true,
   fixedPriceCents: true,
   minimumPriceCents: true,
@@ -104,6 +105,7 @@ export type AdminReleaseRecord = {
   slug: string;
   description: string | null;
   coverImageUrl: string | null;
+  artworkPaletteJson: string | null;
   pricingMode: "FREE" | "FIXED" | "PWYW";
   fixedPriceCents: number | null;
   minimumPriceCents: number | null;
@@ -258,6 +260,11 @@ export function toAdminReleaseRecord(release: AdminReleaseAnyRow): AdminReleaseR
     slug: release.slug,
     description: release.description,
     coverImageUrl: release.coverImageUrl,
+    artworkPaletteJson:
+      "artworkPaletteJson" in release &&
+      typeof release.artworkPaletteJson === "string"
+        ? release.artworkPaletteJson
+        : null,
     pricingMode: release.pricingMode,
     fixedPriceCents: release.fixedPriceCents,
     minimumPriceCents: release.minimumPriceCents,
