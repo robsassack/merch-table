@@ -13,7 +13,7 @@ services:
       PORT: 3000
       NEXT_TELEMETRY_DISABLED: 1
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
-      REDIS_URL: ${DOCKER_REDIS_URL:-redis://localhost:6379}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://:${REDIS_PASSWORD:-change-me-redis-password}@localhost:6379}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       AUTH_SECRET: ${AUTH_SECRET:-dev-insecure-auth-secret-change-me}
       APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-0123456789abcdef0123456789abcdef}
@@ -69,7 +69,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
-      REDIS_URL: ${DOCKER_REDIS_URL:-redis://localhost:6379}
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://:${REDIS_PASSWORD:-change-me-redis-password}@localhost:6379}
       STORAGE_MODE: ${STORAGE_MODE:-GARAGE}
       STORAGE_ENDPOINT: ${DOCKER_STORAGE_ENDPOINT:-http://localhost:3900}
       STORAGE_BUCKET: ${STORAGE_BUCKET:-media}
@@ -111,13 +111,13 @@ services:
     image: redis:7-alpine
     container_name: merchtable-redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:-change-me-redis-password}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-change-me-redis-password}", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5

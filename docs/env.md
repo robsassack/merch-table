@@ -71,7 +71,8 @@ These should be explicitly set for real deployments:
 
 ## Worker Runtime And Transcode
 
-- `REDIS_URL` (default: `redis://localhost:6379`): Redis for queue + distributed rate limiting.
+- `REDIS_PASSWORD` (default: `change-me-redis-password`): Redis auth password used by local/dev compose defaults.
+- `REDIS_URL` (default: `redis://:${REDIS_PASSWORD}@localhost:6379`): Redis for queue + distributed rate limiting.
 - `CDN_BASE_URL` (default: empty): optional CDN origin/base URL used for media URL resolution.
 - `TRANSCODE_CONCURRENCY` (default: `1`): number of concurrent worker loops.
 - `TRANSCODE_QUEUE_KEY` (default: `merch-table:transcode:queue`): Redis list key for transcode messages.

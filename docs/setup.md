@@ -123,6 +123,7 @@ docker compose exec -T garage /garage -c /etc/garage.toml layout apply --version
 - `APP_BASE_URL` (set this to your public app URL, for example `https://store.example.com`)
 - `AUTH_SECRET` (generate one with `openssl rand -base64 32`)
 - `APP_ENCRYPTION_KEY` (generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`)
+- `REDIS_PASSWORD` (generate one with `openssl rand -hex 32`)
 
 Production note:
 
@@ -141,6 +142,7 @@ Example command block:
 ```bash
 AUTH_SECRET_VALUE="$(openssl rand -base64 32 | tr -d '\n')"
 APP_ENCRYPTION_KEY_VALUE="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
+REDIS_PASSWORD_VALUE="$(openssl rand -hex 32)"
 DATABASE_URL_VALUE="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
 APP_BASE_URL_VALUE="https://store.example.com"
 DOCKER_STORAGE_ENDPOINT_VALUE="https://store.example.com"
@@ -155,6 +157,7 @@ sed -i \
   -e "s|^RESEND_FROM_EMAIL=.*|RESEND_FROM_EMAIL=\"$RESEND_FROM_EMAIL_VALUE\"|" \
   -e "s|^AUTH_SECRET=.*|AUTH_SECRET=\"$AUTH_SECRET_VALUE\"|" \
   -e "s|^APP_ENCRYPTION_KEY=.*|APP_ENCRYPTION_KEY=\"$APP_ENCRYPTION_KEY_VALUE\"|" \
+  -e "s|^REDIS_PASSWORD=.*|REDIS_PASSWORD=\"$REDIS_PASSWORD_VALUE\"|" \
   .env
 ```
 
