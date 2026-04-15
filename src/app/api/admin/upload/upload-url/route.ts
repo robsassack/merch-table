@@ -11,9 +11,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { requireAdminRequestContext } from "@/lib/admin/request-context";
-import { adminRateLimitPolicies } from "@/lib/security/admin-policies";
 import { enforceCsrfProtection } from "@/lib/security/csrf";
-import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { getStorageAdapterFromEnv } from "@/lib/storage/adapter";
 import { ensureGarageBucketCors } from "@/lib/storage/cors";
 import {
@@ -108,17 +106,6 @@ export async function POST(request: Request) {
   const auth = await requireAdminRequestContext();
   if (!auth.ok) {
     return auth.response;
-  }
-
-  const sessionScopedRateLimitError = await enforceRateLimit(
-    request,
-    adminRateLimitPolicies.uploadUrl,
-    {
-      key: `admin-session:${auth.context.session.userId}:${auth.context.session.expiresAt}`,
-    },
-  );
-  if (sessionScopedRateLimitError) {
-    return sessionScopedRateLimitError;
   }
 
   try {
