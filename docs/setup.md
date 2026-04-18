@@ -10,6 +10,7 @@
 ## Quickstart (Docker-First)
 
 This is the recommended path for first boot and demos.
+For upgrading an existing deployment from git, see [`docs/backup-and-migration.md`](./backup-and-migration.md) section "Upgrading (Images Or Source) With Rollback" (`git pull` plus `docker compose up -d --build`).
 
 1. Copy env file:
 
