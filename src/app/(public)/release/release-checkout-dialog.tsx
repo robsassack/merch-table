@@ -124,8 +124,8 @@ export default function ReleaseCheckoutDialog({
           {demoModeEnabled ? (
             <div className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
               Demo mode is enabled. Stripe Checkout runs in test mode and will not
-              create real charges. To checkout, use card number "4242 4242 4242
-              4242". Any expiration date and CVC is permitted.
+              create real charges. To checkout, use card number &quot;4242 4242 4242
+              4242&quot;. Any expiration date and CVC is permitted.
             </div>
           ) : null}
 

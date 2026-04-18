@@ -167,6 +167,8 @@ Because object keys are unchanged, rollback is config-only if Garage data remain
 Use this section for routine upgrades of this repository's default Docker Compose setup.
 By default, `web` and `worker` are built from local Dockerfiles, so routine upgrades are
 source-code updates (`git pull`) followed by rebuild/restart.
+Important: `git pull` alone does not deploy new app code to running containers; run
+`docker compose up -d --build` after pulling.
 
 ### Pre-upgrade snapshot checklist
 
