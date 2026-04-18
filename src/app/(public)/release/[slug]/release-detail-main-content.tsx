@@ -14,6 +14,7 @@ import {
   formatTotalDuration,
   resolveInitials,
 } from "@/app/(public)/release/release-detail-page-utils";
+import { isDemoModeEnabled } from "@/lib/env/demo-mode";
 import { IMAGE_BLUR_DATA_URL } from "@/lib/ui/image-blur";
 
 const spaceMonoFontFamily = 'var(--font-space-mono), "Space Mono", monospace';
@@ -75,6 +76,8 @@ export default function ReleaseDetailMainContent({
   artistImageUrl,
   hasOwnedReleaseHint,
 }: ReleaseDetailMainContentProps) {
+  const demoModeEnabled = isDemoModeEnabled();
+
   return (
     <main
       id="main-content"
@@ -136,6 +139,7 @@ export default function ReleaseDetailMainContent({
                 initialMayOwnRelease={hasOwnedReleaseHint}
                 hasDownloadableTracks={downloadableSourceAssetCount > 0}
                 hasOnlyLossyDownloads={downloadableSourceAssetCount > 0 && release.isLossyOnly}
+                demoModeEnabled={demoModeEnabled}
               />
             </div>
           </div>

@@ -35,6 +35,7 @@ These should be explicitly set for real deployments:
 - `AUTH_SECRET` (no safe default): Auth/session secret.
 - `APP_ENCRYPTION_KEY` (no safe default): key used for app-level encryption at rest.
 - `APP_BASE_URL` (default: `http://localhost:3000`): absolute base URL for generated links.
+- `DEMO_MODE` (default: `false`): enables demo-mode UI messaging on public pages and checkout dialogs.
 - `STORE_ORG_SLUG` (default: `main-store`): fallback organization slug for single-org bootstrapping.
 - `EMAIL_PROVIDER` (default: `resend`): active email provider (`resend` or `mock`).
 - `RESEND_API_KEY` (default: empty): Resend API key.

@@ -19,6 +19,7 @@ type ReleaseCheckoutDialogProps = {
   confirmAlreadyOwned: boolean;
   hasDownloadableTracks: boolean;
   hasOnlyLossyDownloads: boolean;
+  demoModeEnabled: boolean;
   checkoutErrorId: string;
   alreadyOwnedWarningId: string;
   checkoutEmailHintId: string;
@@ -49,6 +50,7 @@ export default function ReleaseCheckoutDialog({
   confirmAlreadyOwned,
   hasDownloadableTracks,
   hasOnlyLossyDownloads,
+  demoModeEnabled,
   checkoutErrorId,
   alreadyOwnedWarningId,
   checkoutEmailHintId,
@@ -117,6 +119,13 @@ export default function ReleaseCheckoutDialog({
           {hasDownloadableTracks && hasOnlyLossyDownloads ? (
             <div className="rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
               Only lossy downloads are currently available for this release.
+            </div>
+          ) : null}
+          {demoModeEnabled ? (
+            <div className="rounded-xl border border-sky-300 bg-sky-50 px-3 py-2 text-sm text-sky-900">
+              Demo mode is enabled. Stripe Checkout runs in test mode and will not
+              create real charges. To checkout, use card number "4242 4242 4242
+              4242". Any expiration date and CVC is permitted.
             </div>
           ) : null}
 

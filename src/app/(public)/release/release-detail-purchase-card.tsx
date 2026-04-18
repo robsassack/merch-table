@@ -29,6 +29,7 @@ type ReleaseDetailPurchaseCardProps = {
   initialMayOwnRelease?: boolean;
   hasDownloadableTracks: boolean;
   hasOnlyLossyDownloads: boolean;
+  demoModeEnabled?: boolean;
 };
 
 type ToastState = {
@@ -51,6 +52,7 @@ export default function ReleaseDetailPurchaseCard({
   initialMayOwnRelease = false,
   hasDownloadableTracks,
   hasOnlyLossyDownloads,
+  demoModeEnabled = false,
 }: ReleaseDetailPurchaseCardProps) {
   const primaryActionStyle = {
     backgroundColor: "var(--release-accent, rgb(51 65 85))",
@@ -429,6 +431,7 @@ export default function ReleaseDetailPurchaseCard({
         confirmAlreadyOwned={confirmAlreadyOwned}
         hasDownloadableTracks={hasDownloadableTracks}
         hasOnlyLossyDownloads={hasOnlyLossyDownloads}
+        demoModeEnabled={demoModeEnabled}
         checkoutErrorId={checkoutErrorId}
         alreadyOwnedWarningId={alreadyOwnedWarningId}
         checkoutEmailHintId={checkoutEmailHintId}
