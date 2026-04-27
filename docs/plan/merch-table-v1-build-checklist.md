@@ -400,7 +400,7 @@ Ordered so each phase produces something testable before the next begins. Check 
 
 ### Test data
 
-- [ ] Add deterministic test seed generation (`npm run seed:test`) that creates representative fixtures (free/fixed/PWYW releases, tracks/assets, orders, and library tokens) for local, integration, and E2E testing
+- [x] Add deterministic test seed generation (`npm run seed:test`) that creates representative fixtures (free/fixed/PWYW releases, tracks/assets, orders, and library tokens) for local, integration, and E2E testing
 
 ### Unit tests
 

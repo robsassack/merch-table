@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
+    "seed:test": "node --env-file=.env.test --import tsx scripts/seed-test.ts",
     "audit:currency": "node --env-file=.env --import tsx scripts/audit-currency-minor-units.ts",
     "audit:currency:fix-sql": "node --env-file=.env --import tsx scripts/generate-currency-fix-sql.ts",
     "infra:garage:bootstrap": "bash ./scripts/bootstrap-garage.sh",
