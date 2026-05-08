@@ -32,10 +32,11 @@
 
 - Use `localhost` in `.env` when running the Next.js app directly on your host machine.
 - Use Docker service names when one container talks to another (for example `postgres`, `redis`, `garage` instead of `localhost`).
+- The bundled Compose setup currently runs `web` and `worker` with host networking, so those containers also use `localhost` to reach host-published Postgres, Redis, and Garage ports.
 
 Compose networking reference:
 - Keep host-run app values like `DATABASE_URL=...localhost...` and `REDIS_URL=...localhost...` for `npm run dev`.
-- Containers use service-name URLs by default (`postgres`, `redis`, `garage`) via `DOCKER_DATABASE_URL`, `DOCKER_REDIS_URL`, and `DOCKER_STORAGE_ENDPOINT`.
+- Use `DOCKER_DATABASE_URL`, `DOCKER_REDIS_URL`, and `DOCKER_STORAGE_ENDPOINT` only when you intentionally need Docker runtime values that differ from the host-run values.
 
 ## Hosted Same-Domain Uploads (Caddy)
 

@@ -135,7 +135,7 @@ In `.env`, set:
 - `STORAGE_USE_PATH_STYLE="false"` (or `true` if your provider requires it)
 - `STORAGE_ENDPOINT="<external-endpoint>"` (required for most S3-compatible providers; optional for AWS S3)
 
-If running with Docker Compose service-name overrides, also set:
+If Docker Compose needs a runtime storage endpoint different from `STORAGE_ENDPOINT`, also set:
 
 - `DOCKER_STORAGE_ENDPOINT="<external-endpoint>"` (or leave unset for AWS S3)
 
@@ -349,7 +349,7 @@ Impact of rotation:
 docker compose exec -T postgres psql -U postgres -d postgres -c "ALTER USER postgres WITH PASSWORD '<new-password>';"
 ```
 
-3. Update `.env` `DATABASE_URL` with the same password.
+3. Update `.env` `DATABASE_URL` and `POSTGRES_PASSWORD` with the same password.
 4. Recreate app containers so runtime env is refreshed:
 
 ```bash
@@ -365,5 +365,5 @@ docker compose up -d --force-recreate web worker
 If auth fails after rotation:
 
 1. Set DB password back to previous value with `ALTER USER`.
-2. Restore prior `DATABASE_URL` in `.env`.
+2. Restore prior `DATABASE_URL` and `POSTGRES_PASSWORD` in `.env`.
 3. Recreate `web` and `worker` containers.

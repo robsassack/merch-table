@@ -16,6 +16,7 @@ This file is the canonical reference for runtime environment variables.
 These should be explicitly set for real deployments:
 
 - `DATABASE_URL`: Postgres connection string.
+- `POSTGRES_PASSWORD`: Password for the Docker Postgres `postgres` role; must match the password in `DATABASE_URL` when using bundled Docker Postgres.
 - `AUTH_SECRET`: Better Auth signing secret.
 - `APP_ENCRYPTION_KEY`: 32-byte base64url key for encrypting stored setup secrets.
 - `APP_BASE_URL`: Public base URL used in links (for example magic-link emails).
@@ -31,7 +32,8 @@ These should be explicitly set for real deployments:
 
 ## Core App
 
-- `DATABASE_URL` (default: `postgresql://postgres:postgres@localhost:5432/merchtable?schema=public`): Prisma/Postgres connection URL.
+- `DATABASE_URL` (example: `postgresql://postgres:<password>@localhost:5432/merchtable?schema=public`): Prisma/Postgres connection URL. For bundled Docker Postgres, use the same password as `POSTGRES_PASSWORD`.
+- `POSTGRES_PASSWORD` (no safe default): password assigned to the bundled Docker Postgres `postgres` role. Generate a strong value and do not use `postgres`.
 - `AUTH_SECRET` (no safe default): Auth/session secret.
 - `APP_ENCRYPTION_KEY` (no safe default): key used for app-level encryption at rest.
 - `APP_BASE_URL` (default: `http://localhost:3000`): absolute base URL for generated links.
@@ -139,7 +141,7 @@ These should be explicitly set for real deployments:
 
 ## Docker Compose Overrides
 
-These are optional commented values in `.env.example` for container-to-container networking:
+These are optional commented values in `.env.example` for Docker runtime overrides:
 
 - `DOCKER_DATABASE_URL`
 - `DOCKER_REDIS_URL`

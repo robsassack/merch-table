@@ -121,6 +121,7 @@ docker compose exec -T garage /garage -c /etc/garage.toml layout apply --version
 
 5. Update at least these values in `.env`:
 - `DATABASE_URL`
+- `POSTGRES_PASSWORD`
 - `APP_BASE_URL` (set this to your public app URL, for example `https://store.example.com`)
 - `AUTH_SECRET` (generate one with `openssl rand -base64 32`)
 - `APP_ENCRYPTION_KEY` (generate one with `openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`)
@@ -129,6 +130,7 @@ docker compose exec -T garage /garage -c /etc/garage.toml layout apply --version
 Production note:
 
 - Do not keep the default Postgres password (`postgres`). Use a strong password and set it consistently in both Postgres and `DATABASE_URL`.
+- Do not expose Docker Postgres on public interfaces. In `docker-compose.yml`, keep the Postgres port bound to `127.0.0.1:5432:5432`.
 
 For hosted deployments, also review these URL/domain-related values:
 
@@ -144,7 +146,8 @@ Example command block:
 AUTH_SECRET_VALUE="$(openssl rand -base64 32 | tr -d '\n')"
 APP_ENCRYPTION_KEY_VALUE="$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '=\n')"
 REDIS_PASSWORD_VALUE="$(openssl rand -hex 32)"
-DATABASE_URL_VALUE="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+POSTGRES_PASSWORD_VALUE="$(openssl rand -hex 24)"
+DATABASE_URL_VALUE="postgresql://postgres:${POSTGRES_PASSWORD_VALUE}@localhost:5432/merchtable?schema=public"
 APP_BASE_URL_VALUE="https://store.example.com"
 DOCKER_STORAGE_ENDPOINT_VALUE="https://store.example.com"
 STORAGE_PUBLIC_BASE_URL_VALUE="https://store.example.com/media"
@@ -152,6 +155,7 @@ RESEND_FROM_EMAIL_VALUE="no-reply@example.com"
 
 sed -i \
   -e "s|^DATABASE_URL=.*|DATABASE_URL=\"$DATABASE_URL_VALUE\"|" \
+  -e "s|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=\"$POSTGRES_PASSWORD_VALUE\"|" \
   -e "s|^APP_BASE_URL=.*|APP_BASE_URL=\"$APP_BASE_URL_VALUE\"|" \
   -e "s|^DOCKER_STORAGE_ENDPOINT=.*|DOCKER_STORAGE_ENDPOINT=\"$DOCKER_STORAGE_ENDPOINT_VALUE\"|" \
   -e "s|^STORAGE_PUBLIC_BASE_URL=.*|STORAGE_PUBLIC_BASE_URL=\"$STORAGE_PUBLIC_BASE_URL_VALUE\"|" \
@@ -239,7 +243,15 @@ Open `http://localhost:3000`.
 Use this URL in `.env`:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+DATABASE_URL="postgresql://postgres:<POSTGRES_PASSWORD>@localhost:5432/merchtable?schema=public"
+POSTGRES_PASSWORD="<POSTGRES_PASSWORD>"
+```
+
+Keep Docker Postgres bound to localhost only:
+
+```yaml
+ports:
+  - "127.0.0.1:5432:5432"
 ```
 
 ### Local Postgres (optional)
@@ -253,7 +265,7 @@ CREATE DATABASE merchtable;
 2. Ensure `.env` points at your local database:
 
 ```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/merchtable?schema=public"
+DATABASE_URL="postgresql://postgres:<password>@localhost:5432/merchtable?schema=public"
 ```
 
 ## Apply Prisma Migrations

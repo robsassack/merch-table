@@ -12,7 +12,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       NEXT_TELEMETRY_DISABLED: 1
-      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL:?Set DATABASE_URL in .env}}
       REDIS_URL: ${DOCKER_REDIS_URL:-redis://:${REDIS_PASSWORD:-change-me-redis-password}@localhost:6379}
       APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       DEMO_MODE: ${DEMO_MODE:-false}
@@ -69,7 +69,7 @@ services:
 
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DOCKER_DATABASE_URL:-postgresql://postgres:postgres@localhost:5432/merchtable?schema=public}
+      DATABASE_URL: ${DOCKER_DATABASE_URL:-${DATABASE_URL:?Set DATABASE_URL in .env}}
       REDIS_URL: ${DOCKER_REDIS_URL:-redis://:${REDIS_PASSWORD:-change-me-redis-password}@localhost:6379}
       STORAGE_MODE: ${STORAGE_MODE:-GARAGE}
       STORAGE_ENDPOINT: ${DOCKER_STORAGE_ENDPOINT:-http://localhost:3900}
@@ -95,10 +95,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: merchtable
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
